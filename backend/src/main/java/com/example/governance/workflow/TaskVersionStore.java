@@ -1,0 +1,56 @@
+package com.example.governance.workflow;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Optional;
+import java.util.Set;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/** Stores immutable snapshots; configuration validation for each task type is performed before execution. */
+public final class TaskVersionStore {
+    public record Version(long taskId, int version, String type, String configuration) {}
+    private final JdbcTemplate jdbc;
+    private final TransactionTemplate transaction;
+    private final ObjectMapper mapper = new ObjectMapper();
+    public TaskVersionStore(JdbcTemplate jdbc, PlatformTransactionManager manager) { this.jdbc = jdbc; this.transaction = new TransactionTemplate(manager); }
+    public long create(String name, String type, String configuration) {
+        if (name == null || name.isBlank() || name.length() > 160 || type == null || !Set.of("SQL", "SYNC").contains(type)) throw new IllegalArgumentException("Invalid task");
+        validate(configuration);
+        return transaction.execute(status -> {
+            var key = new GeneratedKeyHolder();
+            jdbc.update(connection -> {
+                var statement = connection.prepareStatement("INSERT INTO processing_tasks(name,task_type,current_version) VALUES (?,?,1)", new String[]{"id"});
+                statement.setString(1, name); statement.setString(2, type); return statement;
+            }, key);
+            Number id = key.getKey();
+            if (id == null) throw new IllegalStateException("Task ID was not generated");
+            jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (?,1,?)", id.longValue(), configuration);
+            return id.longValue();
+        });
+    }
+    public int addVersion(long taskId, String configuration) {
+        validate(configuration);
+        return transaction.execute(status -> {
+            var versions = jdbc.query("SELECT current_version FROM processing_tasks WHERE id=? FOR UPDATE", (rs, row) -> rs.getInt(1), taskId);
+            if (versions.isEmpty()) throw new IllegalArgumentException("Unknown task");
+            int next = Math.addExact(versions.getFirst(), 1);
+            jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (?,?,?)", taskId, next, configuration);
+            jdbc.update("UPDATE processing_tasks SET current_version=? WHERE id=?", next, taskId);
+            return next;
+        });
+    }
+    public record Task(long id, String name, String type, int version, String configuration) {}
+    public java.util.List<Task> list() {
+        return jdbc.query("SELECT t.id,t.name,t.task_type,t.current_version,v.configuration FROM processing_tasks t JOIN processing_task_versions v ON v.task_id=t.id AND v.version=t.current_version ORDER BY t.id", (rs, row) -> new Task(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4), rs.getString(5)));
+    }
+    public Optional<Version> findVersion(long taskId, int version) {
+        return jdbc.query("SELECT v.task_id,v.version,t.task_type,v.configuration FROM processing_task_versions v JOIN processing_tasks t ON t.id=v.task_id WHERE v.task_id=? AND v.version=?", (rs, row) -> new Version(rs.getLong(1), rs.getInt(2), rs.getString(3), rs.getString(4)), taskId, version).stream().findFirst();
+    }
+    private void validate(String configuration) {
+        if (configuration == null || configuration.length() > 100000) throw new IllegalArgumentException("Invalid task configuration");
+        try { if (!mapper.readTree(configuration).isObject()) throw new IllegalArgumentException("Task configuration must be a JSON object"); }
+        catch (java.io.IOException | NullPointerException ex) { throw new IllegalArgumentException("Invalid task configuration"); }
+    }
+}

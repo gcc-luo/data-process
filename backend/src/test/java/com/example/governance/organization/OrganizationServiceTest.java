@@ -1,0 +1,32 @@
+package com.example.governance.organization;
+
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import java.util.Set;
+import java.util.UUID;
+import static org.junit.jupiter.api.Assertions.*;
+
+class OrganizationServiceTest {
+    @Test void createsOrganizationAndRejectsInvalidHierarchyAndPermission() {
+        var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
+        Flyway.configure().dataSource(db).load().migrate();
+        var jdbc = new JdbcTemplate(db);
+        var org = new OrganizationService(jdbc, new DataSourceTransactionManager(db), new BCryptPasswordEncoder());
+        long root = org.createDepartment("总部", null), child = org.createDepartment("销售部", root);
+        assertNull(org.snapshot().departments().getFirst().parentId());
+        assertEquals(root, org.snapshot().departments().get(1).parentId());
+        assertThrows(IllegalArgumentException.class, () -> org.moveDepartment(root, child));
+        long role = org.createRole("分析员");
+        org.setPermissions(role, Set.of("dataset.read"));
+        assertThrows(IllegalArgumentException.class, () -> org.setPermissions(role, Set.of("unknown.permission")));
+        long user = org.createUser("alice", "very-long-password", child);
+        org.setRoles(user, Set.of(role));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM user_roles WHERE user_id=? AND role_id=?", Integer.class, user, role));
+        assertNotEquals("very-long-password", jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?", String.class, user));
+        assertNotNull(jdbc.queryForObject("SELECT security_version FROM users WHERE id=?", String.class, user));
+    }
+}
