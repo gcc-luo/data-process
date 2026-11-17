@@ -127,24 +127,9 @@ async function saveRole() {
   const ok = await mutate(id ? `/roles/${id}` : '/roles', body, id ? '角色信息已更新' : '角色已创建')
   if (ok) roleDialog.value = false
 }
-async function setDepartmentEnabled(item, enabled) {
-  const body = { name: item.name, parentId: item.parentId, sortOrder: item.sortOrder, leader: item.leader, phone: item.phone, email: item.email, enabled }
-  await mutate(`/departments/${item.id}`, body, enabled ? '部门已启用' : '部门已停用')
-}
-async function setRoleEnabled(item, enabled) {
-  const { id, permissions: ignoredPermissions, menuIds: ignoredMenus, ...body } = { ...item, enabled }
-  await mutate(`/roles/${id}`, body, enabled ? '角色已启用' : '角色已停用')
-}
-async function setMenuEnabled(item, enabled) {
-  const body = { name: item.name, parentId: item.parentId, menuType: item.menuType, sortOrder: item.sortOrder, routePath: item.routePath, component: item.component, permission: item.permission, icon: item.icon, visible: item.visible, enabled }
-  await mutate(`/menus/${item.id}`, body, enabled ? '菜单已启用' : '菜单已停用')
-}
 async function setMenuVisible(item, visible) {
   const body = { name: item.name, parentId: item.parentId, menuType: item.menuType, sortOrder: item.sortOrder, routePath: item.routePath, component: item.component, permission: item.permission, icon: item.icon, visible, enabled: item.enabled }
   await mutate(`/menus/${item.id}`, body, visible ? '菜单已设为显示' : '菜单已设为隐藏')
-}
-async function setUserEnabled(item, enabled) {
-  await mutate(`/users/${item.id}/enabled`, { enabled }, enabled ? '用户已启用' : '用户已停用')
 }
 function openPermissions(item) { permissionRole.value = item; selectedPermissions.value = [...item.permissions]; permissionDialog.value = true }
 async function savePermissions() {
@@ -247,7 +232,7 @@ onMounted(load)
         <el-table-column prop="leader" label="负责人" min-width="130"><template #default="scope">{{ scope.row.leader || '—' }}</template></el-table-column>
         <el-table-column prop="phone" label="联系电话" min-width="140"><template #default="scope">{{ scope.row.phone || '—' }}</template></el-table-column>
         <el-table-column prop="sortOrder" label="排序" width="90" />
-        <el-table-column label="状态" width="100"><template #default="scope"><el-switch :model-value="scope.row.enabled" active-text="启用" inactive-text="停用" @change="setDepartmentEnabled(scope.row, $event)" /></template></el-table-column>
+        <el-table-column label="状态" width="100"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
         <el-table-column label="操作" width="190" fixed="right"><template #default="scope"><el-button link type="primary" @click="openDepartment(scope.row)">修改</el-button><el-button link type="danger" @click="confirmDelete(`/departments/${scope.row.id}`, `部门「${scope.row.name}」`, '部门已删除')">删除</el-button></template></el-table-column>
       </el-table>
     </template>
@@ -262,7 +247,7 @@ onMounted(load)
         <el-table-column prop="name" label="角色名称" min-width="150" />
         <el-table-column prop="roleKey" label="权限字符" min-width="170" />
         <el-table-column prop="sortOrder" label="排序" width="85" />
-        <el-table-column label="状态" width="95"><template #default="scope"><el-switch :model-value="scope.row.enabled" @change="setRoleEnabled(scope.row, $event)" /></template></el-table-column>
+        <el-table-column label="状态" width="95"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
         <el-table-column label="功能权限" min-width="230"><template #default="scope">{{ permissionLabels(scope.row.permissions) }}</template></el-table-column>
         <el-table-column label="菜单授权" min-width="180"><template #default="scope">{{ scope.row.menuIds.length }} 项菜单</template></el-table-column>
         <el-table-column label="操作" min-width="280" fixed="right"><template #default="scope"><el-button link type="primary" @click="openRole(scope.row)">修改</el-button><el-button link type="primary" @click="openPermissions(scope.row)">功能权限</el-button><el-button link type="primary" @click="openRoleMenus(scope.row)">菜单授权</el-button><el-button link type="danger" @click="confirmDelete(`/roles/${scope.row.id}`, `角色「${scope.row.name}」`, '角色已删除')">删除</el-button></template></el-table-column>
@@ -283,7 +268,7 @@ onMounted(load)
         <el-table-column label="所属部门" min-width="150"><template #default="scope">{{ departmentName(data.departments, scope.row.departmentId) }}</template></el-table-column>
         <el-table-column prop="phone" label="手机号码" min-width="140"><template #default="scope">{{ scope.row.phone || '—' }}</template></el-table-column>
         <el-table-column label="角色" min-width="180"><template #default="scope">{{ roleLabels(scope.row.roles) }}</template></el-table-column>
-        <el-table-column label="状态" width="95"><template #default="scope"><el-switch :model-value="scope.row.enabled" :disabled="scope.row.id === 1" @change="setUserEnabled(scope.row, $event)" /></template></el-table-column>
+        <el-table-column label="状态" width="95"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
         <el-table-column label="操作" min-width="250" fixed="right"><template #default="scope"><el-button link type="primary" @click="openUser(scope.row)">修改</el-button><el-button link @click="setPassword(scope.row)">重置密码</el-button><el-button link type="danger" @click="confirmDelete(`/users/${scope.row.id}`, `用户「${scope.row.username}」`, '用户已删除')">删除</el-button></template></el-table-column>
       </el-table>
       <el-pagination v-model:current-page="pages.users" class="pagination" layout="total, prev, pager, next" :page-size="pageSize" :total="filtered.users.length" />
@@ -303,7 +288,7 @@ onMounted(load)
         <el-table-column prop="permission" label="权限标识" min-width="180"><template #default="scope">{{ scope.row.permission || '—' }}</template></el-table-column>
         <el-table-column prop="sortOrder" label="排序" width="85" />
         <el-table-column label="显示" width="100"><template #default="scope"><el-switch :model-value="scope.row.visible" :disabled="scope.row.id === 9 || scope.row.id === 94" @change="setMenuVisible(scope.row, $event)" /></template></el-table-column>
-        <el-table-column label="状态" width="90"><template #default="scope"><el-switch :model-value="scope.row.enabled" :disabled="scope.row.id === 9 || scope.row.id === 94" @change="setMenuEnabled(scope.row, $event)" /></template></el-table-column>
+        <el-table-column label="状态" width="90"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
         <el-table-column label="操作" width="150" fixed="right"><template #default="scope"><el-button link type="primary" @click="openMenu(scope.row)">修改</el-button><el-button link type="danger" :disabled="scope.row.id === 94" @click="confirmDelete(`/menus/${scope.row.id}`, `菜单「${scope.row.name}」`, '菜单已删除')">删除</el-button></template></el-table-column>
       </el-table>
     </template>
@@ -364,7 +349,7 @@ onMounted(load)
       <el-form :model="userForm" label-position="top" class="form-grid">
         <el-form-item label="用户账号" required><el-input v-model="userForm.username" autocomplete="off" maxlength="160" /></el-form-item>
         <el-form-item label="用户姓名"><el-input v-model="userForm.nickname" maxlength="160" /></el-form-item>
-        <el-form-item v-if="!userForm.id" label="初始密码（至少 12 字符）" required><el-input v-model="userForm.password" type="password" show-password autocomplete="new-password" /></el-form-item>
+        <el-form-item v-if="!userForm.id" label="初始密码" required><el-input v-model="userForm.password" type="password" show-password autocomplete="new-password" /></el-form-item>
         <el-form-item label="所属部门" required><el-select v-model="userForm.departmentId" placeholder="请选择部门"><el-option v-for="item in data.departments" :key="item.id" :label="item.name" :value="item.id" :disabled="!item.enabled && item.id !== userForm.departmentId" /></el-select></el-form-item>
         <el-form-item label="手机号码"><el-input v-model="userForm.phone" maxlength="48" /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="userForm.email" maxlength="160" /></el-form-item>
@@ -392,7 +377,7 @@ onMounted(load)
 
     <el-dialog v-model="passwordDialog" title="重置密码" width="min(460px, 95vw)" @closed="newPassword = ''">
       <p class="dialog-hint">为 {{ passwordTarget?.username }} 设置新密码，原有会话将失效。</p>
-      <el-input v-model="newPassword" type="password" show-password autocomplete="new-password" placeholder="至少 12 字符" />
+      <el-input v-model="newPassword" type="password" show-password autocomplete="new-password" placeholder="请输入新密码" />
       <template #footer><el-button @click="passwordDialog = false">取消</el-button><el-button type="primary" @click="resetPassword">重置密码</el-button></template>
     </el-dialog>
   </section>

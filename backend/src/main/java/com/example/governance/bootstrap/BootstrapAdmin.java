@@ -21,8 +21,8 @@ public class BootstrapAdmin {
     }
 
     public void create(String username, String password) {
-        if (username == null || username.isBlank() || username.length() > 160 || !username.equals(username.trim()) || password == null || password.length() < 12 || password.isBlank() || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
-            throw new IllegalArgumentException("Username and a password of at least 12 characters are required");
+        if (username == null || username.isBlank() || username.length() > 160 || !username.equals(username.trim()) || password == null || password.isBlank() || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
+            throw new IllegalArgumentException("Username and a non-empty password of at most 72 bytes are required");
         String hash = encoder.encode(password);
         transaction.executeWithoutResult(status -> {
             jdbc.queryForObject("SELECT setting_value FROM platform_settings WHERE setting_key=? FOR UPDATE", String.class, "internal.bootstrap.lock");

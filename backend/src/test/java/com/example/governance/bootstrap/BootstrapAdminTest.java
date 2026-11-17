@@ -17,7 +17,7 @@ class BootstrapAdminTest {
     @Autowired PasswordEncoder encoder;
 
     @BeforeEach void clean() {
-        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions");
+        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions"); jdbc.update("DELETE FROM role_menus");
         jdbc.update("DELETE FROM users"); jdbc.update("DELETE FROM roles"); jdbc.update("DELETE FROM departments");
     }
     @Test void initializesOnceWithHashedPasswordAndExplicitPermission() {
@@ -32,8 +32,12 @@ class BootstrapAdminTest {
     }
     @Test void rejectsWeakOrBlankInputWithoutWriting() {
         assertThrows(IllegalArgumentException.class, () -> bootstrap.create(" ", "long-unique-password"));
-        assertThrows(IllegalArgumentException.class, () -> bootstrap.create("admin", "short"));
+        assertThrows(IllegalArgumentException.class, () -> bootstrap.create("admin", " "));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class));
+    }
+    @Test void acceptsShortAdministratorPassword() {
+        bootstrap.create("admin", "admin");
+        assertTrue(encoder.matches("admin", jdbc.queryForObject("SELECT password_hash FROM users WHERE username='admin'", String.class)));
     }
     @Test void onlyOneConcurrentInitializationCanSucceed() throws Exception {
         var pool=Executors.newFixedThreadPool(2);

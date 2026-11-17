@@ -16,7 +16,7 @@ public final class BootstrapCommand {
         String user = requiredEnv("GOVERNANCE_DB_USER");
         String dbPassword = requiredEnv("GOVERNANCE_DB_PASSWORD");
         String username = console.readLine("Administrator username: ");
-        char[] password = console.readPassword("Administrator password (at least 12 characters): ");
+        char[] password = console.readPassword("Administrator password: ");
         char[] confirmation = console.readPassword("Confirm password: ");
         try {
             if (password == null || confirmation == null || !Arrays.equals(password, confirmation)) throw new IllegalArgumentException("Passwords do not match");

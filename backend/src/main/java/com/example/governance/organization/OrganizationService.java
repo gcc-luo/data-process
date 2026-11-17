@@ -337,7 +337,7 @@ public class OrganizationService {
     private void checkRoleKey(String value) { if (value == null || !value.trim().matches("[A-Za-z][A-Za-z0-9_.-]{1,159}")) throw new IllegalArgumentException("Invalid role key"); }
     private void checkOrder(int value) { if (value < 0 || value > 100000) throw new IllegalArgumentException("Invalid sort order"); }
     private void checkOptional(String value, int maxLength, String field) { if (value != null && (value.length() > maxLength || value.indexOf('\0') >= 0)) throw new IllegalArgumentException("Invalid " + field); }
-    private void checkPassword(String password) { if (password == null || password.length() < 12 || password.isBlank() || password.getBytes(StandardCharsets.UTF_8).length > 72) throw new IllegalArgumentException("Password must contain at least 12 characters"); }
+    private void checkPassword(String password) { if (password == null || password.isBlank() || password.getBytes(StandardCharsets.UTF_8).length > 72) throw new IllegalArgumentException("Password is required and must not exceed 72 bytes"); }
     private void validateRoleIds(Set<Long> roles) { if (roles == null || roles.size() > 100 || roles.stream().anyMatch(java.util.Objects::isNull)) throw new IllegalArgumentException("Invalid roles"); }
     private void replaceUserRoles(long userId, Set<Long> roles) { jdbc.update("DELETE FROM user_roles WHERE user_id=?", userId); roles.forEach(role -> jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (?,?)", userId, role)); }
     private void lock() { jdbc.queryForObject("SELECT setting_value FROM platform_settings WHERE setting_key='internal.organization.lock' FOR UPDATE", String.class); }

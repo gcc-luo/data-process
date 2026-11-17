@@ -22,7 +22,7 @@ class DatabaseLoginTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired AccountCredentials credentials;
     @BeforeEach void setup() {
-        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions"); jdbc.update("DELETE FROM roles"); jdbc.update("DELETE FROM users"); jdbc.update("DELETE FROM departments");
+        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions"); jdbc.update("DELETE FROM role_menus"); jdbc.update("DELETE FROM roles"); jdbc.update("DELETE FROM users"); jdbc.update("DELETE FROM departments");
         jdbc.update("INSERT INTO departments(id,name) VALUES(101,'test')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES(101,'alice',?,101,TRUE,'37b13c71-5d65-46b7-9ce5-564df7822742')", new BCryptPasswordEncoder().encode("correct-password"));
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES(102,'disabled',?,101,FALSE,'d1ee1c52-1210-4c81-a723-20c0615bbf4a')", new BCryptPasswordEncoder().encode("correct-password"));
@@ -58,8 +58,9 @@ class DatabaseLoginTest {
     @Test void securityVersionChangeRevokesExistingSessionEvenIfIdIsReused() throws Exception {
         var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","correct-password"))
                 .andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
-        credentials.resetPassword(101, "a-new-password");
+        credentials.resetPassword(101, "admin");
         mvc.perform(get("/api/session").session(session)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","admin")).andExpect(status().isNoContent());
     }
     @Test void recreatedAccountWithSameIdCannotReuseOldSession() throws Exception {
         var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","correct-password"))

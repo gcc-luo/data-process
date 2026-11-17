@@ -29,4 +29,13 @@ class OrganizationServiceTest {
         assertNotEquals("very-long-password", jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?", String.class, user));
         assertNotNull(jdbc.queryForObject("SELECT security_version FROM users WHERE id=?", String.class, user));
     }
+    @Test void acceptsShortPasswordWhenCreatingUser() {
+        var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
+        Flyway.configure().dataSource(db).load().migrate();
+        var jdbc = new JdbcTemplate(db);
+        var org = new OrganizationService(jdbc, new DataSourceTransactionManager(db), new BCryptPasswordEncoder());
+        long department = org.createDepartment("测试部门", null);
+        long user = org.createUser("alice", "admin", department);
+        assertTrue(new BCryptPasswordEncoder().matches("admin", jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?", String.class, user)));
+    }
 }
