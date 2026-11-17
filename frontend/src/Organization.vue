@@ -33,6 +33,8 @@ const permissionRole = ref(null)
 const selectedPermissions = ref([])
 const menuRole = ref(null)
 const roleMenuTree = ref(null)
+const roleMenuSearch = ref('')
+const roleMenuSelectedCount = ref(0)
 const passwordTarget = ref(null)
 const newPassword = ref('')
 const departmentForm = ref({ id: null, name: '', parentId: null, sortOrder: 0, leader: '', phone: '', email: '', enabled: true })
@@ -137,13 +139,40 @@ async function savePermissions() {
 }
 async function openRoleMenus(item) {
   menuRole.value = item
+  roleMenuSearch.value = ''
   roleMenuDialog.value = true
   await nextTick()
   roleMenuTree.value?.setCheckedKeys(item.menuIds || [], false)
+  roleMenuTree.value?.filter('')
+  setRoleMenuExpanded(true)
+  updateRoleMenuSelection()
 }
 async function saveRoleMenus() {
   const menus = roleMenuTree.value?.getCheckedKeys(false) || []
   if (await mutate(`/roles/${menuRole.value.id}/menus`, { menus }, '角色菜单已更新')) roleMenuDialog.value = false
+}
+function updateRoleMenuSelection(_node, state) {
+  roleMenuSelectedCount.value = state?.checkedKeys?.length ?? roleMenuTree.value?.getCheckedKeys(false).length ?? 0
+}
+function filterRoleMenuNode(value, item) {
+  const query = String(value || '').trim().toLocaleLowerCase()
+  return !query || String(item.label || item.name || '').toLocaleLowerCase().includes(query)
+}
+function setRoleMenuExpanded(expanded) {
+  const visit = items => items.forEach(item => {
+    if (item.children?.length) {
+      const node = roleMenuTree.value?.getNode(item.id)
+      if (expanded) node?.expand()
+      else node?.collapse()
+      visit(item.children)
+    }
+  })
+  visit(roleMenuRows.value)
+}
+function toggleAllRoleMenus() {
+  const keys = roleMenuAllSelected.value ? [] : collectRoleMenuKeys(roleMenuRows.value)
+  roleMenuTree.value?.setCheckedKeys(keys, false)
+  updateRoleMenuSelection()
 }
 function openUser(item = null) {
   userForm.value = item ? { id: item.id, username: item.username, nickname: item.nickname || '', email: item.email || '', phone: item.phone || '', password: '', departmentId: item.departmentId, enabled: item.enabled, roles: [...item.roles] } : { id: null, username: '', nickname: '', email: '', phone: '', password: '', departmentId: data.value.departments[0]?.id ?? null, enabled: true, roles: [] }
@@ -176,7 +205,18 @@ function permissionLabels(ids) { return ids.map(id => permissions.find(([value])
 function menuTypeLabel(type) { return ({ D: '目录', M: '菜单', F: '按钮' })[type] || type }
 function menuName(id) { return data.value.menus.find(item => item.id === id)?.name ?? `菜单 ${id}` }
 function auditMenuTree(items, parentId = null) { return items.filter(item => item.parentId === parentId).map(item => ({ ...item, label: item.name, children: auditMenuTree(items, item.id) })) }
+function collectRoleMenuKeys(items) { return items.flatMap(item => [item.id, ...collectRoleMenuKeys(item.children || [])]) }
 const roleMenuRows = computed(() => auditMenuTree(data.value.menus))
+const roleMenuTotalCount = computed(() => collectRoleMenuKeys(roleMenuRows.value).length)
+const roleMenuAllSelected = computed(() => roleMenuTotalCount.value > 0 && roleMenuSelectedCount.value >= roleMenuTotalCount.value)
+const roleMenuSearchMatches = computed(() => {
+  const query = roleMenuSearch.value.trim().toLocaleLowerCase()
+  return !query || collectRoleMenuKeys(roleMenuRows.value).some(key => {
+    const item = data.value.menus.find(menu => menu.id === key)
+    return String(item?.name || '').toLocaleLowerCase().includes(query)
+  })
+})
+watch(roleMenuSearch, value => roleMenuTree.value?.filter(value))
 
 async function confirmDelete(path, label, success) {
   try {
@@ -339,10 +379,53 @@ onMounted(load)
       <template #footer><el-button @click="permissionDialog = false">取消</el-button><el-button type="primary" @click="savePermissions">保存权限</el-button></template>
     </el-dialog>
 
-    <el-dialog v-model="roleMenuDialog" title="配置角色菜单" width="min(560px, 95vw)">
-      <p class="dialog-hint">为角色「{{ menuRole?.name }}」配置可见菜单。要访问对应页面，还需在“功能权限”中授予相应后端权限。</p>
-      <el-tree ref="roleMenuTree" :data="roleMenuRows" node-key="id" show-checkbox default-expand-all :props="{ label: 'label', children: 'children' }" />
-      <template #footer><el-button @click="roleMenuDialog = false">取消</el-button><el-button type="primary" @click="saveRoleMenus">保存菜单</el-button></template>
+    <el-dialog v-model="roleMenuDialog" class="role-menu-dialog" width="min(820px, 95vw)" top="4vh" :close-on-click-modal="false">
+      <template #header="{ titleId, titleClass }">
+        <div class="role-menu-header">
+          <div class="role-menu-title-row">
+            <span class="role-menu-mark" aria-hidden="true">权</span>
+            <h2 :id="titleId" :class="titleClass">配置角色菜单</h2>
+            <span class="role-menu-role">{{ menuRole?.name }}</span>
+          </div>
+          <p>勾选角色可见的菜单；页面访问还需在“功能权限”中授予对应权限。</p>
+          <div class="role-menu-summary"><span class="role-menu-dot"></span><span>菜单访问范围</span><span class="role-menu-count"><strong>{{ roleMenuSelectedCount }}</strong> 项已选择</span></div>
+        </div>
+      </template>
+      <div class="role-menu-toolbar">
+        <el-input v-model="roleMenuSearch" class="role-menu-search" clearable placeholder="搜索菜单名称" aria-label="搜索菜单名称">
+          <template #prefix><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.7"/><path d="m13 13 4 4"/></svg></template>
+        </el-input>
+        <div class="role-menu-tools">
+          <el-button @click="setRoleMenuExpanded(true)">展开全部</el-button>
+          <el-button @click="setRoleMenuExpanded(false)">收起全部</el-button>
+          <el-button type="primary" plain @click="toggleAllRoleMenus">{{ roleMenuAllSelected ? '清空选择' : '全选' }}</el-button>
+        </div>
+      </div>
+      <div class="role-menu-tree-area">
+        <div class="role-menu-tree-card">
+          <div class="role-menu-tree-caption"><span>菜单目录</span><span>勾选后角色即可在侧边栏看到该菜单</span></div>
+          <div class="role-menu-tree-scroll">
+            <div v-if="!roleMenuSearchMatches" class="role-menu-empty">没有匹配的菜单</div>
+            <el-tree v-show="roleMenuSearchMatches" ref="roleMenuTree" :data="roleMenuRows" node-key="id" show-checkbox default-expand-all :expand-on-click-node="false" :filter-node-method="filterRoleMenuNode" :props="{ label: 'label', children: 'children' }" @check="updateRoleMenuSelection">
+              <template #default="{ data: menuItem, node }">
+                <div class="role-menu-node">
+                  <span class="role-menu-node-icon" aria-hidden="true">
+                    <svg v-if="menuItem.menuType === 'D'" viewBox="0 0 20 20"><path d="M2.5 5.5h6l1.5 2h7.5v8.8H2.5z"/><path d="M2.5 5.5V4h6l1.5 1.5"/></svg>
+                    <svg v-else-if="menuItem.menuType === 'F'" viewBox="0 0 20 20"><circle cx="7" cy="9" r="4"/><path d="m10 12 6 6m-2-2 2-2m-4 0 2-2"/></svg>
+                    <svg v-else viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h3"/></svg>
+                  </span>
+                  <span class="role-menu-node-label">{{ node.label }}</span>
+                  <span v-if="menuItem.children?.length" class="role-menu-child-count">{{ menuItem.children.length }} 个子菜单</span>
+                </div>
+              </template>
+            </el-tree>
+          </div>
+          <div class="role-menu-tree-note"><span class="role-menu-info" aria-hidden="true">i</span><span>菜单可见性与后端功能权限分别控制</span></div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="role-menu-footer"><span class="role-menu-footer-note"><span class="role-menu-dot"></span>当前已选择 <strong>{{ roleMenuSelectedCount }}</strong> 个菜单项</span><span class="role-menu-footer-actions"><el-button @click="roleMenuDialog = false">取消</el-button><el-button type="primary" @click="saveRoleMenus">保存菜单</el-button></span></div>
+      </template>
     </el-dialog>
 
     <el-dialog v-model="userDialog" :title="userForm.id ? '修改用户' : '新增用户'" width="min(680px, 95vw)" @closed="userForm.password = ''">
@@ -387,4 +470,15 @@ onMounted(load)
 .organization-page{min-width:0;color:#25364a}.notice{margin-bottom:12px}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.toolbar .el-input{width:min(340px,100%)}.toolbar .el-select{width:150px}.el-table{width:100%;background:#fff}.pagination{display:flex;justify-content:flex-end;margin:14px 0 0}.pane{padding:12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.audit-toolbar{margin:0 0 10px;padding:0;border:0}.audit-table{margin-top:10px}.menu-state-switch{margin-left:8px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.form-grid .el-form-item{margin-bottom:16px}.form-grid .full-row{grid-column:1/-1}.form-grid :deep(.el-select),.form-grid :deep(.el-tree-select){width:100%}.dialog-hint{margin:0 0 16px;color:#66788a}.check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}.pagination span{align-self:center;color:#556579}
 @media(min-width:1440px){.toolbar{gap:clamp(10px,.65vw,16px)}.toolbar .el-input{width:clamp(340px,23vw,480px)}.pane{padding:clamp(12px,.8vw,20px)}}
 @media(max-width:720px){.toolbar{flex-wrap:wrap}.toolbar .el-input{width:100%}.toolbar .el-select{flex:1;min-width:135px}.form-grid{grid-template-columns:1fr}.form-grid .full-row{grid-column:auto}.check-grid{grid-template-columns:1fr}}
+:global(.role-menu-dialog.el-dialog){display:flex;flex-direction:column;max-height:calc(100dvh - 48px);overflow:hidden;border:1px solid #dde6f0;border-radius:12px;box-shadow:0 22px 64px rgba(25,44,72,.2)}
+:global(.role-menu-dialog .el-dialog__header){flex:none;margin:0;padding:0;border-bottom:1px solid #edf1f6}
+:global(.role-menu-dialog .el-dialog__headerbtn){top:19px;right:20px;width:32px;height:32px;border-radius:7px;color:#8291a4}
+:global(.role-menu-dialog .el-dialog__headerbtn:hover){background:#f1f5fa;color:#3d536e}
+:global(.role-menu-dialog .el-dialog__body){display:flex;flex:1 1 auto;flex-direction:column;min-height:0;overflow:hidden;padding:0}
+:global(.role-menu-dialog .el-dialog__footer){flex:none;margin:0;padding:0;border-top:1px solid #e8edf3}
+.role-menu-header{padding:20px 26px 15px}.role-menu-title-row{display:flex;align-items:center;gap:11px;padding-right:34px}.role-menu-mark{width:34px;height:34px;display:grid;place-items:center;flex:none;border-radius:9px;background:#edf5ff;color:#347ccf;font-size:15px;font-weight:700}.role-menu-header h2{margin:0;color:#26384f;font-size:19px;font-weight:650;letter-spacing:.01em}.role-menu-role{max-width:190px;overflow:hidden;padding:5px 9px;border:1px solid #d8e7fa;border-radius:6px;background:#f5f9ff;color:#3975bd;font-size:12px;font-weight:600;text-overflow:ellipsis;white-space:nowrap}.role-menu-header>p{margin:9px 0 0 45px;color:#718198;font-size:12px;line-height:1.5}.role-menu-summary{display:flex;align-items:center;gap:8px;margin:13px 0 0 45px;color:#77879c;font-size:12px}.role-menu-dot{width:6px;height:6px;flex:none;border-radius:50%;background:#438ce8}.role-menu-count{display:inline-flex;align-items:center;gap:5px;margin-left:auto;padding:5px 9px;border-radius:6px;background:#eef5ff;color:#347bc9;font-weight:600}.role-menu-count strong{font-size:13px}
+.role-menu-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 26px;border-bottom:1px solid #edf1f6;background:#fbfcfe}.role-menu-search{width:min(360px,45%)}.role-menu-search :deep(.el-input__wrapper){min-height:36px;border:1px solid #dfe6ef;border-radius:7px;background:#fff;box-shadow:none}.role-menu-search :deep(.el-input__wrapper.is-focus){border-color:#86b6ef;box-shadow:0 0 0 2px rgba(67,140,232,.1)}.role-menu-search :deep(.el-input__prefix-inner svg){width:15px;height:15px;fill:none;stroke:#8494a8;stroke-width:1.7}.role-menu-tools{display:flex;align-items:center;gap:7px}.role-menu-tools :deep(.el-button){height:34px;margin:0;padding:0 10px;border-radius:6px;font-size:12px}
+.role-menu-tree-area{display:flex;flex:1 1 auto;min-height:0;padding:14px 26px 16px;background:#f7f9fc}.role-menu-tree-card{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border:1px solid #e3eaf2;border-radius:8px;background:#fff}.role-menu-tree-caption{display:flex;flex:none;align-items:center;justify-content:space-between;gap:12px;height:36px;padding:0 14px;border-bottom:1px solid #edf1f6;background:#fbfcfe;color:#718198;font-size:11px}.role-menu-tree-caption span:first-child{font-weight:650;color:#4f627b}.role-menu-tree-caption span:last-child{color:#98a5b5}.role-menu-tree-scroll{position:relative;flex:1;min-height:0;overflow:auto;padding:8px 8px 10px}.role-menu-tree-scroll :deep(.el-tree){color:#40536c;font-size:13px}.role-menu-tree-scroll :deep(.el-tree-node__content){height:36px;margin:2px 4px;padding-right:8px;border-radius:5px}.role-menu-tree-scroll :deep(.el-tree-node__content:hover){background:#f2f7fd}.role-menu-tree-scroll :deep(.el-tree-node__expand-icon){color:#8192a8}.role-menu-tree-scroll :deep(.el-checkbox){margin-right:8px}.role-menu-tree-scroll :deep(.el-checkbox__inner){width:16px;height:16px;border-radius:4px}.role-menu-node{display:flex;align-items:center;gap:9px;width:100%;min-width:0}.role-menu-node-icon{width:16px;height:16px;display:grid;place-items:center;flex:none;color:#7e92ac}.role-menu-node-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.role-menu-node-label{overflow:hidden;color:#40536c;text-overflow:ellipsis;white-space:nowrap}.role-menu-child-count{margin-left:auto;padding-right:4px;color:#98a6b7;font-size:10px}.role-menu-empty{position:absolute;inset:0;z-index:1;display:grid;place-items:center;background:#fff;color:#8796a9;font-size:13px}.role-menu-tree-note{display:flex;flex:none;align-items:center;gap:7px;padding:9px 13px;border-top:1px solid #edf1f6;color:#8493a6;font-size:11px}.role-menu-info{width:14px;height:14px;display:grid;place-items:center;border:1px solid #a4b2c2;border-radius:50%;font-size:9px}.role-menu-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 26px;background:#fff}.role-menu-footer-note{display:flex;align-items:center;gap:7px;color:#8190a3;font-size:11px}.role-menu-footer-note strong{color:#536982;font-weight:650}.role-menu-footer-actions{display:flex;gap:9px}.role-menu-footer-actions :deep(.el-button){height:36px;margin:0;padding:0 16px;border-radius:6px;font-size:13px;font-weight:600}
+@media(max-width:700px){:global(.role-menu-dialog.el-dialog){max-height:calc(100dvh - 24px);margin-top:12px!important;border-radius:9px}.role-menu-header{padding:16px 16px 13px}.role-menu-toolbar{align-items:stretch;flex-direction:column;padding:10px 14px;gap:8px}.role-menu-search{width:100%}.role-menu-tools{flex-wrap:wrap}.role-menu-tree-area{padding:10px 12px}.role-menu-tree-caption{padding:0 10px}.role-menu-tree-caption span:last-child{font-size:10px}.role-menu-footer{padding:11px 14px}}
+@media(max-width:430px){.role-menu-title-row{gap:8px}.role-menu-header h2{font-size:17px}.role-menu-role{max-width:120px;font-size:11px}.role-menu-header>p,.role-menu-summary{margin-left:0}.role-menu-tools :deep(.el-button){flex:1;padding:0 7px;font-size:11px}.role-menu-footer{align-items:flex-start;flex-direction:column}.role-menu-footer-actions{align-self:flex-end}}
 </style>
