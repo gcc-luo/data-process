@@ -157,7 +157,6 @@ onMounted(async () => { await load(); try { await loadDatasets() } catch (e) { e
 </script>
 <template>
   <section>
-    <div class="page-heading"><div><p class="kicker">数据资产</p><h1>数据源与数据集</h1><p class="subheading">管理数据库连接、登记的数据集及访问权限。</p></div></div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon />
     <el-tabs v-model="activeTab">

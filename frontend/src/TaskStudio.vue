@@ -160,7 +160,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnOnUnload))
 </script>
 <template>
 <section>
-  <div class="page-heading"><div><p class="kicker">数据处理</p><h1>任务与工作流</h1><p class="subheading">管理任务、编排依赖并查看运行记录。</p></div><el-button @click="reload">刷新</el-button></div>
+  <div class="page-actions"><el-button @click="reload">刷新</el-button></div>
   <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><el-alert v-if="message" :title="message" type="success" :closable="false" show-icon/>
   <el-tabs>
     <el-tab-pane label="任务">

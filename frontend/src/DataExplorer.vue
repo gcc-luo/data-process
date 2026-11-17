@@ -44,11 +44,13 @@ onMounted(load)
 </script>
 <template>
 <section>
-  <div class="page-heading"><div><p class="kicker">数据分析</p><h1>数据查询</h1><p class="subheading">选择当前账号已授权的数据集，配置查询并保存报表。</p></div><el-button @click="load">刷新数据集</el-button></div>
+  <div class="page-actions"><el-button @click="load">刷新数据集</el-button></div>
   <el-alert v-if="error && !queryOpen" :title="error" type="error" :closable="false" show-icon />
   <div class="toolbar"><el-input v-model="search" placeholder="搜索数据集" clearable aria-label="搜索数据集" /><span>已加载 {{ datasets.length }} 个数据集 · 本页分页</span></div>
-  <el-table :data="visible" empty-text="暂无已授权数据集"><el-table-column prop="name" label="数据集" min-width="180"/><el-table-column label="可用字段" min-width="260"><template #default="scope">{{ scope.row.fields.join('、') }}</template></el-table-column><el-table-column label="操作" width="130"><template #default="scope"><el-button text type="primary" @click="openDataset(scope.row)">查询分析</el-button></template></el-table-column></el-table>
-  <el-pagination v-model:current-page="page" v-model:page-size="pageSize" :total="total" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" class="pagination" />
+  <div class="list-panel">
+    <el-table :data="visible" empty-text="暂无已授权数据集"><el-table-column prop="name" label="数据集" min-width="180"/><el-table-column label="可用字段" min-width="260"><template #default="scope">{{ scope.row.fields.join('、') }}</template></el-table-column><el-table-column label="操作" width="130"><template #default="scope"><el-button text type="primary" @click="openDataset(scope.row)">查询分析</el-button></template></el-table-column></el-table>
+    <el-pagination v-model:current-page="page" v-model:page-size="pageSize" :total="total" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" class="pagination" />
+  </div>
   <el-dialog v-model="queryOpen" :title="`查询分析：${dataset?.name || ''}`" width="min(1100px, 96vw)" destroy-on-close @close="closeQuery">
     <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon/><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
     <el-alert title="结果行数受平台上限限制。筛选和聚合只使用有明文权限的字段。" type="info" :closable="false" show-icon/>

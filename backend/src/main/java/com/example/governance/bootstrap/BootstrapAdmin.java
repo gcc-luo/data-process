@@ -29,8 +29,8 @@ public class BootstrapAdmin {
             Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class);
             if (count == null || count != 0) throw new IllegalStateException("Administrator initialization requires an empty user table");
             jdbc.update("INSERT INTO departments (id, name) VALUES (?, ?)", 1L, "默认部门");
-            jdbc.update("INSERT INTO roles (id, name) VALUES (?, ?)", 1L, "平台管理员");
-            jdbc.update("INSERT INTO users (id, username, password_hash, department_id, enabled, security_version) VALUES (?, ?, ?, ?, ?, ?)", 1L, username, hash, 1L, true, UUID.randomUUID().toString());
+            jdbc.update("INSERT INTO roles (id, name, role_key, sort_order, enabled) VALUES (?, ?, ?, ?, ?)", 1L, "平台管理员", "platform_admin", 0, true);
+            jdbc.update("INSERT INTO users (id, username, nickname, password_hash, department_id, enabled, deleted, security_version) VALUES (?, ?, ?, ?, ?, ?, FALSE, ?)", 1L, username, username, hash, 1L, true, UUID.randomUUID().toString());
             jdbc.update("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", 1L, 1L);
             jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "workflow.validate");
             jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "datasource.manage");
@@ -39,6 +39,7 @@ public class BootstrapAdmin {
             jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "organization.manage");
             jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "report.manage");
             jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "service.manage");
+            jdbc.update("INSERT INTO role_menus (role_id, menu_id) SELECT ?, id FROM menus", 1L);
         });
     }
 }

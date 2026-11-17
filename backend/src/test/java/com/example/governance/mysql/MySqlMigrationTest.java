@@ -11,7 +11,7 @@ class MySqlMigrationTest {
         var flyway = Flyway.configure().dataSource(url,user,password).locations("classpath:db/mysql").load();
         flyway.migrate();
         try (var c = DriverManager.getConnection(url,user,password); var st = c.createStatement()) {
-            try (var rs = st.executeQuery("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE")) { assertTrue(rs.next()); assertEquals(22,rs.getInt(1)); }
+            try (var rs = st.executeQuery("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE")) { assertTrue(rs.next()); assertEquals(23,rs.getInt(1)); }
             assertThrows(java.sql.SQLException.class, () -> st.execute("INSERT INTO workflow_versions(workflow_id,version) VALUES (999999,1)"));
             var db = new org.springframework.jdbc.datasource.DriverManagerDataSource(url, user, password);
             var jdbc = new org.springframework.jdbc.core.JdbcTemplate(db);

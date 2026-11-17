@@ -91,7 +91,7 @@ async function deleteReport(report) {
 onMounted(load)
 </script>
 <template>
-<section><div class="page-heading"><div><p class="kicker">数据分析</p><h1>数据报表</h1><p class="subheading">查看自己的报表并组合看板；每次查询都会检查当前权限。</p></div><el-button @click="load">刷新</el-button></div>
+<section><div class="page-actions"><el-button @click="load">刷新</el-button></div>
 <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
 <el-tabs><el-tab-pane label="报表">
 <div class="toolbar"><span>已加载 {{ reports.length }} 个报表</span></div><el-table :data="visibleReports" empty-text="请先在数据查询中保存报表"><el-table-column prop="name" label="名称"/><el-table-column prop="chartType" label="展示方式"/><el-table-column prop="kind" label="查询方式"/><el-table-column label="操作" min-width="230"><template #default="scope"><el-button text type="primary" @click="selectedReport = scope.row; reportViewOpen = true">查看</el-button><el-button text @click="editReport(scope.row)">编辑</el-button><el-popconfirm title="确认删除该报表？" @confirm="deleteReport(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm></template></el-table-column></el-table>

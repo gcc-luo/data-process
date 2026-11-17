@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/organization")
@@ -18,39 +17,76 @@ public class OrganizationController {
     private final OrganizationService organization;
     private final AccountCredentials credentials;
     private final AuditLog audit;
-    public OrganizationController(OrganizationService organization, AccountCredentials credentials, AuditLog audit) { this.organization = organization; this.credentials = credentials; this.audit = audit; }
-    record DepartmentRequest(String name, Long parentId) {}
+
+    public OrganizationController(OrganizationService organization, AccountCredentials credentials, AuditLog audit) {
+        this.organization = organization; this.credentials = credentials; this.audit = audit;
+    }
+
+    record DepartmentRequest(String name, Long parentId, Integer sortOrder, String leader, String phone, String email, Boolean enabled) {}
     record MoveRequest(Long parentId) {}
-    record RoleRequest(String name) {}
-    record UserRequest(String username, String password, long departmentId) {}
+    record RoleRequest(String name, String roleKey, String description, Integer sortOrder, Boolean enabled) {}
+    record UserRequest(String username, String nickname, String email, String phone, String password, Long departmentId, Boolean enabled, Set<Long> roles) {}
     record RoleIds(Set<Long> roles) {}
     record Permissions(Set<String> permissions) {}
+    record MenuIds(Set<Long> menus) {}
     record Enabled(Boolean enabled) {}
     record Password(String password) {}
+    record MenuRequest(String name, Long parentId, String menuType, Integer sortOrder, String routePath, String component, String permission, String icon, Boolean visible, Boolean enabled) {}
+
     @GetMapping("/audit") java.util.List<AuditLog.Event> audit(@RequestParam(required=false) String action, @RequestParam(required=false) Long beforeId, @RequestParam(defaultValue="50") int limit) { return audit.list(action, beforeId, limit); }
     @GetMapping OrganizationService.Snapshot snapshot() { return organization.snapshot(); }
+
     @PostMapping("/departments") @Transactional
     ResponseEntity<Map<String, Long>> department(@RequestBody DepartmentRequest request, Authentication auth) {
-        long id = organization.createDepartment(request.name(), request.parentId()); audit.success(auth, "department.create", "department", id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
+        long id = organization.createDepartment(request.name(), request.parentId(), value(request.sortOrder()), request.leader(), request.phone(), request.email(), state(request.enabled()));
+        audit.success(auth, "department.create", "department", id); return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
+    }
+    @PostMapping("/departments/{id}") @Transactional
+    ResponseEntity<Void> updateDepartment(@PathVariable long id, @RequestBody DepartmentRequest request, Authentication auth) {
+        organization.updateDepartment(id, request.name(), request.parentId(), value(request.sortOrder()), request.leader(), request.phone(), request.email(), state(request.enabled()));
+        audit.success(auth, "department.update", "department", id); return ResponseEntity.noContent().build();
     }
     @PostMapping("/departments/{id}/parent") @Transactional
     ResponseEntity<Void> move(@PathVariable long id, @RequestBody MoveRequest request, Authentication auth) {
         organization.moveDepartment(id, request.parentId()); audit.success(auth, "department.move", "department", id); return ResponseEntity.noContent().build();
     }
+    @DeleteMapping("/departments/{id}") @Transactional
+    ResponseEntity<Void> deleteDepartment(@PathVariable long id, Authentication auth) {
+        organization.deleteDepartment(id); audit.success(auth, "department.delete", "department", id); return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/roles") @Transactional
     ResponseEntity<Map<String, Long>> role(@RequestBody RoleRequest request, Authentication auth) {
-        long id = organization.createRole(request.name()); audit.success(auth, "role.create", "role", id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
+        long id = organization.createRole(request.name(), request.roleKey(), request.description(), value(request.sortOrder()), state(request.enabled()));
+        audit.success(auth, "role.create", "role", id); return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
+    }
+    @PostMapping("/roles/{id}") @Transactional
+    ResponseEntity<Void> updateRole(@PathVariable long id, @RequestBody RoleRequest request, Authentication auth) {
+        organization.updateRole(id, request.name(), request.roleKey(), request.description(), value(request.sortOrder()), state(request.enabled()));
+        audit.success(auth, "role.update", "role", id); return ResponseEntity.noContent().build();
+    }
+    @DeleteMapping("/roles/{id}") @Transactional
+    ResponseEntity<Void> deleteRole(@PathVariable long id, Authentication auth) {
+        organization.deleteRole(id); audit.success(auth, "role.delete", "role", id); return ResponseEntity.noContent().build();
     }
     @PostMapping("/roles/{id}/permissions") @Transactional
     ResponseEntity<Void> permissions(@PathVariable long id, @RequestBody Permissions request, Authentication auth) {
         organization.setPermissions(id, request.permissions()); audit.success(auth, "role.permissions", "role", id); return ResponseEntity.noContent().build();
     }
+    @PostMapping("/roles/{id}/menus") @Transactional
+    ResponseEntity<Void> roleMenus(@PathVariable long id, @RequestBody MenuIds request, Authentication auth) {
+        organization.setRoleMenus(id, request.menus()); audit.success(auth, "role.menus", "role", id); return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/users") @Transactional
     ResponseEntity<Map<String, Long>> user(@RequestBody UserRequest request, Authentication auth) {
-        long id = organization.createUser(request.username(), request.password(), request.departmentId()); audit.success(auth, "user.create", "user", id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
+        long id = organization.createUser(request.username(), request.nickname(), request.email(), request.phone(), request.password(), requiredDepartment(request.departmentId()), state(request.enabled()), values(request.roles()));
+        audit.success(auth, "user.create", "user", id); return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
+    }
+    @PostMapping("/users/{id}") @Transactional
+    ResponseEntity<Void> updateUser(@PathVariable long id, @RequestBody UserRequest request, Authentication auth) {
+        organization.updateUser(id, request.username(), request.nickname(), request.email(), request.phone(), requiredDepartment(request.departmentId()), state(request.enabled()), values(request.roles()));
+        audit.success(auth, "user.update", "user", id); return ResponseEntity.noContent().build();
     }
     @PostMapping("/users/{id}/roles") @Transactional
     ResponseEntity<Void> roles(@PathVariable long id, @RequestBody RoleIds request, Authentication auth) {
@@ -65,6 +101,32 @@ public class OrganizationController {
     ResponseEntity<Void> password(@PathVariable long id, @RequestBody Password request, Authentication auth) {
         credentials.resetPassword(id, request.password()); audit.success(auth, "user.password", "user", id); return ResponseEntity.noContent().build();
     }
-    @ExceptionHandler(IllegalArgumentException.class) ResponseEntity<Map<String, String>> invalid() { return ResponseEntity.badRequest().body(Map.of("error", "Invalid organization configuration")); }
-    @ExceptionHandler(DataIntegrityViolationException.class) ResponseEntity<Map<String, String>> conflict() { return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Organization configuration conflicts with existing data")); }
+    @DeleteMapping("/users/{id}") @Transactional
+    ResponseEntity<Void> deleteUser(@PathVariable long id, Authentication auth) {
+        organization.deleteUser(id, auth.getName()); audit.success(auth, "user.delete", "user", id); return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/menus") @Transactional
+    ResponseEntity<Map<String, Long>> menu(@RequestBody MenuRequest request, Authentication auth) {
+        long id = organization.createMenu(request.name(), request.parentId(), request.menuType(), value(request.sortOrder()), request.routePath(), request.component(), request.permission(), request.icon(), state(request.visible()), state(request.enabled()));
+        audit.success(auth, "menu.create", "menu", id); return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
+    }
+    @PostMapping("/menus/{id}") @Transactional
+    ResponseEntity<Void> updateMenu(@PathVariable long id, @RequestBody MenuRequest request, Authentication auth) {
+        organization.updateMenu(id, request.name(), request.parentId(), request.menuType(), value(request.sortOrder()), request.routePath(), request.component(), request.permission(), request.icon(), state(request.visible()), state(request.enabled()));
+        audit.success(auth, "menu.update", "menu", id); return ResponseEntity.noContent().build();
+    }
+    @DeleteMapping("/menus/{id}") @Transactional
+    ResponseEntity<Void> deleteMenu(@PathVariable long id, Authentication auth) {
+        organization.deleteMenu(id); audit.success(auth, "menu.delete", "menu", id); return ResponseEntity.noContent().build();
+    }
+
+    private int value(Integer value) { return value == null ? 0 : value; }
+    private boolean state(Boolean value) { return value == null || value; }
+    private long requiredDepartment(Long id) { if (id == null) throw new IllegalArgumentException("Department is required"); return id; }
+    private Set<Long> values(Set<Long> value) { return value == null ? Set.of() : value; }
+
+    @ExceptionHandler(IllegalArgumentException.class) ResponseEntity<Map<String, String>> invalid(IllegalArgumentException error) { return ResponseEntity.badRequest().body(Map.of("error", error.getMessage() == null ? "Invalid organization configuration" : error.getMessage())); }
+    @ExceptionHandler(IllegalStateException.class) ResponseEntity<Map<String, String>> blocked(IllegalStateException error) { return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", error.getMessage() == null ? "Operation conflicts with existing data" : error.getMessage())); }
+    @ExceptionHandler(DataIntegrityViolationException.class) ResponseEntity<Map<String, String>> conflict() { return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "名称、账号或路由已存在，或数据仍有关联")); }
 }
