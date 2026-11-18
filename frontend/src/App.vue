@@ -324,6 +324,11 @@ body{color:var(--ui-text-primary)}
 .shell .content .el-table{--el-table-text-color:var(--ui-text-body);--el-table-header-text-color:var(--ui-text-secondary)}
 @media(min-width:651px){.sidebar{width:clamp(220px,11vw,280px)}.primary-nav{width:calc(100% + 32px);margin-left:-16px;margin-right:-16px}.primary-nav .nav-group,.primary-nav .nav-group>button{width:100%}.primary-nav .nav-leading{flex:1;font-size:var(--ui-navigation-size)}.primary-nav .nav-chevron{margin-left:auto}.submenu button{font-size:clamp(12px,.62vw,14px)}}
 .shell .content .el-table,.shell .content .el-table .cell,.shell .content .el-table .el-button{font-size:var(--ui-navigation-size)}
+.shell .content .toolbar{--ui-toolbar-height:calc(var(--ui-navigation-size) + 19px)}
+.shell .content .toolbar .el-button,.shell .content .toolbar .el-input__inner,.shell .content .toolbar .el-select__wrapper,.shell .content .toolbar .el-select__placeholder,.shell .content .toolbar .el-select__selected-item{font-size:var(--ui-navigation-size)}
+.shell .content .toolbar .el-button{height:var(--ui-toolbar-height);min-height:0;padding:0 calc(var(--ui-navigation-size) * .9)}
+.shell .content .toolbar .el-input{--el-input-height:var(--ui-toolbar-height)}
+.shell .content .toolbar .el-select__wrapper{min-height:var(--ui-toolbar-height)}
 .shell{height:100vh;height:100dvh;min-height:0;overflow:hidden}
 .sidebar{height:100%;min-height:0;overflow:hidden}
 .brand{flex:0 0 auto}
