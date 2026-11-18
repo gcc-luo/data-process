@@ -29,6 +29,13 @@ const auditEvents = ref([])
 const auditTotal = ref(0)
 const auditLoadedAction = ref('')
 const auditBusy = ref(false)
+const auditCatalog = ref({ actions: [], objectTypes: [], results: [] })
+async function loadAuditCatalog() {
+  try {
+    const response = await fetch('/api/organization/audit/catalog', { credentials: 'same-origin' })
+    if (response.ok) auditCatalog.value = await response.json()
+  } catch { /* Keep empty filter options when the catalog cannot be loaded. */ }
+}
 const permissionRole = ref(null)
 const selectedPermissions = ref([])
 const permissionTree = ref(null)
@@ -52,12 +59,12 @@ const menuComponentOptions = computed(() => menuForm.value.menuType === 'D' ? co
 function matches(value, query) { return String(value ?? '').toLocaleLowerCase().includes(query) }
 const filtered = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
-  const enabled = enabledFilter.value
+  const enabled = enabledFilter.value || ''
   const matchState = item => enabled === '' || String(item.enabled) === enabled
   return {
     departments: data.value.departments.filter(item => matchState(item) && (!query || [item.name, item.id, item.leader, item.phone].some(value => matches(value, query)))),
     roles: data.value.roles.filter(item => matchState(item) && (!query || [item.name, item.roleKey, item.id].some(value => matches(value, query)))),
-    users: data.value.users.filter(item => matchState(item) && (departmentFilter.value === '' || item.departmentId === Number(departmentFilter.value)) && (!query || [item.username, item.nickname, item.email, item.phone, departmentName(data.value.departmentOptions, item.departmentId)].some(value => matches(value, query)))),
+    users: data.value.users.filter(item => matchState(item) && ((departmentFilter.value || '') === '' || item.departmentId === Number(departmentFilter.value)) && (!query || [item.username, item.nickname, item.email, item.phone, departmentName(data.value.departmentOptions, item.departmentId)].some(value => matches(value, query)))),
     menus: data.value.menus.filter(item => matchState(item) && (!query || [item.name, item.routePath, item.component].some(value => matches(value, query)))),
   }
 })
@@ -73,8 +80,8 @@ watch([search, enabledFilter, departmentFilter], () => { pages.value = { roles: 
 function nested(items, parentId = null) {
   return items.filter(item => item.parentId === parentId).map(item => ({ ...item, children: nested(items, item.id) }))
 }
-const departmentRows = computed(() => search.value.trim() || enabledFilter.value !== '' ? filtered.value.departments : nested(data.value.departments))
-const menuRows = computed(() => search.value.trim() || enabledFilter.value !== '' ? filtered.value.menus : nested(data.value.menus))
+const departmentRows = computed(() => search.value.trim() || (enabledFilter.value || '') !== '' ? filtered.value.departments : nested(data.value.departments))
+const menuRows = computed(() => search.value.trim() || (enabledFilter.value || '') !== '' ? filtered.value.menus : nested(data.value.menus))
 const menuOptions = computed(() => nested(data.value.menus.filter(item => item.menuType !== 'F' && item.id !== menuForm.value.id)))
 
 async function load() {
@@ -224,7 +231,7 @@ async function loadAudit(reset = false) {
   if (auditBusy.value) return
   auditBusy.value = true
   try {
-    const action = auditAction.value.trim()
+    const action = (auditAction.value || '').trim()
     if (reset || action !== auditLoadedAction.value) pages.value.audit = 1
     const size = pageSizes.value.audit
     const query = new URLSearchParams({ limit: String(size), offset: String((pages.value.audit - 1) * size) })
@@ -239,7 +246,7 @@ async function loadAudit(reset = false) {
   } catch (e) { error.value = e.message } finally { auditBusy.value = false }
 }
 function changeAuditSize() { pages.value.audit = 1; void loadAudit() }
-watch(() => props.view, view => { search.value = ''; enabledFilter.value = ''; departmentFilter.value = ''; if (view === 'audit') loadAudit(true) }, { immediate: true })
+watch(() => props.view, view => { search.value = ''; enabledFilter.value = ''; departmentFilter.value = ''; if (view === 'audit') { void loadAuditCatalog(); loadAudit(true) } }, { immediate: true })
 onMounted(load)
 </script>
 
@@ -338,15 +345,15 @@ onMounted(load)
 
     <template v-else-if="props.view === 'audit'">
       <div class="pane">
-        <div class="toolbar audit-toolbar"><el-input v-model="auditAction" clearable placeholder="操作类型（可留空）" @keyup.enter="loadAudit(true)" /><el-button type="primary" @click="loadAudit(true)">查询</el-button><el-button @click="loadAudit(true)">刷新</el-button></div>
+        <div class="toolbar audit-toolbar"><el-select v-model="auditAction" clearable filterable placeholder="操作类型（可留空）" @change="loadAudit(true)"><el-option v-for="item in auditCatalog.actions" :key="item.code" :label="item.label" :value="item.code" /></el-select><el-button type="primary" @click="loadAudit(true)">查询</el-button><el-button @click="loadAudit(true)">刷新</el-button></div>
         <el-alert title="登录失败等没有关联账号的记录显示为系统或未知账号。" type="info" :closable="false" show-icon />
         <el-table :data="auditEvents" class="audit-table">
-          <el-table-column prop="occurredAt" label="时间" min-width="180" />
+          <el-table-column label="时间" min-width="180"><template #default="scope">{{ scope.row.occurredAtText || String(scope.row.occurredAt || '').replace('T', ' ') }}</template></el-table-column>
           <el-table-column label="操作者" min-width="170"><template #default="scope">{{ scope.row.username || '系统或未知账号' }}</template></el-table-column>
-          <el-table-column prop="action" label="操作" min-width="170" />
-          <el-table-column prop="objectType" label="对象类型" min-width="120" />
+          <el-table-column label="操作" min-width="170"><template #default="scope">{{ scope.row.actionLabel || scope.row.action }}</template></el-table-column>
+          <el-table-column label="对象类型" min-width="120"><template #default="scope">{{ scope.row.objectTypeLabel || scope.row.objectType }}</template></el-table-column>
           <el-table-column prop="objectId" label="对象编号" min-width="120" />
-          <el-table-column label="结果" min-width="110"><template #default="scope"><el-tag :type="scope.row.result === 'SUCCESS' ? 'success' : 'danger'" effect="light">{{ scope.row.result }}</el-tag></template></el-table-column>
+          <el-table-column label="结果" min-width="110"><template #default="scope"><el-tag :type="scope.row.result === 'SUCCESS' ? 'success' : 'danger'" effect="light">{{ scope.row.resultLabel || scope.row.result }}</el-tag></template></el-table-column>
         </el-table>
         <el-pagination v-model:current-page="pages.audit" v-model:page-size="pageSizes.audit" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="auditTotal" :disabled="auditBusy" @current-change="loadAudit()" @size-change="changeAuditSize" />
       </div>
@@ -457,7 +464,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.organization-page{min-width:0;color:#25364a}.notice{margin-bottom:12px}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.toolbar .el-input{width:min(340px,100%)}.toolbar .el-select{width:150px}.el-table{width:100%;background:#fff}.pagination{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:14px 0 0}.pane{padding:12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.audit-toolbar{margin:0 0 10px;padding:0;border:0}.audit-table{margin-top:10px}.menu-state-switch{margin-left:8px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.form-grid .el-form-item{margin-bottom:16px}.form-grid .full-row{grid-column:1/-1}.form-grid :deep(.el-select),.form-grid :deep(.el-tree-select){width:100%}.dialog-hint{margin:0 0 16px;color:#66788a}.check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}.pagination span{align-self:center;color:#556579}
+.organization-page{min-width:0;color:#25364a}.notice{margin-bottom:12px}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.toolbar .el-input{width:min(340px,100%)}.toolbar .el-select{width:150px}.el-table{width:100%;background:#fff}.pagination{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:14px 0 0}.pane{padding:12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.audit-toolbar{margin:0 0 10px;padding:0;border:0}.audit-toolbar .el-select{width:240px}.audit-table{margin-top:10px}.menu-state-switch{margin-left:8px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.form-grid .el-form-item{margin-bottom:16px}.form-grid .full-row{grid-column:1/-1}.form-grid :deep(.el-select),.form-grid :deep(.el-tree-select){width:100%}.dialog-hint{margin:0 0 16px;color:#66788a}.check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}.pagination span{align-self:center;color:#556579}
 .menu-icon-picker{display:flex;align-items:center;gap:12px;width:100%}.menu-icon-select{max-width:340px}.menu-icon-glyph,.menu-icon-cell svg,.menu-icon-option svg{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.menu-icon-cell{display:inline-flex;align-items:center;gap:8px;color:#536982}.menu-icon-option{display:flex;align-items:center;gap:9px}.menu-icon-option small{margin-left:auto;color:#96a4b5;font-size:11px}.menu-icon-help{color:#8190a3;font-size:12px}
 @media(min-width:1440px){.toolbar{gap:clamp(10px,.65vw,16px)}.toolbar .el-input{width:clamp(340px,23vw,480px)}.pane{padding:clamp(12px,.8vw,20px)}}
 @media(max-width:720px){.toolbar{flex-wrap:wrap}.toolbar .el-input{width:100%}.toolbar .el-select{flex:1;min-width:135px}.form-grid{grid-template-columns:1fr}.form-grid .full-row{grid-column:auto}.check-grid{grid-template-columns:1fr}.menu-icon-picker{align-items:flex-start;flex-direction:column}.menu-icon-select{width:100%;max-width:none}}

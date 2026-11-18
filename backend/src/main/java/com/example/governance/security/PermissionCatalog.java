@@ -149,6 +149,7 @@ public final class PermissionCatalog {
 
     private static List<Route> buildRoutes() {
         List<Route> routes = new ArrayList<>();
+        route(routes, "GET", "/api/organization/audit/catalog", "system.audit.read");
         route(routes, "GET", "/api/organization/audit", "system.audit.read");
         route(routes, "POST", "/api/organization/departments", "system.department.create");
         route(routes, "POST", "/api/organization/departments/*/parent", "system.department.update");

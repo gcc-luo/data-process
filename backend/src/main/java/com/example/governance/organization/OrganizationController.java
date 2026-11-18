@@ -1,6 +1,7 @@
 package com.example.governance.organization;
 
 import com.example.governance.security.AccountCredentials;
+import com.example.governance.security.AuditCatalog;
 import com.example.governance.security.AuditLog;
 import com.example.governance.security.PermissionGrantDeniedException;
 import java.util.Map;
@@ -37,6 +38,9 @@ public class OrganizationController {
 
     @GetMapping("/audit") ResponseEntity<java.util.List<AuditLog.Event>> audit(@RequestParam(required=false) String action, @RequestParam(required=false) Long beforeId, @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="50") int limit) {
         return ResponseEntity.ok().header("X-Total-Count", String.valueOf(audit.count(action))).body(audit.list(action, beforeId, offset, limit));
+    }
+    @GetMapping("/audit/catalog") Map<String, Object> auditCatalog() {
+        return Map.of("actions", AuditCatalog.actions(), "objectTypes", AuditCatalog.objectTypes(), "results", AuditCatalog.results());
     }
     @GetMapping OrganizationService.Snapshot snapshot(Authentication auth) {
         Set<String> granted = auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toUnmodifiableSet());
