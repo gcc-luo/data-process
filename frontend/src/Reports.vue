@@ -1,10 +1,11 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { inject, onMounted, ref, computed } from 'vue'
 import { authorizedRequest } from './auth.js'
 import { usePagination } from './pagination.js'
 import ReportView from './ReportView.vue'
 import { reportEditor, reportUpdate, canSaveQuery, serializeEditedQuery } from './report-query-edit.js'
 import { changeFilterType, changeFilterOperation } from './analysis-filters.js'
+const can = inject('canPermission', () => false)
 const reports = ref([]), dashboards = ref([]), error = ref(''), selectedReport = ref(null), selectedDashboard = ref(null), dashboardName = ref(''), reportIds = ref([]), editingDashboard = ref(null)
 const dashboardDialog = ref(false), dashboardSaving = ref(false), reportViewOpen = ref(false), dashboardViewOpen = ref(false)
 const { page: reportPage, visible: visibleReports } = usePagination(reports)
@@ -18,9 +19,14 @@ let editRevision = 0
 const sortOptions = computed(() => [...(editor.value?.query.groups ?? []), ...(editor.value?.query.metrics ?? []).map((_, i) => `metric_${i}`)])
 async function load() {
   try {
-    const [a,b] = await Promise.all([fetch('/api/reports'),fetch('/api/dashboards')])
-    if (!a.ok || !b.ok) throw new Error(a.status === 403 || b.status === 403 ? '当前账号没有报表管理权限' : '无法读取报表')
-    reports.value = await a.json(); dashboards.value = await b.json()
+    const [reportsResponse, dashboardsResponse] = await Promise.all([
+      can('report.report.read') ? fetch('/api/reports') : Promise.resolve(null),
+      can('report.dashboard.read') ? fetch('/api/dashboards') : Promise.resolve(null),
+    ])
+    if (reportsResponse && !reportsResponse.ok) throw new Error(reportsResponse.status === 403 ? '当前账号没有报表读取权限' : '无法读取报表')
+    if (dashboardsResponse && !dashboardsResponse.ok) throw new Error(dashboardsResponse.status === 403 ? '当前账号没有看板读取权限' : '无法读取看板')
+    reports.value = reportsResponse ? await reportsResponse.json() : []
+    dashboards.value = dashboardsResponse ? await dashboardsResponse.json() : []
     if (selectedReport.value) selectedReport.value = reports.value.find(r => r.id === selectedReport.value.id) ?? null
     if (selectedDashboard.value) selectedDashboard.value = dashboards.value.find(d => d.id === selectedDashboard.value.id) ?? null
     return true
@@ -94,11 +100,11 @@ onMounted(load)
 <section><div class="page-actions"><el-button @click="load">刷新</el-button></div>
 <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
 <el-tabs><el-tab-pane label="报表">
-<div class="toolbar"><span>已加载 {{ reports.length }} 个报表</span></div><el-table :data="visibleReports" empty-text="请先在数据查询中保存报表"><el-table-column prop="name" label="名称"/><el-table-column prop="chartType" label="展示方式"/><el-table-column prop="kind" label="查询方式"/><el-table-column label="操作" min-width="230"><template #default="scope"><el-button text type="primary" @click="selectedReport = scope.row; reportViewOpen = true">查看</el-button><el-button text @click="editReport(scope.row)">编辑</el-button><el-popconfirm title="确认删除该报表？" @confirm="deleteReport(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm></template></el-table-column></el-table>
+<div class="toolbar"><span>已加载 {{ reports.length }} 个报表</span></div><el-table :data="visibleReports" empty-text="请先在数据查询中保存报表"><el-table-column prop="name" label="名称"/><el-table-column prop="chartType" label="展示方式"/><el-table-column prop="kind" label="查询方式"/><el-table-column label="操作" min-width="230"><template #default="scope"><el-button v-if="can('report.report.execute') && can('datasource.query.read')" text type="primary" @click="selectedReport = scope.row; reportViewOpen = true">查看结果</el-button><el-button v-if="can('report.report.update') && can('datasource.query.read')" text @click="editReport(scope.row)">编辑</el-button><el-popconfirm v-if="can('report.report.delete')" title="确认删除该报表？" @confirm="deleteReport(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm></template></el-table-column></el-table>
 <el-pagination v-model:current-page="reportPage" :page-size="10" :total="reports.length" layout="total, prev, pager, next"/><el-dialog v-model="reportViewOpen" :title="selectedReport?.name || '报表详情'" width="min(1000px, 95vw)" destroy-on-close><ReportView v-if="selectedReport && reportViewOpen" :key="`${selectedReport.id}-${selectedReport.chartType}-${selectedReport.configuration}`" :report="selectedReport"/></el-dialog>
 </el-tab-pane><el-tab-pane label="看板">
-<div class="toolbar"><span>已加载 {{ dashboards.length }} 个看板</span><el-button type="primary" @click="newDashboard">新建看板</el-button></div><el-dialog v-model="dashboardDialog" :title="editingDashboard ? '编辑看板' : '新建看板'" width="min(620px, 95vw)" :close-on-click-modal="!dashboardSaving" :close-on-press-escape="!dashboardSaving" :show-close="!dashboardSaving" @closed="resetDashboard"><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><div class="row"><el-input v-model="dashboardName" placeholder="看板名称"/><el-select v-model="reportIds" multiple placeholder="选择报表"><el-option v-for="r in reports" :key="r.id" :label="r.name" :value="r.id"/></el-select><el-button type="primary" :loading="dashboardSaving" :disabled="dashboardSaving" @click="saveDashboard">{{ editingDashboard ? '保存修改' : '创建看板' }}</el-button><el-button :disabled="dashboardSaving" @click="dashboardDialog = false">取消</el-button></div></el-dialog>
-<el-table :data="visibleDashboards"><el-table-column prop="name" label="看板"/><el-table-column label="操作" min-width="230"><template #default="scope"><el-button text type="primary" @click="selectedDashboard = scope.row; dashboardViewOpen = true">查看</el-button><el-button text @click="editDashboard(scope.row)">编辑</el-button><el-popconfirm title="确认删除该看板？报表将保留。" @confirm="deleteDashboard(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm></template></el-table-column></el-table>
+<div class="toolbar"><span>已加载 {{ dashboards.length }} 个看板</span><el-button v-if="can('report.dashboard.create') && can('report.report.read')" type="primary" @click="newDashboard">新建看板</el-button></div><el-dialog v-model="dashboardDialog" :title="editingDashboard ? '编辑看板' : '新建看板'" width="min(620px, 95vw)" :close-on-click-modal="!dashboardSaving" :close-on-press-escape="!dashboardSaving" :show-close="!dashboardSaving" @closed="resetDashboard"><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><div class="row"><el-input v-model="dashboardName" placeholder="看板名称"/><el-select v-model="reportIds" multiple placeholder="选择报表"><el-option v-for="r in reports" :key="r.id" :label="r.name" :value="r.id"/></el-select><el-button v-if="(editingDashboard ? can('report.dashboard.update') : can('report.dashboard.create')) && can('report.report.read')" type="primary" :loading="dashboardSaving" :disabled="dashboardSaving" @click="saveDashboard">{{ editingDashboard ? '保存修改' : '创建看板' }}</el-button><el-button :disabled="dashboardSaving" @click="dashboardDialog = false">取消</el-button></div></el-dialog>
+<el-table :data="visibleDashboards"><el-table-column prop="name" label="看板"/><el-table-column label="操作" min-width="230"><template #default="scope"><el-button v-if="can('report.report.execute') && can('datasource.query.read') && can('report.report.read')" text type="primary" @click="selectedDashboard = scope.row; dashboardViewOpen = true">查看</el-button><el-button v-if="can('report.dashboard.update') && can('report.report.read')" text @click="editDashboard(scope.row)">编辑</el-button><el-popconfirm v-if="can('report.dashboard.delete')" title="确认删除该看板？报表将保留。" @confirm="deleteDashboard(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm></template></el-table-column></el-table>
 <el-pagination v-model:current-page="dashboardPage" :page-size="10" :total="dashboards.length" layout="total, prev, pager, next"/><el-dialog v-model="dashboardViewOpen" :title="selectedDashboard?.name || '看板详情'" width="min(1100px, 95vw)" destroy-on-close><template v-if="selectedDashboard && dashboardViewOpen" v-for="id in selectedDashboard.reports" :key="id"><ReportView v-if="reports.find(r => r.id === id)" :key="`${id}-${reports.find(r => r.id === id).chartType}-${reports.find(r => r.id === id).configuration}`" :report="reports.find(r => r.id === id)"/></template></el-dialog>
 </el-tab-pane></el-tabs>
 <el-dialog v-model="reportDialog" title="编辑报表" width="min(780px, 95vw)">

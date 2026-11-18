@@ -72,7 +72,7 @@ public final class DatasetPolicyStore {
     }
     public record Accessible(long id, String name, List<String> fields) {}
     public List<Accessible> accessible(long userId) {
-        var rows = jdbc.query("SELECT DISTINCT d.id,d.name FROM datasets d JOIN dataset_role_rules r ON r.dataset_id=d.id JOIN user_roles ur ON ur.role_id=r.role_id JOIN role_permissions p ON p.role_id=r.role_id AND p.permission='dataset.read' JOIN users u ON u.id=ur.user_id AND u.enabled=TRUE WHERE u.id=? ORDER BY d.id", (rs, row) -> new Accessible(rs.getLong(1), rs.getString(2), List.of()), userId);
+        var rows = jdbc.query("SELECT DISTINCT d.id,d.name FROM datasets d JOIN dataset_role_rules r ON r.dataset_id=d.id JOIN user_roles ur ON ur.role_id=r.role_id JOIN role_permissions p ON p.role_id=r.role_id AND p.permission='datasource.query.read' JOIN users u ON u.id=ur.user_id AND u.enabled=TRUE WHERE u.id=? ORDER BY d.id", (rs, row) -> new Accessible(rs.getLong(1), rs.getString(2), List.of()), userId);
         var result = new java.util.ArrayList<Accessible>();
         for (var row : rows) {
             try { result.add(new Accessible(row.id(), row.name(), resolve(userId, row.id()).policy().fields().keySet().stream().sorted().toList())); }
@@ -92,7 +92,7 @@ public final class DatasetPolicyStore {
         var datasets = jdbc.query("SELECT source_id,catalog_name,schema_name,table_name,department_field FROM datasets WHERE id=?", (rs, row) -> new DatasetRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)), datasetId);
         var users = jdbc.query("SELECT department_id,enabled FROM users WHERE id=?", (rs, row) -> new UserRow(rs.getLong(1), rs.getBoolean(2)), userId);
         if (datasets.isEmpty() || users.isEmpty() || !users.getFirst().enabled() || datasets.getFirst().departmentField() == null) throw new SecurityException("Dataset access denied");
-        var rules = jdbc.query("SELECT DISTINCT r.role_id,r.scope FROM dataset_role_rules r JOIN user_roles ur ON ur.role_id=r.role_id JOIN role_permissions p ON p.role_id=r.role_id AND p.permission='dataset.read' WHERE r.dataset_id=? AND ur.user_id=?", (rs, row) -> new Rule(rs.getLong(1), AccessPolicy.Scope.valueOf(rs.getString(2))), datasetId, userId);
+        var rules = jdbc.query("SELECT DISTINCT r.role_id,r.scope FROM dataset_role_rules r JOIN user_roles ur ON ur.role_id=r.role_id JOIN role_permissions p ON p.role_id=r.role_id AND p.permission='datasource.query.read' WHERE r.dataset_id=? AND ur.user_id=?", (rs, row) -> new Rule(rs.getLong(1), AccessPolicy.Scope.valueOf(rs.getString(2))), datasetId, userId);
         if (rules.isEmpty()) throw new SecurityException("Dataset access denied");
         var departments = jdbc.query("SELECT id,parent_id FROM departments", (rs, row) -> new long[]{rs.getLong(1), rs.getLong(2), rs.wasNull() ? 0 : 1});
         Set<String> ids = new HashSet<>(); Map<String, String> parents = new HashMap<>();

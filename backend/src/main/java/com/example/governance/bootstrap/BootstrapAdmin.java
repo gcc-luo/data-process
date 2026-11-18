@@ -3,6 +3,7 @@ package com.example.governance.bootstrap;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.example.governance.security.PermissionCatalog;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -32,14 +33,7 @@ public class BootstrapAdmin {
             jdbc.update("INSERT INTO roles (id, name, role_key, sort_order, enabled) VALUES (?, ?, ?, ?, ?)", 1L, "平台管理员", "platform_admin", 0, true);
             jdbc.update("INSERT INTO users (id, username, nickname, password_hash, department_id, enabled, deleted, security_version) VALUES (?, ?, ?, ?, ?, ?, FALSE, ?)", 1L, username, username, hash, 1L, true, UUID.randomUUID().toString());
             jdbc.update("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", 1L, 1L);
-            jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "workflow.validate");
-            jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "datasource.manage");
-            jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "workflow.manage");
-            jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "dataset.read");
-            jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "organization.manage");
-            jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "report.manage");
-            jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, "service.manage");
-            jdbc.update("INSERT INTO role_menus (role_id, menu_id) SELECT ?, id FROM menus", 1L);
+            PermissionCatalog.codes().forEach(permission -> jdbc.update("INSERT IGNORE INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, permission));
         });
     }
 }

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, provide, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { login, authorizedRequest } from './auth.js'
 import DataSources from './DataSources.vue'
@@ -9,9 +9,13 @@ import DataExplorer from './DataExplorer.vue'
 import Reports from './Reports.vue'
 import Services from './Services.vue'
 import Realtime from './Realtime.vue'
+import { menuIconPath } from './menu-icons.js'
 
 const status = ref('正在检查')
 const user = ref(null)
+const grantedPermissions = ref([])
+const canPermission = permission => grantedPermissions.value.includes(permission)
+provide('canPermission', canPermission)
 const sessionLoading = ref(true)
 const username = ref('')
 const password = ref('')
@@ -20,9 +24,16 @@ const loginError = ref('')
 const loggingIn = ref(false)
 async function loadSession() {
   const response = await fetch('/api/session', { credentials: 'same-origin' })
-  user.value = response.ok ? (await response.json()).username : null
+  if (response.ok) {
+    const session = await response.json()
+    user.value = session.username
+    grantedPermissions.value = Array.isArray(session.permissions) ? session.permissions : []
+  } else {
+    user.value = null
+    grantedPermissions.value = []
+  }
   if (response.ok) await loadNavigation()
-  else navigation.value = fallbackMenus
+  else navigation.value = []
 }
 async function signIn() {
   loggingIn.value = true; loginError.value = ''
@@ -39,49 +50,17 @@ async function signIn() {
 function showForgotPassword() { void ElMessageBox.alert('请联系平台管理员重置账号密码。', '找回密码', { confirmButtonText: '知道了' }) }
 async function signOut() {
   if (!(await canLeave())) return
-  try { const response = await authorizedRequest('/api/logout', { method: 'POST' }); if (!response.ok && response.status !== 401) throw new Error(); user.value = null }
+  try { const response = await authorizedRequest('/api/logout', { method: 'POST' }); if (!response.ok && response.status !== 401) throw new Error(); user.value = null; grantedPermissions.value = []; navigation.value = []; section.value = '' }
   catch { loginError.value = '退出失败，请检查服务连接' }
 }
 
-const section = ref('tasks')
+const section = ref('')
 const mobileNavigationOpen = ref(false)
-const iconPaths = {
-  grid: 'M4 4h7v7H4z M13 4h7v5h-7z M13 11h7v9h-7z M4 13h7v7H4z',
-  database: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6m-16 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6',
-  workflow: 'M6 4v4a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4m-12 0v-3m12-13v3',
-  pulse: 'M3 12h4l3-7 4 14 3-7h4',
-  settings: 'M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4m0-12.8L17 7M7 17l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
-  box: 'M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Zm-8 4.5 8 4.5 8-4.5m-8 4.5V21',
-  search: 'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm5 11 4.5 4.5',
-  chart: 'M4 20h16M7 16v-5m5 5V5m5 11v-8',
-  system: 'M4 7h9m4 0h3M4 17h3m4 0h9m-7-2v4m-4-14v4m8-4v4',
-  building: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-3h4v3',
-  roles: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0m-3-12h4m-2-2v4',
-  users: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0',
-  menu: 'M4 6h16M4 12h16M4 18h16M8 6v.01M8 12v.01M8 18v.01',
-  audit: 'M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
-}
-const fallbackMenus = [
-  { id: 1, parentId: null, name: '平台概览', menuType: 'M', component: 'overview', icon: 'grid' },
-  { id: 2, parentId: null, name: '数据资产', menuType: 'M', component: 'assets', icon: 'database' },
-  { id: 3, parentId: null, name: '任务与工作流', menuType: 'M', component: 'tasks', icon: 'workflow' },
-  { id: 4, parentId: null, name: '实时同步', menuType: 'M', component: 'realtime', icon: 'pulse' },
-  { id: 5, parentId: null, name: '运行运维', menuType: 'M', component: 'operations', icon: 'settings' },
-  { id: 6, parentId: null, name: '数据服务', menuType: 'M', component: 'services', icon: 'box' },
-  { id: 7, parentId: null, name: '数据查询', menuType: 'M', component: 'query', icon: 'search' },
-  { id: 8, parentId: null, name: '数据报表', menuType: 'M', component: 'reports', icon: 'chart' },
-  { id: 9, parentId: null, name: '系统管理', menuType: 'D', component: 'system', icon: 'system' },
-  { id: 91, parentId: 9, name: '部门管理', menuType: 'M', component: 'system/departments', icon: 'building' },
-  { id: 92, parentId: 9, name: '角色管理', menuType: 'M', component: 'system/roles', icon: 'roles' },
-  { id: 93, parentId: 9, name: '用户管理', menuType: 'M', component: 'system/users', icon: 'users' },
-  { id: 94, parentId: 9, name: '菜单管理', menuType: 'M', component: 'system/menus', icon: 'menu' },
-  { id: 95, parentId: 9, name: '审计记录', menuType: 'M', component: 'system/audit', icon: 'audit' },
-]
-const navigation = ref(fallbackMenus)
+const navigation = ref([])
 const menu = computed(() => {
   const build = parentId => navigation.value.filter(item => item.parentId === parentId).map(item => {
     const children = build(item.id)
-    const normalized = { ...item, label: item.name, icon: iconPaths[item.icon] || iconPaths.menu }
+    const normalized = { ...item, label: item.name, icon: menuIconPath(item.icon) }
     if (children.length) normalized.children = children
     return normalized
   })
@@ -97,17 +76,17 @@ const pendingMenus = new Set(['overview', 'operations'])
 async function loadNavigation() {
   try {
     const response = await fetch('/api/navigation', { credentials: 'same-origin' })
-    if (!response.ok) return
+    if (!response.ok) { navigation.value = []; section.value = ''; return }
     const rows = await response.json()
     if (!Array.isArray(rows)) return
     navigation.value = rows
     if (!rows.some(item => item.component === section.value)) {
       const first = rows.find(item => item.parentId == null)
-      if (first) section.value = first.component === 'system' ? 'system' : first.component
+      section.value = first ? (first.component === 'system' ? 'system' : first.component) : ''
     }
     const firstSystemPage = rows.find(item => item.parentId != null && item.component?.startsWith('system/'))
     if (firstSystemPage && !rows.some(item => item.component === `system/${systemPage.value}`)) systemPage.value = firstSystemPage.component.slice('system/'.length)
-  } catch { /* Keep the built-in menu if navigation cannot be loaded. */ }
+  } catch { navigation.value = []; section.value = '' }
 }
 const taskStudio = ref(null)
 async function canLeave() {
@@ -193,12 +172,12 @@ onMounted(async () => {
       </header>
       <div v-if="section === 'assets'" class="content"><DataSources /></div>
       <div v-else-if="section === 'tasks'" class="content"><TaskStudio ref="taskStudio" /></div>
-      <div v-else-if="section === 'system'" class="content"><Organization :view="systemPage" @navigation-updated="loadNavigation" /></div>
+      <div v-else-if="section === 'system'" class="content"><Organization :view="systemPage" @navigation-updated="loadSession" /></div>
       <div v-else-if="section === 'query'" class="content"><DataExplorer /></div>
       <div v-else-if="section === 'reports'" class="content"><Reports /></div>
       <div v-else-if="section === 'services'" class="content"><Services /></div>
       <div v-else-if="section === 'realtime'" class="content"><Realtime /></div>
-      <div v-else class="content"><div class="unavailable"><h2>功能尚未接入</h2><p>该模块仍在开发，可前往任务与工作流查看已接入的功能。</p><el-button @click="navigate('tasks')">前往任务与工作流</el-button></div></div>
+      <div v-else class="content"><div class="unavailable"><h2>{{ section ? '功能尚未接入' : '当前账号没有可访问的模块' }}</h2><p>{{ section ? '该模块仍在开发。' : '请联系平台管理员为你的角色分配相应的模块操作权限。' }}</p></div></div>
     </section>
   </main>
 </template>

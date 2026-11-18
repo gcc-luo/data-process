@@ -21,7 +21,7 @@ public final class DatasetAccess {
     public DatasetAccess(AccessPolicy policy) { this.policy = policy; }
 
     public Decision decide(AccessPolicy.User user, Rule rule) {
-        if (user == null || rule == null || !policy.allowed(user, "dataset.read") ||
+        if (user == null || rule == null || !policy.allowed(user, "datasource.query.read") ||
                 Collections.disjoint(user.roles(), rule.allowedRoles())) throw new SecurityException("Dataset access denied");
         Set<String> departments = policy.departments(user, rule.scope());
         if (departments.isEmpty()) throw new SecurityException("Department scope unavailable");
