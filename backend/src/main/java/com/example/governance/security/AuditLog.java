@@ -42,12 +42,20 @@ public class AuditLog {
     private static String[] requestContext() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
             var request = attributes.getRequest();
-            String ip = request.getHeader("X-Forwarded-For");
-            ip = ip == null || ip.isBlank() ? request.getRemoteAddr() : ip.split(",")[0].trim();
             String agent = request.getHeader("User-Agent");
-            return new String[]{truncate(ip == null ? "" : ip, 45), truncate(agent == null ? "" : agent, 255)};
+            return new String[]{truncate(clientIp(request), 45), truncate(agent == null ? "" : agent, 255)};
         }
         return new String[]{"", ""};
+    }
+
+    /** Normalizes proxy headers and IPv6 loopback/mapped forms so logs and profiles show familiar IPv4. */
+    public static String clientIp(jakarta.servlet.http.HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        ip = ip == null || ip.isBlank() ? request.getRemoteAddr() : ip.split(",")[0].trim();
+        if (ip == null) return "";
+        if (ip.startsWith("::ffff:")) ip = ip.substring(7);
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) ip = "127.0.0.1";
+        return ip;
     }
     private static String truncate(String value, int max) { return value.length() <= max ? value : value.substring(0, max); }
 

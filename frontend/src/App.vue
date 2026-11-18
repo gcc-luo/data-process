@@ -24,8 +24,9 @@ const captchaRequired = ref(false)
 const captchaCode = ref('')
 const captchaStamp = ref(0)
 const profileDialog = ref(false)
+const profileMode = ref('profile')
 const forcePassword = ref(false)
-const profileInfo = ref({ username: '', nickname: '' })
+const profileInfo = ref({})
 const profileForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
 const profileMessage = ref('')
 const loginError = ref('')
@@ -35,10 +36,10 @@ async function loadSession() {
   if (response.ok) {
     const session = await response.json()
     user.value = session.username
-    profileInfo.value = { username: session.username, nickname: session.nickname || session.username }
+    profileInfo.value = session
     grantedPermissions.value = Array.isArray(session.permissions) ? session.permissions : []
     forcePassword.value = Boolean(session.mustChangePassword)
-    if (forcePassword.value) profileDialog.value = true
+    if (forcePassword.value) { profileMode.value = 'password'; profileDialog.value = true }
   } else {
     user.value = null
     grantedPermissions.value = []
@@ -62,18 +63,27 @@ async function signIn() {
   finally { loggingIn.value = false }
 }
 function showForgotPassword() { void ElMessageBox.alert('请联系平台管理员重置账号密码。', '找回密码', { confirmButtonText: '知道了' }) }
-async function openProfile() {
+async function openProfile(mode = 'profile') {
+  profileMode.value = forcePassword.value ? 'password' : mode
   profileMessage.value = ''
   profileForm.value = { oldPassword: '', newPassword: '', confirm: '' }
   try {
     const response = await fetch('/api/session', { credentials: 'same-origin' })
     if (response.ok) {
       const session = await response.json()
-      profileInfo.value = { username: session.username, nickname: session.nickname || session.username }
+      profileInfo.value = session
     }
   } catch { /* Keep the cached identity when the session cannot be refreshed. */ }
   profileDialog.value = true
 }
+function fmtTime(value) { return value ? String(value).replace('T', ' ').slice(0, 19) : '—' }
+function fmtEpoch(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+function onAccountCommand(command) { void openProfile(command === 'password' ? 'password' : 'profile') }
 async function submitProfile() {
   profileMessage.value = ''
   if (profileForm.value.newPassword !== profileForm.value.confirm) { profileMessage.value = '两次输入的新密码不一致'; return }
@@ -209,7 +219,15 @@ onMounted(async () => {
         </div>
         <div class="header-actions">
           <span class="status"><i :class="{ offline: status !== '服务正常' }"></i>{{ status }}</span>
-          <button type="button" class="account-chip-button" title="个人中心" @click="openProfile"><span class="account-chip"><span class="account-avatar">{{ user?.slice(0, 1)?.toUpperCase() }}</span><span>{{ user }}</span></span></button>
+          <el-dropdown trigger="click" @command="onAccountCommand">
+            <button type="button" class="account-chip-button" title="账号菜单"><span class="account-chip"><span class="account-avatar">{{ user?.slice(0, 1)?.toUpperCase() }}</span><span>{{ user }}</span><svg class="account-caret" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></span></button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+                <el-dropdown-item command="password">修改密码</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <button class="logout-button" type="button" @click="signOut"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4.8A1.8 1.8 0 0 0 3 5.8v8.4A1.8 1.8 0 0 0 4.8 16H8m3-9 4 3-4 3m4-3H7" /></svg><span>退出</span></button>
         </div>
       </header>
@@ -222,16 +240,32 @@ onMounted(async () => {
       <div v-else-if="section === 'realtime'" class="content"><Realtime /></div>
       <div v-else class="content"><div class="unavailable"><h2>{{ section ? '功能尚未接入' : '当前账号没有可访问的模块' }}</h2><p>{{ section ? '该模块仍在开发。' : '请联系平台管理员为你的角色分配相应的模块操作权限。' }}</p></div></div>
     </section>
-    <el-dialog v-model="profileDialog" :title="forcePassword ? '修改初始密码' : '个人中心'" width="min(480px, 95vw)" :show-close="!forcePassword" :close-on-click-modal="!forcePassword" :close-on-press-escape="!forcePassword">
+    <el-dialog v-model="profileDialog" :title="forcePassword ? '修改初始密码' : (profileMode === 'password' ? '修改密码' : '个人中心')" width="min(620px, 95vw)" :show-close="!forcePassword" :close-on-click-modal="!forcePassword" :close-on-press-escape="!forcePassword">
       <el-alert v-if="forcePassword" title="首次登录或密码被管理员重置后，需修改密码才能继续使用平台。" type="warning" :closable="false" show-icon style="margin-bottom:14px" />
       <el-alert v-if="profileMessage" :title="profileMessage" type="error" :closable="false" show-icon style="margin-bottom:14px" />
-      <p class="profile-identity">账号：{{ profileInfo.username }}　姓名：{{ profileInfo.nickname }}</p>
-      <el-form label-position="top" @submit.prevent="submitProfile">
+      <el-descriptions v-if="profileMode === 'profile' && !forcePassword" :column="2" border>
+        <el-descriptions-item label="账号">{{ profileInfo.username }}</el-descriptions-item>
+        <el-descriptions-item label="姓名">{{ profileInfo.nickname }}</el-descriptions-item>
+        <el-descriptions-item label="所属部门">{{ profileInfo.department || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="角色">{{ (profileInfo.roles || []).join('、') || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="邮箱">{{ profileInfo.email || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="手机">{{ profileInfo.phone || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="注册时间">{{ fmtTime(profileInfo.createdAt) }}</el-descriptions-item>
+        <el-descriptions-item label="上次登录">{{ fmtTime(profileInfo.prevLoginAt) }}</el-descriptions-item>
+        <el-descriptions-item label="本次登录">{{ fmtEpoch(profileInfo.loginAt) }}</el-descriptions-item>
+        <el-descriptions-item label="登录 IP">{{ profileInfo.loginIp || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="终端" :span="2">{{ profileInfo.userAgent || '—' }}</el-descriptions-item>
+      </el-descriptions>
+      <el-form v-else label-position="top" @submit.prevent="submitProfile">
         <el-form-item label="原密码" required><el-input v-model="profileForm.oldPassword" type="password" show-password autocomplete="current-password" /></el-form-item>
         <el-form-item label="新密码" required><el-input v-model="profileForm.newPassword" type="password" show-password autocomplete="new-password" placeholder="至少8位，含大小写/数字/特殊字符中三类" /></el-form-item>
         <el-form-item label="确认新密码" required><el-input v-model="profileForm.confirm" type="password" show-password autocomplete="new-password" /></el-form-item>
       </el-form>
-      <template #footer><el-button v-if="!forcePassword" @click="profileDialog = false">取消</el-button><el-button type="primary" @click="submitProfile">保存</el-button></template>
+      <template #footer>
+        <el-button v-if="!forcePassword" @click="profileDialog = false">关闭</el-button>
+        <el-button v-if="profileMode === 'profile' && !forcePassword" type="primary" @click="profileMode = 'password'">修改密码</el-button>
+        <el-button v-else type="primary" @click="submitProfile">保存</el-button>
+      </template>
     </el-dialog>
   </main>
 </template>
@@ -248,7 +282,7 @@ onMounted(async () => {
 .login-loading{justify-content:center}.login-loading-card{padding:18px 26px;border:1px solid rgba(255,255,255,.88);border-radius:12px;background:rgba(255,255,255,.94);color:#536c80;font-size:14px;box-shadow:0 12px 36px rgba(13,58,111,.18)}
 .captcha-row{display:flex;gap:10px;align-items:center}.captcha-row img{width:120px;height:40px;flex:none;border:1px solid #d9e2eb;border-radius:8px;cursor:pointer;background:#f2f6fc}
 .account-chip-button{border:0;background:transparent;padding:0;font:inherit;color:inherit;cursor:pointer}
-.profile-identity{margin:0 0 14px;color:#556579;font-size:13px}
+.account-caret{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
 @keyframes login-backdrop-drift{0%{transform:scale(1)}100%{transform:scale(1.025)}}@keyframes login-card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:1120px){.login-card{width:min(40vw,520px);min-width:410px;padding-right:34px;padding-left:34px}}
 @media(max-width:820px){.login-screen{justify-content:center;padding:22px}.login-screen::before{background-size:auto 124%;background-position:80% 56%}.login-card{width:min(100%,480px);min-width:0;min-height:0;margin:auto;padding:35px 34px;border-radius:20px}.login-card h2{font-size:32px}.card-subtitle{font-size:18px}}

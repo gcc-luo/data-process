@@ -58,8 +58,8 @@ public class SecurityConfiguration {
                     .successHandler((request, response, authentication) -> {
                         try {
                             var principal = (AccountPrincipal) authentication.getPrincipal();
-                            jdbc.update("UPDATE users SET failed_attempts=0, locked_until=NULL, last_login_at=CURRENT_TIMESTAMP WHERE id=?", principal.id());
-                            onlineSessions.register(request.getSession(), principal, request.getRemoteAddr(), request.getHeader("User-Agent") == null ? "" : request.getHeader("User-Agent"));
+                            jdbc.update("UPDATE users SET failed_attempts=0, locked_until=NULL, prev_login_at=last_login_at, last_login_at=CURRENT_TIMESTAMP WHERE id=?", principal.id());
+                            onlineSessions.register(request.getSession(), principal, AuditLog.clientIp(request), request.getHeader("User-Agent") == null ? "" : request.getHeader("User-Agent"));
                             var session = request.getSession(false);
                             if (session != null) { session.removeAttribute(CaptchaController.SESSION_CODE); session.removeAttribute(CaptchaController.SESSION_EXPIRES); }
                             audit.success(authentication, "auth.login", "user", principal.id());

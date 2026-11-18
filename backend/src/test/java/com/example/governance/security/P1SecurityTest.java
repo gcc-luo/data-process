@@ -65,13 +65,28 @@ class P1SecurityTest {
         var online = mvc.perform(get("/api/organization/online").session(admin)).andExpect(status().isOk()).andReturn();
         String body = online.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertTrue(body.contains("alice"));
-        String sessionId = null;
-        for (var node : com.fasterxml.jackson.databind.json.JsonMapper.builder().build().readTree(body))
-            if ("alice".equals(node.get("username").asText())) sessionId = node.get("sessionId").asText();
-        assertNotNull(sessionId);
+        String sessionId = alice.getId();
         mvc.perform(post("/api/organization/online/" + sessionId + "/kick").session(admin).with(csrf())).andExpect(status().isNoContent());
         mvc.perform(get("/api/session").session(alice)).andExpect(status().isUnauthorized());
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='user.kick'", Integer.class));
+    }
+
+    @Test void sessionProfileCarriesDepartmentRolesAndLoginContext() throws Exception {
+        var first = login("alice");
+        var second = login("alice");
+        var body = mvc.perform(get("/api/session").session(second)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.department").value("test"))
+                .andExpect(jsonPath("$.loginIp").value("127.0.0.1"))
+                .andExpect(jsonPath("$.prevLoginAt").exists())
+                .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(body.contains("\"roles\":[]"));
+        assertNotNull(first);
+    }
+
+    @Test void ipv6LoopbackIsNormalizedToIpv4() throws Exception {
+        mvc.perform(post("/api/login").with(csrf()).with(request -> { request.setRemoteAddr("0:0:0:0:0:0:0:1"); return request; })
+                .param("username", "alice").param("password", "wrong")).andExpect(status().isUnauthorized());
+        assertEquals("127.0.0.1", jdbc.queryForObject("SELECT ip FROM audit_events ORDER BY id DESC LIMIT 1", String.class));
     }
 
     @Test void retentionPurgesOldRowsAndAuditsItself() {

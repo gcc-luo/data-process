@@ -63,6 +63,12 @@ const roleUsersDialog = ref(false)
 const roleUsersRows = ref([])
 const roleUsersRole = ref(null)
 function timeText(value) { return value ? String(value).replace('T', ' ').slice(0, 19) : '—' }
+function fmtEpoch(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -604,7 +610,7 @@ onMounted(load)
         <el-table-column prop="username" label="账号" min-width="120" />
         <el-table-column prop="nickname" label="姓名" min-width="120" />
         <el-table-column prop="ip" label="IP" min-width="130" />
-        <el-table-column label="登录时间" min-width="160"><template #default="scope">{{ new Date(scope.row.loginAt).toLocaleString('zh-CN', { hour12: false }) }}</template></el-table-column>
+        <el-table-column label="登录时间" min-width="160"><template #default="scope">{{ fmtEpoch(scope.row.loginAt) }}</template></el-table-column>
         <el-table-column prop="userAgent" label="终端" min-width="200" show-overflow-tooltip />
         <el-table-column label="操作" width="100"><template #default="scope"><el-button v-if="can('system.user.set_status')" link type="danger" @click="kickSession(scope.row)">踢下线</el-button></template></el-table-column>
       </el-table>

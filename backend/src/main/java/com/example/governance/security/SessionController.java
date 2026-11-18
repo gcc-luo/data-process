@@ -24,16 +24,26 @@ public class SessionController {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
     private final AuditLog audit;
-    public SessionController(JdbcTemplate jdbc, PasswordEncoder encoder, AuditLog audit) { this.jdbc = jdbc; this.encoder = encoder; this.audit = audit; }
+    private final OnlineSessions onlineSessions;
+    public SessionController(JdbcTemplate jdbc, PasswordEncoder encoder, AuditLog audit, OnlineSessions onlineSessions) { this.jdbc = jdbc; this.encoder = encoder; this.audit = audit; this.onlineSessions = onlineSessions; }
 
     @GetMapping("/api/csrf") Map<String, String> csrf(CsrfToken token) {
         return Map.of("token", token.getToken(), "headerName", token.getHeaderName());
     }
-    public record Session(String username, String nickname, boolean mustChangePassword, Set<String> permissions) {}
-    @GetMapping("/api/session") Session session(Authentication authentication) {
+    public record Session(String username, String nickname, boolean mustChangePassword, Set<String> permissions, String department, java.util.List<String> roles, String email, String phone, java.time.LocalDateTime createdAt, java.time.LocalDateTime prevLoginAt, String loginIp, Long loginAt, String userAgent) {}
+    @GetMapping("/api/session") Session session(Authentication authentication, jakarta.servlet.http.HttpServletRequest request) {
         var principal = (AccountPrincipal) authentication.getPrincipal();
+        var rows = jdbc.query("SELECT u.email,u.phone,u.created_at,u.prev_login_at,d.name FROM users u LEFT JOIN departments d ON d.id=u.department_id WHERE u.id=? AND u.deleted=FALSE",
+                (rs, row) -> new Object[]{rs.getString(1), rs.getString(2), rs.getTimestamp(3), rs.getTimestamp(4), rs.getString(5)}, principal.id());
+        Object[] profile = rows.isEmpty() ? new Object[]{null, null, null, null, null} : rows.get(0);
+        var roles = jdbc.queryForList("SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=? ORDER BY r.sort_order,r.id", String.class, principal.id());
+        var online = onlineSessions.list().stream().filter(entry -> entry.sessionId().equals(request.getSession().getId())).findFirst().orElse(null);
         return new Session(principal.getUsername(), principal.nickname(), principal.mustChangePassword(),
-                authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toUnmodifiableSet()));
+                authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toUnmodifiableSet()),
+                (String) profile[4], roles, (String) profile[0], (String) profile[1],
+                profile[2] == null ? null : ((java.sql.Timestamp) profile[2]).toLocalDateTime(),
+                profile[3] == null ? null : ((java.sql.Timestamp) profile[3]).toLocalDateTime(),
+                online == null ? null : online.ip(), online == null ? null : online.loginAt(), online == null ? null : online.userAgent());
     }
 
     public record SelfPassword(String oldPassword, String newPassword) {}
