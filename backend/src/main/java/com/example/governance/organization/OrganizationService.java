@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import com.example.governance.security.PasswordPolicy;
 import com.example.governance.security.PermissionCatalog;
 import com.example.governance.security.PermissionGrantDeniedException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -51,6 +52,13 @@ public class OrganizationService {
         checkOptional(leader, 160, "leader"); checkOptional(phone, 48, "phone"); checkOptional(email, 160, "email");
         tx.executeWithoutResult(status -> {
             lock(); validateDepartmentParent(id, parent);
+            if (!enabled) {
+                var subtree = departmentSubtree(id);
+                String placeholders = String.join(",", java.util.Collections.nCopies(subtree.size(), "?"));
+                Integer activeChildren = jdbc.queryForObject("SELECT COUNT(*) FROM departments WHERE enabled=TRUE AND id<>" + id + " AND id IN (" + placeholders + ")", Integer.class, subtree.toArray());
+                Integer staff = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE deleted=FALSE AND department_id IN (" + placeholders + ")", Integer.class, subtree.toArray());
+                if ((activeChildren != null && activeChildren > 0) || (staff != null && staff > 0)) throw new IllegalStateException("该部门或下级部门仍有启用子部门或在职用户，不能停用");
+            }
             int changed = jdbc.update("UPDATE departments SET name=?,parent_id=?,sort_order=?,leader=?,phone=?,email=?,enabled=? WHERE id=?", name.trim(), parent, sortOrder, blankToNull(leader), blankToNull(phone), blankToNull(email), enabled, id);
             if (changed != 1) throw new IllegalArgumentException("Unknown department");
         });
@@ -61,6 +69,21 @@ public class OrganizationService {
             lock(); validateDepartmentParent(id, parent);
             jdbc.update("UPDATE departments SET parent_id=? WHERE id=?", parent, id);
         });
+    }
+
+    private java.util.Set<Long> departmentSubtree(long root) {
+        Map<Long, List<Long>> children = new HashMap<>();
+        jdbc.query("SELECT id,parent_id FROM departments", rs -> { long parent = rs.getLong(2); if (!rs.wasNull()) children.computeIfAbsent(parent, key -> new ArrayList<>()).add(rs.getLong(1)); });
+        java.util.Set<Long> ids = new HashSet<>();
+        java.util.Deque<Long> stack = new java.util.ArrayDeque<>();
+        stack.push(root);
+        while (!stack.isEmpty()) { long current = stack.pop(); if (ids.add(current)) for (long child : children.getOrDefault(current, List.of())) stack.push(child); }
+        return ids;
+    }
+
+    private static java.time.LocalDateTime timestamp(java.sql.ResultSet rs, int index) throws java.sql.SQLException {
+        var value = rs.getTimestamp(index);
+        return value == null ? null : value.toLocalDateTime();
     }
 
     private void validateDepartmentParent(Long id, Long parent) {
@@ -148,7 +171,7 @@ public class OrganizationService {
 
     public long createUser(String username, String nickname, String email, String phone, String password, long department, boolean enabled, Set<Long> roles, Set<String> actorPermissions) {
         checkUsername(username); checkOptional(nickname, 160, "nickname"); checkOptional(email, 160, "email"); checkOptional(phone, 48, "phone");
-        checkPassword(password);
+        checkPassword(password, username);
         validateRoleIds(roles);
         Set<String> actor = actorPermissions == null ? Set.of() : Set.copyOf(actorPermissions);
         String hash = encoder.encode(password);
@@ -158,7 +181,7 @@ public class OrganizationService {
             if (roles.stream().anyMatch(role -> !exists("roles", role))) throw new IllegalArgumentException("Unknown role");
             validateRoleAssignments(roles, Set.of(), actor);
             long id = next("users");
-            jdbc.update("INSERT INTO users(id,username,nickname,email,phone,password_hash,department_id,enabled,deleted,security_version) VALUES (?,?,?,?,?,?,?,?,FALSE,?)", id, username.trim(), defaultNickname(username, nickname), blankToNull(email), blankToNull(phone), hash, department, enabled, UUID.randomUUID().toString());
+            jdbc.update("INSERT INTO users(id,username,nickname,email,phone,password_hash,department_id,enabled,deleted,security_version,must_change_password) VALUES (?,?,?,?,?,?,?,?,FALSE,?,TRUE)", id, username.trim(), defaultNickname(username, nickname), blankToNull(email), blankToNull(phone), hash, department, enabled, UUID.randomUUID().toString());
             replaceUserRoles(id, roles);
             return id;
         });
@@ -269,7 +292,7 @@ public class OrganizationService {
 
     public record Department(long id, String name, Long parentId, int sortOrder, String leader, String phone, String email, boolean enabled) {}
     public record Role(long id, String name, String roleKey, String description, int sortOrder, boolean enabled, Set<String> permissions) {}
-    public record User(long id, String username, String nickname, String email, String phone, long departmentId, boolean enabled, Set<Long> roles) {}
+    public record User(long id, String username, String nickname, String email, String phone, long departmentId, boolean enabled, Set<Long> roles, java.time.LocalDateTime createdAt, java.time.LocalDateTime lastLoginAt) {}
     public record Menu(long id, Long parentId, String name, String menuType, String routePath, String component, String icon, int sortOrder, boolean visible, boolean enabled) {}
     public record DepartmentOption(long id, String name, Long parentId, boolean enabled) {}
     public record Snapshot(List<Department> departments, List<DepartmentOption> departmentOptions, List<Role> roles, List<User> users, List<Menu> menus, List<PermissionCatalog.Entry> permissionCatalog, Set<String> assignablePermissionCodes) {}
@@ -292,16 +315,47 @@ public class OrganizationService {
         }
         List<User> users = List.of();
         if (granted.contains("system.user.read")) {
-            List<User> baseUsers = jdbc.query("SELECT id,username,nickname,email,phone,department_id,enabled FROM users WHERE deleted=FALSE ORDER BY id", (rs, row) -> new User(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getLong(6), rs.getBoolean(7), Set.of()));
-            users = baseUsers.stream().map(user -> new User(user.id(), user.username(), user.nickname(), user.email(), user.phone(), user.departmentId(), user.enabled(), Set.copyOf(jdbc.queryForList("SELECT role_id FROM user_roles WHERE user_id=?", Long.class, user.id())))).toList();
+            List<User> baseUsers = jdbc.query("SELECT id,username,nickname,email,phone,department_id,enabled,created_at,last_login_at FROM users WHERE deleted=FALSE ORDER BY id", (rs, row) -> new User(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getLong(6), rs.getBoolean(7), Set.of(), timestamp(rs, 8), timestamp(rs, 9)));
+            users = baseUsers.stream().map(user -> new User(user.id(), user.username(), user.nickname(), user.email(), user.phone(), user.departmentId(), user.enabled(), Set.copyOf(jdbc.queryForList("SELECT role_id FROM user_roles WHERE user_id=?", Long.class, user.id())), user.createdAt(), user.lastLoginAt())).toList();
         } else if (granted.contains("system.user.assign_roles") || granted.contains("service.caller.create")) {
-            List<User> userChoices = jdbc.query("SELECT id,username,department_id,enabled FROM users WHERE deleted=FALSE AND enabled=TRUE ORDER BY id", (rs, row) -> new User(rs.getLong(1), rs.getString(2), rs.getString(2), null, null, rs.getLong(3), rs.getBoolean(4), Set.of()));
-            users = userChoices.stream().map(user -> new User(user.id(), user.username(), user.nickname(), null, null, user.departmentId(), user.enabled(), granted.contains("system.user.assign_roles") ? Set.copyOf(jdbc.queryForList("SELECT role_id FROM user_roles WHERE user_id=?", Long.class, user.id())) : Set.of())).toList();
+            List<User> userChoices = jdbc.query("SELECT id,username,department_id,enabled,created_at,last_login_at FROM users WHERE deleted=FALSE AND enabled=TRUE ORDER BY id", (rs, row) -> new User(rs.getLong(1), rs.getString(2), rs.getString(2), null, null, rs.getLong(3), rs.getBoolean(4), Set.of(), timestamp(rs, 5), timestamp(rs, 6)));
+            users = userChoices.stream().map(user -> new User(user.id(), user.username(), user.nickname(), null, null, user.departmentId(), user.enabled(), granted.contains("system.user.assign_roles") ? Set.copyOf(jdbc.queryForList("SELECT role_id FROM user_roles WHERE user_id=?", Long.class, user.id())) : Set.of(), user.createdAt(), user.lastLoginAt())).toList();
         }
         List<Menu> menus = granted.contains("system.menu.read") ? allMenus() : List.of();
         List<PermissionCatalog.Entry> catalog = (granted.contains("system.permission.read") || granted.contains("system.role.assign_permissions")) ? permissionCatalog() : List.of();
         Set<String> assignablePermissionCodes = granted.stream().filter(PermissionCatalog.codes()::contains).collect(java.util.stream.Collectors.toUnmodifiableSet());
         return new Snapshot(departments, departmentOptions, roles, users, menus, catalog, assignablePermissionCodes);
+    }
+
+    public record RoleUser(long id, String username, String nickname, boolean enabled) {}
+    public List<RoleUser> roleUsers(long roleId) {
+        if (!exists("roles", roleId)) throw new IllegalArgumentException("Unknown role");
+        return jdbc.query("SELECT u.id,u.username,u.nickname,u.enabled FROM users u JOIN user_roles ur ON ur.user_id=u.id WHERE ur.role_id=? AND u.deleted=FALSE ORDER BY u.id", (rs, row) -> new RoleUser(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4)), roleId);
+    }
+
+    public List<User> allUsers() {
+        List<User> base = jdbc.query("SELECT id,username,nickname,email,phone,department_id,enabled,created_at,last_login_at FROM users WHERE deleted=FALSE ORDER BY id", (rs, row) -> new User(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getLong(6), rs.getBoolean(7), Set.of(), timestamp(rs, 8), timestamp(rs, 9)));
+        return base.stream().map(user -> new User(user.id(), user.username(), user.nickname(), user.email(), user.phone(), user.departmentId(), user.enabled(), Set.copyOf(jdbc.queryForList("SELECT role_id FROM user_roles WHERE user_id=?", Long.class, user.id())), user.createdAt(), user.lastLoginAt())).toList();
+    }
+
+    /** Row-wise CSV import: valid rows are created, invalid rows are reported without aborting the batch. */
+    public Map<String, Object> importUsers(List<String[]> rows) {
+        List<Map<String, Object>> errors = new ArrayList<>();
+        int created = 0;
+        for (int i = 0; i < rows.size(); i++) {
+            String[] row = rows.get(i);
+            try {
+                if (row.length < 4) throw new IllegalArgumentException("列数不足（账号,姓名,密码,部门ID,手机,邮箱）");
+                long department = Long.parseLong(row[3].trim());
+                createUser(row[0].trim(), row[1].trim(), row.length > 5 ? row[5].trim() : null, row.length > 4 ? row[4].trim() : null, row[2], department, true, Set.of());
+                created++;
+            } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+                errors.add(Map.of("row", i + 1, "error", "账号已存在或部门无效"));
+            } catch (RuntimeException failure) {
+                errors.add(Map.of("row", i + 1, "error", failure.getMessage() == null ? "导入失败" : failure.getMessage()));
+            }
+        }
+        return Map.of("created", created, "errors", errors);
     }
 
     /** Returns visible menu nodes whose module has at least one operation grant, including ancestors. */
@@ -335,7 +389,7 @@ public class OrganizationService {
     }
 
     private List<PermissionCatalog.Entry> permissionCatalog() {
-        return jdbc.query("SELECT permission_code,module_code,module_name,action_name,description,sort_order FROM permission_catalog WHERE enabled=TRUE ORDER BY sort_order,permission_code", (rs, row) -> new PermissionCatalog.Entry(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getInt(6)))
+        return jdbc.query("SELECT permission_code,module_code,module_name,action_name,description,sort_order FROM permission_catalog ORDER BY sort_order,permission_code", (rs, row) -> new PermissionCatalog.Entry(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getInt(6)))
                 .stream().filter(entry -> PermissionCatalog.codes().contains(entry.code())).toList();
     }
 
@@ -351,7 +405,7 @@ public class OrganizationService {
 
     private void validateMenu(String name, Long parentId, String type, int order, String path, String component, String icon, Long id) {
         checkName(name); checkOrder(order); checkOptional(path, 255, "route path"); checkOptional(component, 160, "component"); checkOptional(icon, 80, "icon");
-        if (type == null || !Set.of("D", "M", "F").contains(type)) throw new IllegalArgumentException("Invalid menu type");
+        if (type == null || !Set.of("D", "M").contains(type)) throw new IllegalArgumentException("菜单类型仅支持目录与菜单，按钮权限由权限管理目录统一登记");
         String normalizedPath = normalizedRoute(path, type);
         if ("M".equals(type) && normalizedPath.isBlank()) throw new IllegalArgumentException("Page route is required");
         if ("M".equals(type) && !normalizedPath.startsWith("/")) throw new IllegalArgumentException("Page route must start with /");
@@ -409,7 +463,7 @@ public class OrganizationService {
     private void checkRoleKey(String value) { if (value == null || !value.trim().matches("[A-Za-z][A-Za-z0-9_.-]{1,159}")) throw new IllegalArgumentException("Invalid role key"); }
     private void checkOrder(int value) { if (value < 0 || value > 100000) throw new IllegalArgumentException("Invalid sort order"); }
     private void checkOptional(String value, int maxLength, String field) { if (value != null && (value.length() > maxLength || value.indexOf('\0') >= 0)) throw new IllegalArgumentException("Invalid " + field); }
-    private void checkPassword(String password) { if (password == null || password.isBlank() || password.getBytes(StandardCharsets.UTF_8).length > 72) throw new IllegalArgumentException("Password is required and must not exceed 72 bytes"); }
+    private void checkPassword(String password, String username) { PasswordPolicy.validate(password, username); }
     private void validateRoleIds(Set<Long> roles) { if (roles == null || roles.size() > 100 || roles.stream().anyMatch(java.util.Objects::isNull)) throw new IllegalArgumentException("Invalid roles"); }
     private void replaceUserRoles(long userId, Set<Long> roles) { jdbc.update("DELETE FROM user_roles WHERE user_id=?", userId); roles.forEach(role -> jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (?,?)", userId, role)); }
     private void lock() { jdbc.queryForObject("SELECT setting_value FROM platform_settings WHERE setting_key='internal.organization.lock' FOR UPDATE", String.class); }

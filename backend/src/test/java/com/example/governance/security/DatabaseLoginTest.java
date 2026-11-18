@@ -42,7 +42,7 @@ class DatabaseLoginTest {
     @Test void changedPermissionsApplyImmediatelyAndRecreatedUserCannotReuseSession() throws Exception {
         jdbc.update("INSERT INTO roles(id,name) VALUES (101,'test')");
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (101,101)");
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (101,'workflow.validate')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (101,'workflow.workflow.validate')");
         var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","correct-password"))
                 .andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
         String body = "{\"tasks\":[\"a\"],\"edges\":[]}";
@@ -58,9 +58,9 @@ class DatabaseLoginTest {
     @Test void securityVersionChangeRevokesExistingSessionEvenIfIdIsReused() throws Exception {
         var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","correct-password"))
                 .andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
-        credentials.resetPassword(101, "admin");
+        credentials.resetPassword(101, "Str0ng-Reset!1");
         mvc.perform(get("/api/session").session(session)).andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","admin")).andExpect(status().isNoContent());
+        mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","Str0ng-Reset!1")).andExpect(status().isNoContent());
     }
     @Test void recreatedAccountWithSameIdCannotReuseOldSession() throws Exception {
         var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","alice").param("password","correct-password"))

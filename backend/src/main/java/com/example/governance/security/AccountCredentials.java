@@ -12,8 +12,10 @@ public class AccountCredentials {
     private final PasswordEncoder encoder;
     public AccountCredentials(JdbcTemplate jdbc, PasswordEncoder encoder) { this.jdbc = jdbc; this.encoder = encoder; }
     public void resetPassword(long accountId, String password) {
-        if (password == null || password.isBlank() || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) throw new IllegalArgumentException("Password is required and must not exceed 72 bytes");
-        int updated = jdbc.update("UPDATE users SET password_hash=?, security_version=? WHERE id=? AND deleted=FALSE",
+        var rows = jdbc.query("SELECT username FROM users WHERE id=? AND deleted=FALSE", (rs, row) -> rs.getString(1), accountId);
+        if (rows.isEmpty()) throw new IllegalArgumentException("Unknown account");
+        PasswordPolicy.validate(password, rows.get(0));
+        int updated = jdbc.update("UPDATE users SET password_hash=?, security_version=?, must_change_password=TRUE WHERE id=? AND deleted=FALSE",
                 encoder.encode(password), UUID.randomUUID().toString(), accountId);
         if (updated != 1) throw new IllegalArgumentException("Unknown account");
     }

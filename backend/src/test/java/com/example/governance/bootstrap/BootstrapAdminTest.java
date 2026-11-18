@@ -21,28 +21,29 @@ class BootstrapAdminTest {
         jdbc.update("DELETE FROM users"); jdbc.update("DELETE FROM roles"); jdbc.update("DELETE FROM departments");
     }
     @Test void initializesOnceWithHashedPasswordAndExplicitPermission() {
-        bootstrap.create("admin", "long-unique-password");
+        bootstrap.create("admin", "L0ng-Unique-Pass!");
         String hash = jdbc.queryForObject("SELECT password_hash FROM users WHERE username='admin'", String.class);
-        assertTrue(encoder.matches("long-unique-password", hash));
-        assertNotEquals("long-unique-password", hash);
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM role_permissions WHERE permission='workflow.validate'", Integer.class));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM role_permissions WHERE permission='datasource.manage'", Integer.class));
-        assertThrows(IllegalStateException.class, () -> bootstrap.create("other", "another-long-password"));
+        assertTrue(encoder.matches("L0ng-Unique-Pass!", hash));
+        assertNotEquals("L0ng-Unique-Pass!", hash);
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM role_permissions WHERE permission='workflow.workflow.validate'", Integer.class));
+        assertEquals(com.example.governance.security.PermissionCatalog.codes().size(), jdbc.queryForObject("SELECT COUNT(*) FROM role_permissions WHERE role_id=1", Integer.class));
+        assertThrows(IllegalStateException.class, () -> bootstrap.create("other", "An0ther-Long-Pass!"));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class));
     }
     @Test void rejectsWeakOrBlankInputWithoutWriting() {
-        assertThrows(IllegalArgumentException.class, () -> bootstrap.create(" ", "long-unique-password"));
+        assertThrows(IllegalArgumentException.class, () -> bootstrap.create(" ", "L0ng-Unique-Pass!"));
         assertThrows(IllegalArgumentException.class, () -> bootstrap.create("admin", " "));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class));
     }
-    @Test void acceptsShortAdministratorPassword() {
-        bootstrap.create("admin", "admin");
-        assertTrue(encoder.matches("admin", jdbc.queryForObject("SELECT password_hash FROM users WHERE username='admin'", String.class)));
+    @Test void rejectsWeakAdministratorPassword() {
+        assertThrows(IllegalArgumentException.class, () -> bootstrap.create("admin", "admin"));
+        bootstrap.create("admin", "L0ng-Unique-Pass!");
+        assertTrue(encoder.matches("L0ng-Unique-Pass!", jdbc.queryForObject("SELECT password_hash FROM users WHERE username='admin'", String.class)));
     }
     @Test void onlyOneConcurrentInitializationCanSucceed() throws Exception {
         var pool=Executors.newFixedThreadPool(2);
         var start=new CountDownLatch(1);
-        Callable<Boolean> job=() -> { start.await(); try { bootstrap.create("admin", "long-unique-password"); return true; } catch (IllegalStateException e) { return false; } };
+        Callable<Boolean> job=() -> { start.await(); try { bootstrap.create("admin", "L0ng-Unique-Pass!"); return true; } catch (IllegalStateException e) { return false; } };
         try {
             var a=pool.submit(job); var b=pool.submit(job); start.countDown();
             assertNotEquals(a.get(10, TimeUnit.SECONDS), b.get(10, TimeUnit.SECONDS));

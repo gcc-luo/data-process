@@ -20,6 +20,14 @@ const sessionLoading = ref(true)
 const username = ref('')
 const password = ref('')
 const rememberUsername = ref(false)
+const captchaRequired = ref(false)
+const captchaCode = ref('')
+const captchaStamp = ref(0)
+const profileDialog = ref(false)
+const forcePassword = ref(false)
+const profileInfo = ref({ username: '', nickname: '' })
+const profileForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
+const profileMessage = ref('')
 const loginError = ref('')
 const loggingIn = ref(false)
 async function loadSession() {
@@ -27,7 +35,10 @@ async function loadSession() {
   if (response.ok) {
     const session = await response.json()
     user.value = session.username
+    profileInfo.value = { username: session.username, nickname: session.nickname || session.username }
     grantedPermissions.value = Array.isArray(session.permissions) ? session.permissions : []
+    forcePassword.value = Boolean(session.mustChangePassword)
+    if (forcePassword.value) profileDialog.value = true
   } else {
     user.value = null
     grantedPermissions.value = []
@@ -42,12 +53,42 @@ async function signIn() {
       if (rememberUsername.value) localStorage.setItem('governance-platform-username', username.value)
       else localStorage.removeItem('governance-platform-username')
     } catch { /* Storage may be unavailable in private browsing. */ }
-    await login(username.value, password.value); password.value = ''; await loadSession()
+    await login(username.value, password.value, captchaCode.value); password.value = ''; captchaCode.value = ''; captchaRequired.value = false; await loadSession()
   }
-  catch (error) { loginError.value = error.message }
+  catch (error) {
+    loginError.value = error.message
+    if (error.captchaRequired) { captchaRequired.value = true; captchaStamp.value = Date.now() }
+  }
   finally { loggingIn.value = false }
 }
 function showForgotPassword() { void ElMessageBox.alert('请联系平台管理员重置账号密码。', '找回密码', { confirmButtonText: '知道了' }) }
+async function openProfile() {
+  profileMessage.value = ''
+  profileForm.value = { oldPassword: '', newPassword: '', confirm: '' }
+  try {
+    const response = await fetch('/api/session', { credentials: 'same-origin' })
+    if (response.ok) {
+      const session = await response.json()
+      profileInfo.value = { username: session.username, nickname: session.nickname || session.username }
+    }
+  } catch { /* Keep the cached identity when the session cannot be refreshed. */ }
+  profileDialog.value = true
+}
+async function submitProfile() {
+  profileMessage.value = ''
+  if (profileForm.value.newPassword !== profileForm.value.confirm) { profileMessage.value = '两次输入的新密码不一致'; return }
+  try {
+    const response = await authorizedRequest('/api/session/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oldPassword: profileForm.value.oldPassword, newPassword: profileForm.value.newPassword }) })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      throw new Error(payload?.error || '修改密码失败')
+    }
+    forcePassword.value = false
+    profileDialog.value = false
+    profileForm.value = { oldPassword: '', newPassword: '', confirm: '' }
+    void ElMessageBox.alert('密码已修改，其他设备的登录会话已失效。', '修改成功', { confirmButtonText: '知道了' })
+  } catch (error) { profileMessage.value = error.message }
+}
 async function signOut() {
   if (!(await canLeave())) return
   try { const response = await authorizedRequest('/api/logout', { method: 'POST' }); if (!response.ok && response.status !== 401) throw new Error(); user.value = null; grantedPermissions.value = []; navigation.value = []; section.value = '' }
@@ -116,6 +157,7 @@ async function navigateSystemPage(item) {
   mobileNavigationOpen.value = false
 }
 onMounted(async () => {
+  window.addEventListener('governance:session-expired', () => { user.value = null; grantedPermissions.value = []; navigation.value = []; section.value = ''; loginError.value = '登录已失效，请重新登录' })
   try { const remembered = localStorage.getItem('governance-platform-username'); if (remembered) { username.value = remembered; rememberUsername.value = true } } catch { /* Storage may be unavailable in private browsing. */ }
   try { await loadSession() } catch { user.value = null } finally { sessionLoading.value = false }
   try { const response = await fetch('/api/health'); if (!response.ok || (await response.json()).status !== 'UP') throw new Error(); status.value = '服务正常' }
@@ -132,6 +174,7 @@ onMounted(async () => {
       <p class="card-subtitle">Data Governance Platform</p>
       <el-input v-model="username" autocomplete="username" placeholder="用户名" aria-label="用户名" required><template #prefix><svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></template></el-input>
       <el-input v-model="password" type="password" autocomplete="current-password" placeholder="密码" aria-label="密码" required show-password><template #prefix><svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></template></el-input>
+      <div v-if="captchaRequired" class="captcha-row"><el-input v-model="captchaCode" placeholder="验证码" maxlength="4" aria-label="验证码" /><img :src="'/api/captcha?t=' + captchaStamp" alt="验证码" title="点击刷新" @click="captchaStamp = Date.now()" /></div>
       <div class="login-options"><el-checkbox v-model="rememberUsername">记住我</el-checkbox><button type="button" class="forgot-link" @click="showForgotPassword">忘记密码？</button></div>
       <el-alert v-if="loginError" :title="loginError" type="error" :closable="false" />
       <el-button type="primary" native-type="submit" :loading="loggingIn">登录</el-button>
@@ -166,7 +209,7 @@ onMounted(async () => {
         </div>
         <div class="header-actions">
           <span class="status"><i :class="{ offline: status !== '服务正常' }"></i>{{ status }}</span>
-          <span class="account-chip"><span class="account-avatar">{{ user?.slice(0, 1)?.toUpperCase() }}</span><span>{{ user }}</span></span>
+          <button type="button" class="account-chip-button" title="个人中心" @click="openProfile"><span class="account-chip"><span class="account-avatar">{{ user?.slice(0, 1)?.toUpperCase() }}</span><span>{{ user }}</span></span></button>
           <button class="logout-button" type="button" @click="signOut"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4.8A1.8 1.8 0 0 0 3 5.8v8.4A1.8 1.8 0 0 0 4.8 16H8m3-9 4 3-4 3m4-3H7" /></svg><span>退出</span></button>
         </div>
       </header>
@@ -179,6 +222,17 @@ onMounted(async () => {
       <div v-else-if="section === 'realtime'" class="content"><Realtime /></div>
       <div v-else class="content"><div class="unavailable"><h2>{{ section ? '功能尚未接入' : '当前账号没有可访问的模块' }}</h2><p>{{ section ? '该模块仍在开发。' : '请联系平台管理员为你的角色分配相应的模块操作权限。' }}</p></div></div>
     </section>
+    <el-dialog v-model="profileDialog" :title="forcePassword ? '修改初始密码' : '个人中心'" width="min(480px, 95vw)" :show-close="!forcePassword" :close-on-click-modal="!forcePassword" :close-on-press-escape="!forcePassword">
+      <el-alert v-if="forcePassword" title="首次登录或密码被管理员重置后，需修改密码才能继续使用平台。" type="warning" :closable="false" show-icon style="margin-bottom:14px" />
+      <el-alert v-if="profileMessage" :title="profileMessage" type="error" :closable="false" show-icon style="margin-bottom:14px" />
+      <p class="profile-identity">账号：{{ profileInfo.username }}　姓名：{{ profileInfo.nickname }}</p>
+      <el-form label-position="top" @submit.prevent="submitProfile">
+        <el-form-item label="原密码" required><el-input v-model="profileForm.oldPassword" type="password" show-password autocomplete="current-password" /></el-form-item>
+        <el-form-item label="新密码" required><el-input v-model="profileForm.newPassword" type="password" show-password autocomplete="new-password" placeholder="至少8位，含大小写/数字/特殊字符中三类" /></el-form-item>
+        <el-form-item label="确认新密码" required><el-input v-model="profileForm.confirm" type="password" show-password autocomplete="new-password" /></el-form-item>
+      </el-form>
+      <template #footer><el-button v-if="!forcePassword" @click="profileDialog = false">取消</el-button><el-button type="primary" @click="submitProfile">保存</el-button></template>
+    </el-dialog>
   </main>
 </template>
 <style>
@@ -192,6 +246,9 @@ onMounted(async () => {
 .login-card .el-input{width:100%}.login-card .el-input__wrapper{min-height:56px;padding:0 17px;border:1px solid #d9e2eb;border-radius:10px;background:rgba(255,255,255,.96);box-shadow:0 1px 3px rgba(34,72,110,.04),0 0 0 1px rgba(221,231,239,.35) inset;transition:border-color .18s ease,box-shadow .18s ease}.login-card .el-input__wrapper:hover{border-color:#a9c9e8;box-shadow:0 0 0 3px rgba(48,134,227,.08)}.login-card .el-input__wrapper.is-focus{border-color:#4594ed;box-shadow:0 0 0 3px rgba(48,134,227,.12)}.login-card .el-input__inner{color:#1d3348;font-size:16px}.login-card .el-input__inner::placeholder{color:#8493a3}.field-icon{display:block;width:21px;height:21px;fill:none;stroke:#223b50;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.login-card .el-input__prefix{margin-right:10px}
 .login-options{display:flex;align-items:center;justify-content:space-between;margin:-2px 0 1px}.login-options .el-checkbox__label{color:#34485d;font-size:14px}.login-options .el-checkbox__inner{width:16px;height:16px;border-color:#9eb2c3}.forgot-link{padding:4px 0;border:0;background:transparent;color:#1671eb;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.forgot-link:hover{text-decoration:underline}.login-card .el-button--primary{width:100%;height:56px;margin-top:5px;border:0;border-radius:10px;background:linear-gradient(105deg,#0769f5 0%,#3589fb 100%);box-shadow:0 7px 16px rgba(17,112,244,.22);font-size:18px;font-weight:650;letter-spacing:.08em;transition:filter .18s ease,transform .18s ease}.login-card .el-button--primary:hover{filter:brightness(1.04);transform:translateY(-1px)}.login-security{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;color:#72879a;font-size:11px}.login-security svg{display:block;width:15px;height:15px;flex:0 0 15px;fill:none;stroke:#368b9d;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .login-loading{justify-content:center}.login-loading-card{padding:18px 26px;border:1px solid rgba(255,255,255,.88);border-radius:12px;background:rgba(255,255,255,.94);color:#536c80;font-size:14px;box-shadow:0 12px 36px rgba(13,58,111,.18)}
+.captcha-row{display:flex;gap:10px;align-items:center}.captcha-row img{width:120px;height:40px;flex:none;border:1px solid #d9e2eb;border-radius:8px;cursor:pointer;background:#f2f6fc}
+.account-chip-button{border:0;background:transparent;padding:0;font:inherit;color:inherit;cursor:pointer}
+.profile-identity{margin:0 0 14px;color:#556579;font-size:13px}
 @keyframes login-backdrop-drift{0%{transform:scale(1)}100%{transform:scale(1.025)}}@keyframes login-card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:1120px){.login-card{width:min(40vw,520px);min-width:410px;padding-right:34px;padding-left:34px}}
 @media(max-width:820px){.login-screen{justify-content:center;padding:22px}.login-screen::before{background-size:auto 124%;background-position:80% 56%}.login-card{width:min(100%,480px);min-width:0;min-height:0;margin:auto;padding:35px 34px;border-radius:20px}.login-card h2{font-size:32px}.card-subtitle{font-size:18px}}

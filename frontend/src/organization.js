@@ -1,5 +1,5 @@
 export function allowedDepartmentParents(departments, id) {
-  const excluded = new Set([id]); let changed
+  const excluded = new Set(id == null ? [] : [id]); let changed
   do {
     changed = false
     for (const department of departments) if (excluded.has(department.parentId) && !excluded.has(department.id)) { excluded.add(department.id); changed = true }

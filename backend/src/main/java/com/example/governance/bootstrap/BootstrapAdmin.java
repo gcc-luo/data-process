@@ -1,5 +1,6 @@
 package com.example.governance.bootstrap;
 
+import com.example.governance.security.PasswordPolicy;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,8 +23,9 @@ public class BootstrapAdmin {
     }
 
     public void create(String username, String password) {
-        if (username == null || username.isBlank() || username.length() > 160 || !username.equals(username.trim()) || password == null || password.isBlank() || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
-            throw new IllegalArgumentException("Username and a non-empty password of at most 72 bytes are required");
+        if (username == null || username.isBlank() || username.length() > 160 || !username.equals(username.trim()))
+            throw new IllegalArgumentException("Username is required and must be at most 160 characters");
+        PasswordPolicy.validate(password, username);
         String hash = encoder.encode(password);
         transaction.executeWithoutResult(status -> {
             jdbc.queryForObject("SELECT setting_value FROM platform_settings WHERE setting_key=? FOR UPDATE", String.class, "internal.bootstrap.lock");
@@ -33,7 +35,7 @@ public class BootstrapAdmin {
             jdbc.update("INSERT INTO roles (id, name, role_key, sort_order, enabled) VALUES (?, ?, ?, ?, ?)", 1L, "平台管理员", "platform_admin", 0, true);
             jdbc.update("INSERT INTO users (id, username, nickname, password_hash, department_id, enabled, deleted, security_version) VALUES (?, ?, ?, ?, ?, ?, FALSE, ?)", 1L, username, username, hash, 1L, true, UUID.randomUUID().toString());
             jdbc.update("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", 1L, 1L);
-            PermissionCatalog.codes().forEach(permission -> jdbc.update("INSERT IGNORE INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, permission));
+            PermissionCatalog.codes().forEach(permission -> jdbc.update("INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)", 1L, permission));
         });
     }
 }

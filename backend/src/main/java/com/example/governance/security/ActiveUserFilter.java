@@ -30,6 +30,15 @@ public class ActiveUserFilter extends OncePerRequestFilter {
             }
             var refreshed = new UsernamePasswordAuthenticationToken(current, null, current.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(refreshed);
+            if (current.mustChangePassword()) {
+                String uri = req.getRequestURI();
+                if (!java.util.Set.of("/api/session", "/api/session/password", "/api/logout", "/api/csrf", "/api/health", "/api/captcha", "/api/login").contains(uri)) {
+                    res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    res.setContentType("application/json;charset=UTF-8");
+                    res.getWriter().write("{\"error\":\"请先修改初始密码\",\"mustChangePassword\":true}");
+                    return;
+                }
+            }
         }
         chain.doFilter(req, res);
     }

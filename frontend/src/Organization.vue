@@ -1,7 +1,7 @@
 <script setup>
 import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { authorizedRequest } from './auth.js'
+import { authorizedRequest, sessionExpired } from './auth.js'
 import { allowedDepartmentParents, departmentName } from './organization.js'
 import { menuIconOptions, menuIconPath } from './menu-icons.js'
 
@@ -15,6 +15,21 @@ const message = ref('')
 const search = ref('')
 const enabledFilter = ref('')
 const departmentFilter = ref('')
+const deptTree = ref(null)
+const departmentTreeRows = computed(() => nested(data.value.departmentOptions))
+const departmentDescendants = computed(() => {
+  const selected = departmentFilter.value
+  if (selected === '' || selected == null) return null
+  const ids = new Set([Number(selected)])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const item of data.value.departmentOptions) if (item.parentId != null && ids.has(item.parentId) && !ids.has(item.id)) { ids.add(item.id); changed = true }
+  }
+  return ids
+})
+function selectDepartment(node) { departmentFilter.value = node.id }
+function clearDepartmentFilter() { departmentFilter.value = ''; deptTree.value?.setCurrentKey(null) }
 const pageSizeOptions = [10, 20, 50, 100]
 const pageSizes = ref({ roles: 10, users: 10, permissions: 10, audit: 10 })
 const pages = ref({ roles: 1, users: 1, permissions: 1, audit: 1 })
@@ -30,6 +45,89 @@ const auditTotal = ref(0)
 const auditLoadedAction = ref('')
 const auditBusy = ref(false)
 const auditCatalog = ref({ actions: [], objectTypes: [], results: [] })
+const auditDetail = ref(null)
+const auditDetailOpen = ref(false)
+const loading = ref(false)
+const auditActor = ref('')
+const auditResult = ref('')
+const auditFrom = ref('')
+const auditTo = ref('')
+const importDialog = ref(false)
+const importFile = ref(null)
+const importResult = ref(null)
+const importBusy = ref(false)
+const onlineDialog = ref(false)
+const onlineRows = ref([])
+const onlineBusy = ref(false)
+const roleUsersDialog = ref(false)
+const roleUsersRows = ref([])
+const roleUsersRole = ref(null)
+function timeText(value) { return value ? String(value).replace('T', ' ').slice(0, 19) : '—' }
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url; link.download = filename
+  document.body.appendChild(link); link.click(); link.remove()
+  URL.revokeObjectURL(url)
+}
+async function exportCsv(path, filename) {
+  try {
+    const response = await fetch(path, { credentials: 'same-origin' })
+    if (sessionExpired(response)) return
+    if (!response.ok) throw new Error('导出失败，请检查权限')
+    downloadBlob(await response.blob(), filename)
+  } catch (e) { error.value = e.message }
+}
+function exportUsers() { void exportCsv('/api/organization/users/export', 'users.csv') }
+function exportAudit() {
+  const query = new URLSearchParams()
+  if (auditAction.value) query.set('action', auditAction.value)
+  if (auditActor.value.trim()) query.set('actor', auditActor.value.trim())
+  if (auditResult.value) query.set('result', auditResult.value)
+  if (auditFrom.value) query.set('from', auditFrom.value)
+  if (auditTo.value) query.set('to', auditTo.value)
+  void exportCsv(`/api/organization/audit/export?${query}`, 'audit.csv')
+}
+function openImport() { importFile.value = null; importResult.value = null; importDialog.value = true }
+function downloadTemplate() { downloadBlob(new Blob(['\uFEFF账号,姓名,密码,部门ID,手机,邮箱\r\nzhangsan,张三,Str0ng-Pass!1,1,13800000000,zhangsan@example.com\r\n'], { type: 'text/csv;charset=UTF-8' }), 'users-template.csv') }
+async function submitImport() {
+  if (!importFile.value) { importResult.value = { error: '请先选择 CSV 文件' }; return }
+  importBusy.value = true
+  try {
+    const form = new FormData()
+    form.append('file', importFile.value)
+    const response = await authorizedRequest('/api/organization/users/import', { method: 'POST', body: form })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) throw new Error(payload?.error || '导入失败')
+    importResult.value = payload
+    await load()
+  } catch (e) { importResult.value = { error: e.message } } finally { importBusy.value = false }
+}
+async function openOnline() {
+  onlineDialog.value = true
+  onlineBusy.value = true
+  try {
+    const response = await fetch('/api/organization/online', { credentials: 'same-origin' })
+    if (sessionExpired(response)) return
+    if (!response.ok) throw new Error('读取在线会话失败')
+    onlineRows.value = await response.json()
+  } catch (e) { error.value = e.message } finally { onlineBusy.value = false }
+}
+async function kickSession(row) {
+  try { await ElMessageBox.confirm(`确定踢下线「${row.username}」的该会话？`, '踢下线', { type: 'warning', confirmButtonText: '踢下线', cancelButtonText: '取消' }) } catch { return }
+  if (await mutate(`/online/${row.sessionId}/kick`, undefined, '会话已踢下线')) await openOnline()
+}
+async function openRoleUsers(role) {
+  roleUsersRole.value = role
+  roleUsersDialog.value = true
+  try {
+    const response = await fetch(`/api/organization/roles/${role.id}/users`, { credentials: 'same-origin' })
+    if (sessionExpired(response)) return
+    if (!response.ok) throw new Error('读取角色用户失败')
+    roleUsersRows.value = await response.json()
+  } catch (e) { error.value = e.message }
+}
+function openAuditDetail(row) { auditDetail.value = row; auditDetailOpen.value = true }
 async function loadAuditCatalog() {
   try {
     const response = await fetch('/api/organization/audit/catalog', { credentials: 'same-origin' })
@@ -64,7 +162,7 @@ const filtered = computed(() => {
   return {
     departments: data.value.departments.filter(item => matchState(item) && (!query || [item.name, item.id, item.leader, item.phone].some(value => matches(value, query)))),
     roles: data.value.roles.filter(item => matchState(item) && (!query || [item.name, item.roleKey, item.id].some(value => matches(value, query)))),
-    users: data.value.users.filter(item => matchState(item) && ((departmentFilter.value || '') === '' || item.departmentId === Number(departmentFilter.value)) && (!query || [item.username, item.nickname, item.email, item.phone, departmentName(data.value.departmentOptions, item.departmentId)].some(value => matches(value, query)))),
+    users: data.value.users.filter(item => matchState(item) && (!departmentDescendants.value || departmentDescendants.value.has(item.departmentId)) && (!query || [item.username, item.nickname, item.email, item.phone, departmentName(data.value.departmentOptions, item.departmentId)].some(value => matches(value, query)))),
     menus: data.value.menus.filter(item => matchState(item) && (!query || [item.name, item.routePath, item.component].some(value => matches(value, query)))),
   }
 })
@@ -85,12 +183,14 @@ const menuRows = computed(() => search.value.trim() || (enabledFilter.value || '
 const menuOptions = computed(() => nested(data.value.menus.filter(item => item.menuType !== 'F' && item.id !== menuForm.value.id)))
 
 async function load() {
+  loading.value = true
   try {
     const response = await fetch('/api/organization', { credentials: 'same-origin' })
+    if (sessionExpired(response)) throw new Error('登录已失效，请重新登录')
     if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有读取该模块的权限' : '无法读取系统管理数据')
     data.value = { ...emptyData(), ...(await response.json()) }
     error.value = ''
-  } catch (e) { error.value = e.message }
+  } catch (e) { error.value = e.message } finally { loading.value = false }
 }
 async function mutate(path, body, success, method = 'POST') {
   try {
@@ -98,6 +198,7 @@ async function mutate(path, body, success, method = 'POST') {
     const options = { method }
     if (body !== undefined) { options.headers = { 'Content-Type': 'application/json' }; options.body = JSON.stringify(body) }
     const response = await authorizedRequest(`/api/organization${path}`, options)
+    if (sessionExpired(response)) throw new Error('登录已失效，请重新登录')
     if (!response.ok) {
       const payload = await response.json().catch(() => null)
       throw new Error(payload?.error || (response.status === 403 ? '当前账号没有组织管理权限' : '保存失败，请检查输入'))
@@ -235,7 +336,12 @@ async function loadAudit(reset = false) {
     const size = pageSizes.value.audit
     const query = new URLSearchParams({ limit: String(size), offset: String((pages.value.audit - 1) * size) })
     if (action) query.set('action', action)
+    if (auditActor.value.trim()) query.set('actor', auditActor.value.trim())
+    if (auditResult.value) query.set('result', auditResult.value)
+    if (auditFrom.value) query.set('from', auditFrom.value)
+    if (auditTo.value) query.set('to', auditTo.value)
     const response = await fetch(`/api/organization/audit?${query}`, { credentials: 'same-origin' })
+    if (sessionExpired(response)) throw new Error('登录已失效，请重新登录')
     if (!response.ok) throw new Error('读取审计记录失败，请检查权限')
     auditTotal.value = Number(response.headers.get('X-Total-Count') || 0)
     auditEvents.value = await response.json()
@@ -258,9 +364,9 @@ onMounted(load)
       <div class="toolbar">
         <el-input v-model="search" clearable placeholder="搜索部门名称、负责人或编号" />
         <el-select v-model="enabledFilter" clearable placeholder="部门状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button v-if="can('system.department.create')" type="primary" @click="openDepartment()">新建部门</el-button><el-button @click="load">刷新</el-button>
+        <el-button @click="load">刷新</el-button><el-button v-if="can('system.department.create')" class="toolbar-add" type="primary" @click="openDepartment()">新增</el-button>
       </div>
-      <el-table :data="departmentRows" row-key="id" :tree-props="{ children: 'children' }" default-expand-all>
+      <el-table :data="departmentRows" row-key="id" :tree-props="{ children: 'children' }" default-expand-all v-loading="loading">
         <el-table-column prop="name" label="部门名称" min-width="190" />
         <el-table-column prop="id" label="部门编号" min-width="100" />
         <el-table-column label="上级部门" min-width="150"><template #default="scope">{{ departmentName(data.departments, scope.row.parentId) }}</template></el-table-column>
@@ -276,44 +382,58 @@ onMounted(load)
       <div class="toolbar">
         <el-input v-model="search" clearable placeholder="搜索角色名称、权限字符或编号" />
         <el-select v-model="enabledFilter" clearable placeholder="角色状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button v-if="can('system.role.create')" type="primary" @click="openRole()">新建角色</el-button><el-button @click="load">刷新</el-button>
+        <el-button @click="load">刷新</el-button><el-button v-if="can('system.role.create')" class="toolbar-add" type="primary" @click="openRole()">新增</el-button>
       </div>
-      <el-table :data="page(filtered.roles, 'roles')" row-key="id">
+      <el-table :data="page(filtered.roles, 'roles')" row-key="id" v-loading="loading">
         <el-table-column prop="name" label="角色名称" min-width="150" />
         <el-table-column prop="roleKey" label="权限字符" min-width="170" />
         <el-table-column prop="sortOrder" label="排序" width="85" />
         <el-table-column label="状态" width="95"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
-        <el-table-column label="操作" min-width="220" fixed="right"><template #default="scope"><el-button v-if="can('system.role.update')" link type="primary" @click="openRole(scope.row)">修改</el-button><el-button v-if="can('system.role.assign_permissions')" link type="primary" @click="openPermissions(scope.row)">配置操作权限</el-button><el-button v-if="can('system.role.delete')" link type="danger" @click="confirmDelete(`/roles/${scope.row.id}`, `角色「${scope.row.name}」`, '角色已删除')">删除</el-button></template></el-table-column>
+        <el-table-column label="操作" min-width="220" fixed="right"><template #default="scope"><el-button v-if="can('system.role.update')" link type="primary" @click="openRole(scope.row)">修改</el-button><el-button v-if="can('system.role.assign_permissions')" link type="primary" @click="openPermissions(scope.row)">配置操作权限</el-button><el-button v-if="can('system.role.read')" link @click="openRoleUsers(scope.row)">查看用户</el-button><el-button v-if="can('system.role.delete')" link type="danger" @click="confirmDelete(`/roles/${scope.row.id}`, `角色「${scope.row.name}」`, '角色已删除')">删除</el-button></template></el-table-column>
       </el-table>
       <el-pagination v-model:current-page="pages.roles" v-model:page-size="pageSizes.roles" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="filtered.roles.length" />
     </template>
 
     <template v-else-if="props.view === 'users'">
+      <div class="users-layout">
+        <div class="dept-tree-card">
+          <div class="dept-tree-header"><span>组织机构</span><span class="dept-tree-tools"><el-button link :disabled="departmentFilter === '' || departmentFilter == null" @click="clearDepartmentFilter">清除</el-button></span></div>
+          <div class="dept-tree-scroll">
+            <el-tree ref="deptTree" :data="departmentTreeRows" node-key="id" highlight-current default-expand-all :expand-on-click-node="false" :props="{ label: 'name', children: 'children' }" @node-click="selectDepartment">
+              <template #default="{ data: node }"><span class="dept-node" :class="{ 'dept-disabled': !node.enabled }"><span class="dept-node-name">{{ node.name }}</span><span v-if="!node.enabled" class="dept-disabled-tag">停用</span></span></template>
+            </el-tree>
+            <div v-if="!departmentTreeRows.length" class="dept-tree-empty">暂无部门数据</div>
+          </div>
+        </div>
+        <div class="users-main">
       <div class="toolbar">
         <el-input v-model="search" clearable placeholder="搜索账号、姓名、部门或手机号" />
-        <el-select v-if="can('system.user.read')" v-model="departmentFilter" clearable placeholder="所属部门"><el-option v-for="item in data.departmentOptions" :key="item.id" :label="item.name" :value="item.id" /></el-select>
         <el-select v-if="can('system.user.read')" v-model="enabledFilter" clearable placeholder="用户状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button v-if="can('system.user.create')" type="primary" @click="openUser()">新建用户</el-button><el-button @click="load">刷新</el-button>
+        <el-button v-if="can('system.user.read')" @click="exportUsers">导出</el-button><el-button v-if="can('system.user.create')" @click="openImport">导入</el-button><el-button v-if="can('system.user.read')" @click="openOnline">在线用户</el-button><el-button @click="load">刷新</el-button><el-button v-if="can('system.user.create')" class="toolbar-add" type="primary" @click="openUser()">新增</el-button>
       </div>
-      <el-table :data="page(filtered.users, 'users')" row-key="id">
+      <el-table :data="page(filtered.users, 'users')" row-key="id" v-loading="loading">
         <el-table-column prop="username" label="用户账号" min-width="140" />
         <el-table-column v-if="can('system.user.read')" prop="nickname" label="用户姓名" min-width="140" />
         <el-table-column v-if="can('system.user.read')" label="所属部门" min-width="150"><template #default="scope">{{ departmentName(data.departmentOptions, scope.row.departmentId) }}</template></el-table-column>
         <el-table-column v-if="can('system.user.read')" prop="phone" label="手机号码" min-width="140"><template #default="scope">{{ scope.row.phone || '—' }}</template></el-table-column>
         <el-table-column label="角色" min-width="180"><template #default="scope">{{ roleLabels(scope.row.roles) }}</template></el-table-column>
         <el-table-column v-if="can('system.user.read') || can('system.user.set_status')" label="状态" width="95"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
+        <el-table-column v-if="can('system.user.read')" label="创建时间" min-width="160"><template #default="scope">{{ timeText(scope.row.createdAt) }}</template></el-table-column>
+        <el-table-column v-if="can('system.user.read')" label="最后登录" min-width="160"><template #default="scope">{{ timeText(scope.row.lastLoginAt) }}</template></el-table-column>
         <el-table-column label="操作" min-width="300" fixed="right"><template #default="scope"><el-button v-if="can('system.user.update') || can('system.user.assign_roles')" link type="primary" @click="openUser(scope.row)">{{ can('system.user.update') ? '修改' : '分配角色' }}</el-button><el-button v-if="can('system.user.set_status')" link @click="toggleUserEnabled(scope.row)">{{ scope.row.enabled ? '停用' : '启用' }}</el-button><el-button v-if="can('system.user.reset_password')" link @click="setPassword(scope.row)">重置密码</el-button><el-button v-if="can('system.user.delete')" link type="danger" @click="confirmDelete(`/users/${scope.row.id}`, `用户「${scope.row.username}」`, '用户已删除')">删除</el-button></template></el-table-column>
       </el-table>
       <el-pagination v-model:current-page="pages.users" v-model:page-size="pageSizes.users" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="filtered.users.length" />
+        </div>
+      </div>
     </template>
 
     <template v-else-if="props.view === 'menus'">
       <div class="toolbar">
         <el-input v-model="search" clearable placeholder="搜索菜单名称或路由" />
         <el-select v-model="enabledFilter" clearable placeholder="菜单状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button v-if="can('system.menu.create')" type="primary" @click="openMenu()">新增菜单</el-button><el-button @click="load">刷新</el-button>
+        <el-button @click="load">刷新</el-button><el-button v-if="can('system.menu.create')" class="toolbar-add" type="primary" @click="openMenu()">新增</el-button>
       </div>
-      <el-table :data="menuRows" row-key="id" :tree-props="{ children: 'children' }" default-expand-all>
+      <el-table :data="menuRows" row-key="id" :tree-props="{ children: 'children' }" default-expand-all v-loading="loading">
         <el-table-column prop="name" label="菜单名称" min-width="180" />
         <el-table-column label="类型" width="100"><template #default="scope"><el-tag effect="plain">{{ menuTypeLabel(scope.row.menuType) }}</el-tag></template></el-table-column>
         <el-table-column label="图标" width="130"><template #default="scope"><span v-if="scope.row.icon" class="menu-icon-cell"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="menuIconPath(scope.row.icon)" /></svg><span>{{ scope.row.icon }}</span></span><span v-else>—</span></template></el-table-column>
@@ -331,7 +451,7 @@ onMounted(load)
         <el-button @click="load">刷新</el-button>
       </div>
       <el-alert title="权限点由平台后端登记并逐接口校验。此目录用于查看与授权，新增操作需先在后端实现对应校验，避免配置出无效权限。" type="info" :closable="false" show-icon />
-      <el-table :data="page(permissionRows, 'permissions')" row-key="code">
+      <el-table :data="page(permissionRows, 'permissions')" row-key="code" v-loading="loading">
         <el-table-column prop="moduleName" label="所属模块" min-width="150" />
         <el-table-column prop="actionName" label="操作" min-width="110" />
         <el-table-column prop="code" label="权限码" min-width="250"><template #default="scope"><code>{{ scope.row.code }}</code></template></el-table-column>
@@ -343,15 +463,17 @@ onMounted(load)
 
     <template v-else-if="props.view === 'audit'">
       <div class="pane">
-        <div class="toolbar audit-toolbar"><el-select v-model="auditAction" clearable filterable placeholder="操作类型（可留空）" @change="loadAudit(true)"><el-option v-for="item in auditCatalog.actions" :key="item.code" :label="item.label" :value="item.code" /></el-select><el-button type="primary" @click="loadAudit(true)">查询</el-button><el-button @click="loadAudit(true)">刷新</el-button></div>
+        <div class="toolbar audit-toolbar"><el-select v-model="auditAction" clearable filterable placeholder="操作类型（可留空）" @change="loadAudit(true)"><el-option v-for="item in auditCatalog.actions" :key="item.code" :label="item.label" :value="item.code" /></el-select><el-select v-model="auditResult" clearable placeholder="结果" @change="loadAudit(true)"><el-option label="成功" value="SUCCESS" /><el-option label="失败" value="FAILURE" /></el-select><el-input v-model="auditActor" clearable placeholder="操作者账号" class="audit-actor" @keyup.enter="loadAudit(true)" /><el-input v-model="auditFrom" type="datetime-local" class="audit-time" aria-label="开始时间" /><el-input v-model="auditTo" type="datetime-local" class="audit-time" aria-label="结束时间" /><el-button type="primary" @click="loadAudit(true)">查询</el-button><el-button @click="loadAudit(true)">刷新</el-button><el-button v-if="can('system.audit.read')" @click="exportAudit">导出</el-button></div>
         <el-alert title="登录失败等没有关联账号的记录显示为系统或未知账号。" type="info" :closable="false" show-icon />
-        <el-table :data="auditEvents" class="audit-table">
+        <el-table :data="auditEvents" class="audit-table" v-loading="auditBusy">
           <el-table-column label="时间" min-width="180"><template #default="scope">{{ scope.row.occurredAtText || String(scope.row.occurredAt || '').replace('T', ' ') }}</template></el-table-column>
           <el-table-column label="操作者" min-width="170"><template #default="scope">{{ scope.row.username || '系统或未知账号' }}</template></el-table-column>
+          <el-table-column label="IP" min-width="130"><template #default="scope">{{ scope.row.ip || '—' }}</template></el-table-column>
           <el-table-column label="操作" min-width="170"><template #default="scope">{{ scope.row.actionLabel || scope.row.action }}</template></el-table-column>
           <el-table-column label="对象类型" min-width="120"><template #default="scope">{{ scope.row.objectTypeLabel || scope.row.objectType }}</template></el-table-column>
           <el-table-column prop="objectId" label="对象编号" min-width="120" />
           <el-table-column label="结果" min-width="110"><template #default="scope"><el-tag :type="scope.row.result === 'SUCCESS' ? 'success' : 'danger'" effect="light">{{ scope.row.resultLabel || scope.row.result }}</el-tag></template></el-table-column>
+          <el-table-column label="详情" width="80"><template #default="scope"><el-button link type="primary" @click="openAuditDetail(scope.row)">查看</el-button></template></el-table-column>
         </el-table>
         <el-pagination v-model:current-page="pages.audit" v-model:page-size="pageSizes.audit" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="auditTotal" :disabled="auditBusy" @current-change="loadAudit()" @size-change="changeAuditSize" />
       </div>
@@ -416,7 +538,7 @@ onMounted(load)
       <el-form :model="userForm" label-position="top" class="form-grid">
         <el-form-item v-if="can('system.user.update') || !userForm.id" label="用户账号" required><el-input v-model="userForm.username" autocomplete="off" maxlength="160" :disabled="!!userForm.id && !can('system.user.update')" /></el-form-item>
         <el-form-item v-if="can('system.user.update') || !userForm.id" label="用户姓名"><el-input v-model="userForm.nickname" maxlength="160" :disabled="!!userForm.id && !can('system.user.update')" /></el-form-item>
-        <el-form-item v-if="!userForm.id" label="初始密码" required><el-input v-model="userForm.password" type="password" show-password autocomplete="new-password" /></el-form-item>
+        <el-form-item v-if="!userForm.id" label="初始密码" required><el-input v-model="userForm.password" type="password" show-password autocomplete="new-password" placeholder="至少8位，含大小写/数字/特殊字符中三类" /></el-form-item>
         <el-form-item v-if="can('system.user.update') || !userForm.id" label="所属部门" required><el-select v-model="userForm.departmentId" placeholder="请选择部门" :disabled="!!userForm.id && !can('system.user.update')"><el-option v-for="item in data.departmentOptions" :key="item.id" :label="item.name" :value="item.id" :disabled="!item.enabled && item.id !== userForm.departmentId" /></el-select></el-form-item>
         <el-form-item v-if="can('system.user.update') || !userForm.id" label="手机号码"><el-input v-model="userForm.phone" maxlength="48" :disabled="!!userForm.id && !can('system.user.update')" /></el-form-item>
         <el-form-item v-if="can('system.user.update') || !userForm.id" label="邮箱"><el-input v-model="userForm.email" maxlength="160" :disabled="!!userForm.id && !can('system.user.update')" /></el-form-item>
@@ -432,7 +554,7 @@ onMounted(load)
       <el-form :model="menuForm" label-position="top" class="form-grid">
         <el-form-item label="菜单名称" required><el-input v-model="menuForm.name" maxlength="160" /></el-form-item>
         <el-form-item label="上级菜单"><el-tree-select v-model="menuForm.parentId" :data="menuOptions" node-key="id" clearable check-strictly default-expand-all :disabled="menuForm.component === 'system' || menuForm.component === 'system/menus'" :props="{ label: 'name', children: 'children', value: 'id' }" placeholder="顶级菜单" /></el-form-item>
-        <el-form-item label="菜单类型" required><el-select v-model="menuForm.menuType" :disabled="menuForm.id === 9 || menuForm.id === 94"><el-option label="目录" value="D" /><el-option label="菜单" value="M" /><el-option label="按钮" value="F" /></el-select></el-form-item>
+        <el-form-item label="菜单类型" required><el-select v-model="menuForm.menuType" :disabled="menuForm.id === 9 || menuForm.id === 94"><el-option label="目录" value="D" /><el-option label="菜单" value="M" /></el-select></el-form-item>
         <el-form-item label="显示排序"><el-input-number v-model="menuForm.sortOrder" :min="0" :max="100000" /></el-form-item>
         <el-form-item v-if="menuForm.menuType === 'M'" label="路由地址" required><el-input v-model="menuForm.routePath" maxlength="255" placeholder="例如 /system/users" /></el-form-item>
         <el-form-item v-if="menuForm.menuType !== 'F'" label="组件标识" :required="menuForm.menuType === 'M'"><el-select v-model="menuForm.component" filterable :disabled="menuForm.id === 9 || menuForm.id === 94"><el-option v-for="[value, label] in menuComponentOptions" :key="value" :label="label" :value="value" /></el-select></el-form-item>
@@ -453,17 +575,76 @@ onMounted(load)
       <template #footer><el-button @click="menuDialog = false">取消</el-button><el-button type="primary" @click="saveMenu">保存</el-button></template>
     </el-dialog>
 
+    <el-dialog v-model="auditDetailOpen" title="审计详情" width="min(560px, 95vw)">
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="时间">{{ auditDetail?.occurredAtText }}</el-descriptions-item>
+        <el-descriptions-item label="操作者">{{ auditDetail?.username || '系统或未知账号' }}</el-descriptions-item>
+        <el-descriptions-item label="操作">{{ auditDetail?.actionLabel }}</el-descriptions-item>
+        <el-descriptions-item label="对象">{{ auditDetail?.objectTypeLabel }} · {{ auditDetail?.objectId }}</el-descriptions-item>
+        <el-descriptions-item label="结果">{{ auditDetail?.resultLabel }}</el-descriptions-item>
+        <el-descriptions-item label="IP">{{ auditDetail?.ip || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="终端">{{ auditDetail?.userAgent || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="说明">{{ auditDetail?.message || '—' }}</el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
+
+    <el-dialog v-model="importDialog" title="导入用户" width="min(560px, 95vw)">
+      <p class="dialog-hint">CSV 列：账号,姓名,密码,部门ID,手机,邮箱；密码需符合强度策略；逐行导入，失败行单独提示。</p>
+      <div class="import-row"><el-button @click="downloadTemplate">下载模板</el-button><input type="file" accept=".csv,text/csv" @change="event => importFile = event.target.files[0] || null" /></div>
+      <el-alert v-if="importResult?.error" :title="importResult.error" type="error" :closable="false" show-icon style="margin-top:12px" />
+      <template v-if="importResult && !importResult.error">
+        <el-alert :title="`成功导入 ${importResult.created} 行`" type="success" :closable="false" show-icon style="margin-top:12px" />
+        <el-table v-if="importResult.errors?.length" :data="importResult.errors" size="small" style="margin-top:12px"><el-table-column prop="row" label="行号" width="80" /><el-table-column prop="error" label="原因" /></el-table>
+      </template>
+      <template #footer><el-button @click="importDialog = false">关闭</el-button><el-button type="primary" :loading="importBusy" @click="submitImport">开始导入</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="onlineDialog" title="在线用户" width="min(760px, 95vw)">
+      <el-table :data="onlineRows" v-loading="onlineBusy" row-key="sessionId">
+        <el-table-column prop="username" label="账号" min-width="120" />
+        <el-table-column prop="nickname" label="姓名" min-width="120" />
+        <el-table-column prop="ip" label="IP" min-width="130" />
+        <el-table-column label="登录时间" min-width="160"><template #default="scope">{{ new Date(scope.row.loginAt).toLocaleString('zh-CN', { hour12: false }) }}</template></el-table-column>
+        <el-table-column prop="userAgent" label="终端" min-width="200" show-overflow-tooltip />
+        <el-table-column label="操作" width="100"><template #default="scope"><el-button v-if="can('system.user.set_status')" link type="danger" @click="kickSession(scope.row)">踢下线</el-button></template></el-table-column>
+      </el-table>
+      <template #footer><el-button @click="openOnline">刷新</el-button><el-button @click="onlineDialog = false">关闭</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="roleUsersDialog" :title="`角色用户 · ${roleUsersRole?.name || ''}`" width="min(560px, 95vw)">
+      <el-table :data="roleUsersRows" row-key="id">
+        <el-table-column prop="username" label="账号" min-width="140" />
+        <el-table-column prop="nickname" label="姓名" min-width="140" />
+        <el-table-column label="状态" width="90"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
+      </el-table>
+    </el-dialog>
+
     <el-dialog v-model="passwordDialog" title="重置密码" width="min(460px, 95vw)" @closed="newPassword = ''">
       <p class="dialog-hint">为 {{ passwordTarget?.username }} 设置新密码，原有会话将失效。</p>
-      <el-input v-model="newPassword" type="password" show-password autocomplete="new-password" placeholder="请输入新密码" />
+      <el-input v-model="newPassword" type="password" show-password autocomplete="new-password" placeholder="至少8位，含大小写/数字/特殊字符中三类" />
       <template #footer><el-button @click="passwordDialog = false">取消</el-button><el-button type="primary" @click="resetPassword">重置密码</el-button></template>
     </el-dialog>
   </section>
 </template>
 
 <style scoped>
-.organization-page{min-width:0;color:#25364a}.notice{margin-bottom:12px}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.toolbar .el-input{width:min(340px,100%)}.toolbar .el-select{width:150px}.el-table{width:100%;background:#fff}.pagination{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:14px 0 0}.pane{padding:12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.audit-toolbar{margin:0 0 10px;padding:0;border:0}.audit-toolbar .el-select{width:240px}.audit-table{margin-top:10px}.menu-state-switch{margin-left:8px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.form-grid .el-form-item{margin-bottom:16px}.form-grid .full-row{grid-column:1/-1}.form-grid :deep(.el-select),.form-grid :deep(.el-tree-select){width:100%}.dialog-hint{margin:0 0 16px;color:#66788a}.check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}.pagination span{align-self:center;color:#556579}
+.organization-page{min-width:0;color:#25364a}.notice{margin-bottom:12px}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.toolbar .el-input{width:min(340px,100%)}.toolbar .el-select{width:150px}.toolbar .toolbar-add{margin-left:auto}.el-table{width:100%;background:#fff}.pagination{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:14px 0 0}.pane{padding:12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.audit-toolbar{margin:0 0 10px;padding:0;border:0;flex-wrap:wrap}.audit-toolbar .el-select{width:240px}.audit-actor{width:160px}.audit-time{width:210px}.import-row{display:flex;align-items:center;gap:12px}.audit-table{margin-top:10px}.menu-state-switch{margin-left:8px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.form-grid .el-form-item{margin-bottom:16px}.form-grid .full-row{grid-column:1/-1}.form-grid :deep(.el-select),.form-grid :deep(.el-tree-select){width:100%}.dialog-hint{margin:0 0 16px;color:#66788a}.check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}.pagination span{align-self:center;color:#556579}
 .menu-icon-picker{display:flex;align-items:center;gap:12px;width:100%}.menu-icon-select{max-width:340px}.menu-icon-glyph,.menu-icon-cell svg,.menu-icon-option svg{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.menu-icon-cell{display:inline-flex;align-items:center;gap:8px;color:#536982}.menu-icon-option{display:flex;align-items:center;gap:9px}.menu-icon-option small{margin-left:auto;color:#96a4b5;font-size:11px}.menu-icon-help{color:#8190a3;font-size:12px}
+.users-layout{display:flex;gap:12px;align-items:stretch}
+.dept-tree-card{width:15%;flex:none;display:flex;flex-direction:column;background:#fff;border:1px solid #e5eaf0;border-radius:4px;overflow:hidden}
+.dept-tree-header{display:flex;align-items:center;justify-content:space-between;padding:8px 8px;border-bottom:1px solid #edf1f6;font-weight:650;color:#4f627b;font-size:12px}
+.dept-tree-tools{display:flex;gap:2px}
+.dept-tree-tools .el-button{font-size:12px;padding:0 4px}
+.dept-tree-scroll{flex:1;min-height:0;max-height:520px;overflow:auto;padding:6px 4px}
+.dept-tree-scroll :deep(.el-tree-node__content){height:32px;border-radius:4px}
+.dept-tree-scroll :deep(.el-tree-node.is-current > .el-tree-node__content){background:#ecf5ff;color:#409eff}
+.dept-node{display:flex;align-items:center;gap:4px;min-width:0;flex:1;font-size:12px}
+.dept-node-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dept-disabled{color:#a8abb2}
+.dept-disabled-tag{font-size:10px;color:#a8abb2;border:1px solid #e4e7ed;border-radius:3px;padding:0 3px}
+.dept-tree-empty{padding:16px;text-align:center;color:#8796a9;font-size:12px}
+.users-main{flex:1;min-width:0}
+@media(max-width:900px){.users-layout{flex-direction:column}.dept-tree-card{width:100%}.dept-tree-scroll{max-height:220px}}
 @media(min-width:1440px){.toolbar{gap:clamp(10px,.65vw,16px)}.toolbar .el-input{width:clamp(340px,23vw,480px)}.pane{padding:clamp(12px,.8vw,20px)}}
 @media(max-width:720px){.toolbar{flex-wrap:wrap}.toolbar .el-input{width:100%}.toolbar .el-select{flex:1;min-width:135px}.form-grid{grid-template-columns:1fr}.form-grid .full-row{grid-column:auto}.check-grid{grid-template-columns:1fr}.menu-icon-picker{align-items:flex-start;flex-direction:column}.menu-icon-select{width:100%;max-width:none}}
 :global(.role-menu-dialog.el-dialog){display:flex;flex-direction:column;max-height:calc(100dvh - 48px);overflow:hidden;border:1px solid #dde6f0;border-radius:12px;box-shadow:0 22px 64px rgba(25,44,72,.2)}
