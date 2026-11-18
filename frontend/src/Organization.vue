@@ -186,7 +186,6 @@ async function saveMenu() {
 }
 
 function roleLabels(ids) { return ids.map(id => data.value.roles.find(role => role.id === id)?.name ?? `角色 ${id}`).join('、') || '暂无角色' }
-function permissionLabels(ids) { return ids.map(id => { const item = data.value.permissionCatalog.find(permission => permission.code === id); return item ? `${item.moduleName}·${item.actionName}` : id }).join('、') || '暂无权限' }
 function menuTypeLabel(type) { return ({ D: '目录', M: '菜单', F: '按钮' })[type] || type }
 function menuName(id) { return data.value.menus.find(item => item.id === id)?.name ?? `菜单 ${id}` }
 const permissionTreeRows = computed(() => {
@@ -284,7 +283,6 @@ onMounted(load)
         <el-table-column prop="roleKey" label="权限字符" min-width="170" />
         <el-table-column prop="sortOrder" label="排序" width="85" />
         <el-table-column label="状态" width="95"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
-        <el-table-column label="功能权限" min-width="230"><template #default="scope">{{ permissionLabels(scope.row.permissions) }}</template></el-table-column>
         <el-table-column label="操作" min-width="220" fixed="right"><template #default="scope"><el-button v-if="can('system.role.update')" link type="primary" @click="openRole(scope.row)">修改</el-button><el-button v-if="can('system.role.assign_permissions')" link type="primary" @click="openPermissions(scope.row)">配置操作权限</el-button><el-button v-if="can('system.role.delete')" link type="danger" @click="confirmDelete(`/roles/${scope.row.id}`, `角色「${scope.row.name}」`, '角色已删除')">删除</el-button></template></el-table-column>
       </el-table>
       <el-pagination v-model:current-page="pages.roles" v-model:page-size="pageSizes.roles" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="filtered.roles.length" />
