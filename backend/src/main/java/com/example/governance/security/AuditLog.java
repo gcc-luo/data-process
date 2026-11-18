@@ -21,13 +21,19 @@ public class AuditLog {
         jdbc.update("INSERT INTO audit_events(actor_id,occurred_at,action,object_type,object_id,result) VALUES (?,CURRENT_TIMESTAMP,?,?,?,'SUCCESS')", user.id(), action, objectType, objectId);
     }
     public record Event(long id, Long actorId, String username, java.time.LocalDateTime occurredAt, String action, String objectType, String objectId, String result) {}
-    public java.util.List<Event> list(String action, Long beforeId, int limit) {
-        if ((action != null && (action.isBlank() || action.length() > 160)) || (beforeId != null && beforeId < 1) || limit < 1 || limit > 100) throw new IllegalArgumentException("Invalid audit filter");
+    public java.util.List<Event> list(String action, Long beforeId, int limit) { return list(action, beforeId, 0, limit); }
+    public java.util.List<Event> list(String action, Long beforeId, int offset, int limit) {
+        if ((action != null && (action.isBlank() || action.length() > 160)) || (beforeId != null && beforeId < 1) || offset < 0 || offset > 100000 || limit < 1 || limit > 100) throw new IllegalArgumentException("Invalid audit filter");
         var sql = new StringBuilder("SELECT e.id,e.actor_id,u.username,e.occurred_at,e.action,e.object_type,e.object_id,e.result FROM audit_events e LEFT JOIN users u ON u.id=e.actor_id WHERE 1=1");
         var args = new java.util.ArrayList<Object>();
         if (action != null) { sql.append(" AND e.action=?"); args.add(action); }
         if (beforeId != null) { sql.append(" AND e.id<?"); args.add(beforeId); }
-        sql.append(" ORDER BY e.id DESC LIMIT ").append(limit);
+        sql.append(" ORDER BY e.id DESC LIMIT ").append(limit).append(" OFFSET ").append(offset);
         return jdbc.query(sql.toString(), (rs, row) -> { long actor = rs.getLong(2); Long id = rs.wasNull() ? null : actor; return new Event(rs.getLong(1), id, rs.getString(3), rs.getTimestamp(4).toLocalDateTime(), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8)); }, args.toArray());
+    }
+    public int count(String action) {
+        if (action != null && (action.isBlank() || action.length() > 160)) throw new IllegalArgumentException("Invalid audit filter");
+        Integer value = action == null ? jdbc.queryForObject("SELECT COUNT(*) FROM audit_events", Integer.class) : jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action=?", Integer.class, action);
+        return value == null ? 0 : value;
     }
 }

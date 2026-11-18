@@ -15,8 +15,9 @@ const message = ref('')
 const search = ref('')
 const enabledFilter = ref('')
 const departmentFilter = ref('')
-const pageSize = 10
-const pages = ref({ roles: 1, users: 1 })
+const pageSizeOptions = [10, 20, 50, 100]
+const pageSizes = ref({ roles: 10, users: 10, permissions: 10, audit: 10 })
+const pages = ref({ roles: 1, users: 1, permissions: 1, audit: 1 })
 const departmentDialog = ref(false)
 const roleDialog = ref(false)
 const userDialog = ref(false)
@@ -25,10 +26,8 @@ const permissionDialog = ref(false)
 const passwordDialog = ref(false)
 const auditAction = ref('')
 const auditEvents = ref([])
-const auditMore = ref(false)
+const auditTotal = ref(0)
 const auditLoadedAction = ref('')
-const auditCursors = ref([null])
-const auditPage = ref(0)
 const auditBusy = ref(false)
 const permissionRole = ref(null)
 const selectedPermissions = ref([])
@@ -63,15 +62,13 @@ const filtered = computed(() => {
   }
 })
 function page(items, name) {
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize))
+  const size = pageSizes.value[name]
+  const totalPages = Math.max(1, Math.ceil(items.length / size))
   const index = Math.min(pages.value[name], totalPages)
   if (pages.value[name] !== index) pages.value[name] = index
-  return items.slice((index - 1) * pageSize, index * pageSize)
+  return items.slice((index - 1) * size, index * size)
 }
-watch([search, enabledFilter, departmentFilter], () => { pages.value = { roles: 1, users: 1 } })
-watch(filtered, result => {
-  for (const name of ['roles', 'users']) pages.value[name] = Math.min(pages.value[name], Math.max(1, Math.ceil(result[name].length / pageSize)))
-})
+watch([search, enabledFilter, departmentFilter], () => { pages.value = { roles: 1, users: 1, permissions: 1, audit: 1 } })
 
 function nested(items, parentId = null) {
   return items.filter(item => item.parentId === parentId).map(item => ({ ...item, children: nested(items, item.id) }))
@@ -201,6 +198,10 @@ const permissionRows = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
   return data.value.permissionCatalog.filter(item => !query || [item.moduleName, item.moduleCode, item.actionName, item.code, item.description].some(value => matches(value, query)))
 })
+watch([filtered, permissionRows, pageSizes], () => {
+  const totals = { roles: filtered.value.roles.length, users: filtered.value.users.length, permissions: permissionRows.value.length, audit: auditTotal.value }
+  for (const name of ['roles', 'users', 'permissions', 'audit']) pages.value[name] = Math.min(pages.value[name], Math.max(1, Math.ceil(totals[name] / pageSizes.value[name])))
+}, { deep: true })
 function setAllPermissions(checked) {
   const keys = checked ? [...new Set([...data.value.assignablePermissionCodes, ...(permissionRole.value?.permissions || [])])] : []
   permissionTree.value?.setCheckedKeys(keys, false)
@@ -219,28 +220,26 @@ async function resetPassword() {
   if (await mutate(`/users/${passwordTarget.value.id}/password`, { password: newPassword.value }, '密码已重置，原会话将失效')) passwordDialog.value = false
 }
 
-async function loadAudit(index = 0, reset = false) {
+async function loadAudit(reset = false) {
   if (auditBusy.value) return
   auditBusy.value = true
   try {
     const action = auditAction.value.trim()
-    if (reset || action !== auditLoadedAction.value) { index = 0; auditCursors.value = [null] }
-    const query = new URLSearchParams({ limit: '10' })
+    if (reset || action !== auditLoadedAction.value) pages.value.audit = 1
+    const size = pageSizes.value.audit
+    const query = new URLSearchParams({ limit: String(size), offset: String((pages.value.audit - 1) * size) })
     if (action) query.set('action', action)
-    if (auditCursors.value[index] != null) query.set('beforeId', auditCursors.value[index])
     const response = await fetch(`/api/organization/audit?${query}`, { credentials: 'same-origin' })
     if (!response.ok) throw new Error('读取审计记录失败，请检查权限')
-    const result = await response.json()
-    auditEvents.value = result; auditPage.value = index; auditMore.value = result.length === 10; auditLoadedAction.value = action; error.value = ''
+    auditTotal.value = Number(response.headers.get('X-Total-Count') || 0)
+    auditEvents.value = await response.json()
+    auditLoadedAction.value = action; error.value = ''
+    const maxPage = Math.max(1, Math.ceil(auditTotal.value / size))
+    if (pages.value.audit > maxPage) { pages.value.audit = maxPage; auditBusy.value = false; return loadAudit() }
   } catch (e) { error.value = e.message } finally { auditBusy.value = false }
 }
-function nextAudit() {
-  if (!auditMore.value || !auditEvents.value.length) return
-  const nextPage = auditPage.value + 1
-  auditCursors.value = [...auditCursors.value.slice(0, nextPage), auditEvents.value.at(-1).id]
-  loadAudit(nextPage)
-}
-watch(() => props.view, view => { search.value = ''; enabledFilter.value = ''; departmentFilter.value = ''; if (view === 'audit') loadAudit(0, true) }, { immediate: true })
+function changeAuditSize() { pages.value.audit = 1; void loadAudit() }
+watch(() => props.view, view => { search.value = ''; enabledFilter.value = ''; departmentFilter.value = ''; if (view === 'audit') loadAudit(true) }, { immediate: true })
 onMounted(load)
 </script>
 
@@ -281,7 +280,7 @@ onMounted(load)
         <el-table-column label="功能权限" min-width="230"><template #default="scope">{{ permissionLabels(scope.row.permissions) }}</template></el-table-column>
         <el-table-column label="操作" min-width="220" fixed="right"><template #default="scope"><el-button v-if="can('system.role.update')" link type="primary" @click="openRole(scope.row)">修改</el-button><el-button v-if="can('system.role.assign_permissions')" link type="primary" @click="openPermissions(scope.row)">配置操作权限</el-button><el-button v-if="can('system.role.delete')" link type="danger" @click="confirmDelete(`/roles/${scope.row.id}`, `角色「${scope.row.name}」`, '角色已删除')">删除</el-button></template></el-table-column>
       </el-table>
-      <el-pagination v-model:current-page="pages.roles" class="pagination" layout="total, prev, pager, next" :page-size="pageSize" :total="filtered.roles.length" />
+      <el-pagination v-model:current-page="pages.roles" v-model:page-size="pageSizes.roles" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="filtered.roles.length" />
     </template>
 
     <template v-else-if="props.view === 'users'">
@@ -300,7 +299,7 @@ onMounted(load)
         <el-table-column v-if="can('system.user.read') || can('system.user.set_status')" label="状态" width="95"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
         <el-table-column label="操作" min-width="300" fixed="right"><template #default="scope"><el-button v-if="can('system.user.update') || can('system.user.assign_roles')" link type="primary" @click="openUser(scope.row)">{{ can('system.user.update') ? '修改' : '分配角色' }}</el-button><el-button v-if="can('system.user.set_status')" link @click="toggleUserEnabled(scope.row)">{{ scope.row.enabled ? '停用' : '启用' }}</el-button><el-button v-if="can('system.user.reset_password')" link @click="setPassword(scope.row)">重置密码</el-button><el-button v-if="can('system.user.delete')" link type="danger" @click="confirmDelete(`/users/${scope.row.id}`, `用户「${scope.row.username}」`, '用户已删除')">删除</el-button></template></el-table-column>
       </el-table>
-      <el-pagination v-model:current-page="pages.users" class="pagination" layout="total, prev, pager, next" :page-size="pageSize" :total="filtered.users.length" />
+      <el-pagination v-model:current-page="pages.users" v-model:page-size="pageSizes.users" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="filtered.users.length" />
     </template>
 
     <template v-else-if="props.view === 'menus'">
@@ -327,18 +326,19 @@ onMounted(load)
         <el-button @click="load">刷新</el-button>
       </div>
       <el-alert title="权限点由平台后端登记并逐接口校验。此目录用于查看与授权，新增操作需先在后端实现对应校验，避免配置出无效权限。" type="info" :closable="false" show-icon />
-      <el-table :data="permissionRows" row-key="code">
+      <el-table :data="page(permissionRows, 'permissions')" row-key="code">
         <el-table-column prop="moduleName" label="所属模块" min-width="150" />
         <el-table-column prop="actionName" label="操作" min-width="110" />
         <el-table-column prop="code" label="权限码" min-width="250"><template #default="scope"><code>{{ scope.row.code }}</code></template></el-table-column>
         <el-table-column prop="description" label="用途说明" min-width="260" />
       </el-table>
+      <el-pagination v-model:current-page="pages.permissions" v-model:page-size="pageSizes.permissions" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="permissionRows.length" />
       <el-empty v-if="!permissionRows.length" description="暂无权限点或当前账号无权查看" />
     </template>
 
     <template v-else-if="props.view === 'audit'">
       <div class="pane">
-        <div class="toolbar audit-toolbar"><el-input v-model="auditAction" clearable placeholder="操作类型（可留空）" @keyup.enter="loadAudit(0, true)" /><el-button type="primary" @click="loadAudit(0, true)">查询</el-button><el-button @click="loadAudit(0, true)">刷新</el-button></div>
+        <div class="toolbar audit-toolbar"><el-input v-model="auditAction" clearable placeholder="操作类型（可留空）" @keyup.enter="loadAudit(true)" /><el-button type="primary" @click="loadAudit(true)">查询</el-button><el-button @click="loadAudit(true)">刷新</el-button></div>
         <el-alert title="登录失败等没有关联账号的记录显示为系统或未知账号。" type="info" :closable="false" show-icon />
         <el-table :data="auditEvents" class="audit-table">
           <el-table-column prop="occurredAt" label="时间" min-width="180" />
@@ -348,7 +348,7 @@ onMounted(load)
           <el-table-column prop="objectId" label="对象编号" min-width="120" />
           <el-table-column label="结果" min-width="110"><template #default="scope"><el-tag :type="scope.row.result === 'SUCCESS' ? 'success' : 'danger'" effect="light">{{ scope.row.result }}</el-tag></template></el-table-column>
         </el-table>
-        <div class="pagination"><el-button :disabled="auditPage === 0 || auditBusy" @click="loadAudit(auditPage - 1)">上一页</el-button><span>第 {{ auditPage + 1 }} 页</span><el-button :disabled="!auditMore || auditBusy" @click="nextAudit">下一页</el-button></div>
+        <el-pagination v-model:current-page="pages.audit" v-model:page-size="pageSizes.audit" class="pagination" layout="total, sizes, prev, pager, next, jumper" :page-sizes="pageSizeOptions" :total="auditTotal" :disabled="auditBusy" @current-change="loadAudit()" @size-change="changeAuditSize" />
       </div>
     </template>
 
@@ -457,7 +457,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.organization-page{min-width:0;color:#25364a}.notice{margin-bottom:12px}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.toolbar .el-input{width:min(340px,100%)}.toolbar .el-select{width:150px}.el-table{width:100%;background:#fff}.pagination{display:flex;justify-content:flex-end;margin:14px 0 0}.pane{padding:12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.audit-toolbar{margin:0 0 10px;padding:0;border:0}.audit-table{margin-top:10px}.menu-state-switch{margin-left:8px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.form-grid .el-form-item{margin-bottom:16px}.form-grid .full-row{grid-column:1/-1}.form-grid :deep(.el-select),.form-grid :deep(.el-tree-select){width:100%}.dialog-hint{margin:0 0 16px;color:#66788a}.check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}.pagination span{align-self:center;color:#556579}
+.organization-page{min-width:0;color:#25364a}.notice{margin-bottom:12px}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.toolbar .el-input{width:min(340px,100%)}.toolbar .el-select{width:150px}.el-table{width:100%;background:#fff}.pagination{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:14px 0 0}.pane{padding:12px;background:#fff;border:1px solid #e5eaf0;border-radius:4px}.audit-toolbar{margin:0 0 10px;padding:0;border:0}.audit-table{margin-top:10px}.menu-state-switch{margin-left:8px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.form-grid .el-form-item{margin-bottom:16px}.form-grid .full-row{grid-column:1/-1}.form-grid :deep(.el-select),.form-grid :deep(.el-tree-select){width:100%}.dialog-hint{margin:0 0 16px;color:#66788a}.check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}.pagination span{align-self:center;color:#556579}
 .menu-icon-picker{display:flex;align-items:center;gap:12px;width:100%}.menu-icon-select{max-width:340px}.menu-icon-glyph,.menu-icon-cell svg,.menu-icon-option svg{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.menu-icon-cell{display:inline-flex;align-items:center;gap:8px;color:#536982}.menu-icon-option{display:flex;align-items:center;gap:9px}.menu-icon-option small{margin-left:auto;color:#96a4b5;font-size:11px}.menu-icon-help{color:#8190a3;font-size:12px}
 @media(min-width:1440px){.toolbar{gap:clamp(10px,.65vw,16px)}.toolbar .el-input{width:clamp(340px,23vw,480px)}.pane{padding:clamp(12px,.8vw,20px)}}
 @media(max-width:720px){.toolbar{flex-wrap:wrap}.toolbar .el-input{width:100%}.toolbar .el-select{flex:1;min-width:135px}.form-grid{grid-template-columns:1fr}.form-grid .full-row{grid-column:auto}.check-grid{grid-template-columns:1fr}.menu-icon-picker{align-items:flex-start;flex-direction:column}.menu-icon-select{width:100%;max-width:none}}

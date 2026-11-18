@@ -35,7 +35,9 @@ public class OrganizationController {
     record Password(String password) {}
     record MenuRequest(String name, Long parentId, String menuType, Integer sortOrder, String routePath, String component, String icon, Boolean visible, Boolean enabled) {}
 
-    @GetMapping("/audit") java.util.List<AuditLog.Event> audit(@RequestParam(required=false) String action, @RequestParam(required=false) Long beforeId, @RequestParam(defaultValue="50") int limit) { return audit.list(action, beforeId, limit); }
+    @GetMapping("/audit") ResponseEntity<java.util.List<AuditLog.Event>> audit(@RequestParam(required=false) String action, @RequestParam(required=false) Long beforeId, @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="50") int limit) {
+        return ResponseEntity.ok().header("X-Total-Count", String.valueOf(audit.count(action))).body(audit.list(action, beforeId, offset, limit));
+    }
     @GetMapping OrganizationService.Snapshot snapshot(Authentication auth) {
         Set<String> granted = auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toUnmodifiableSet());
         return organization.snapshot(granted);
