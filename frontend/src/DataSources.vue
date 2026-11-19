@@ -260,7 +260,7 @@ async function save() {
 }
 async function loadForView() {
   error.value = ''
-  if (props.view === 'sources') { await loadProfiles(); await load() }
+  if (props.view === 'sources') { await loadProfiles(); await loadDrivers(); await load() }
   else if (props.view === 'drivers') { await loadProfiles(); await loadDrivers() }
   else { try { await loadDatasets() } catch (e) { error.value = e.message } }
 }
