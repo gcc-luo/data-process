@@ -19,7 +19,7 @@
 - Modify(test): `src/test/java/com/example/governance/assets/DataSourceApiTest.java`、`DataSourceDeletionApiTest.java`、`DatasetDeletionApiTest.java`、`DatasetRefreshApiTest.java`、`security/DatasetAccessTest.java`、`security/AccessPolicyTest.java`、`query/DatasetPolicyStoreTest.java`、`realtime/RealtimeSettingsApiTest.java`、`workflow/StandaloneTaskRetryApiTest.java`、`workflow/WorkflowValidationApiTest.java`、`organization/OrganizationNavigationTest.java`、`mysql/MySqlPolicySnapshotTest.java`
 - Modify(test): `frontend/tests/auth.test.js`
 
-- [ ] **Step 1: 提交遗留改动**
+- [x] **Step 1: 提交遗留改动**
 
 ```bash
 cd ~/Documents/project/data_process
@@ -27,7 +27,7 @@ git add -A
 git commit -m "chore(assets): 提交进行中的资产菜单调整（V29）与连接层设计文档"
 ```
 
-- [ ] **Step 2: 修复后端旧权限码（机械替换，不改生产代码）**
+- [x] **Step 2: 修复后端旧权限码（机械替换，不改生产代码）**
 
 旧码 → 新码集合（按测试实际用到的端点插入 `role_permissions`）：
 - `datasource.manage` → 按测试需要插入：`datasource.source.read/create/update/delete/test`、`datasource.dataset.read/create/delete/refresh/manage_policy`、`datasource.query.read`。断言"删除权限后 403"的地方改为删除对应的具体码（如 `datasource.dataset.read`）。
@@ -39,11 +39,11 @@ git commit -m "chore(assets): 提交进行中的资产菜单调整（V29）与�
 
 逐文件 grep 旧码并替换；`AccessPolicyTest`/`DatasetAccessTest`/`DatasetPolicyStoreTest` 中构造 `AccessPolicy` 的 `Set.of("dataset.read")` 改 `Set.of("datasource.query.read")`。
 
-- [ ] **Step 3: 修复前端 auth 测试**
+- [x] **Step 3: 修复前端 auth 测试**
 
 `frontend/tests/auth.test.js` 第一个测试：`login('alice', 'p&ss', fetcher)` → `login('alice', 'p&ss', null, fetcher)`（auth.js 增加了 captcha 参数，fetcher 落错位导致走了真实 fetch）。
 
-- [ ] **Step 4: 全量验证基线绿**
+- [x] **Step 4: 全量验证基线绿**
 
 ```bash
 cd backend && mvn -q test 2>&1 | grep -E "Tests run:" | tail -3
@@ -51,7 +51,7 @@ cd ../frontend && node --test tests/*.test.js 2>&1 | grep -E "^ℹ (tests|pass|f
 ```
 预期：后端 Failures: 0, Errors: 0（Skipped 为 MySQL 环境用例，允许）；前端 fail 0。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "test: 修复细粒度 RBAC 遗留的旧权限码测试与登录测试参数"
@@ -70,7 +70,7 @@ git add -A && git commit -m "test: 修复细粒度 RBAC 遗留的旧权限码测
 - Create: `.../driver/DatabaseProfileRegistry.java`
 - Test: `backend/src/test/java/com/example/governance/assets/driver/DatabaseProfileTest.java`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```java
 package com.example.governance.assets.driver;
@@ -132,11 +132,11 @@ class DatabaseProfileTest {
 
 注意：此测试依赖 Task 2 的新 `DataSourceDefinition`（profileId 字符串 + 8 参构造）。**先做 Task 2 Step 1 的 record 改造**（旧测试同步改，见 Task 2），再回到本任务。执行顺序：Task 2 的 record 部分先行。
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 `cd backend && mvn -q test -Dtest=DatabaseProfileTest` → 编译失败（类不存在）即红。
 
-- [ ] **Step 3: 实现接口与工具**
+- [x] **Step 3: 实现接口与工具**
 
 `DatabaseProfile.java`：
 
@@ -215,7 +215,7 @@ public final class ProfileParams {
 }
 ```
 
-- [ ] **Step 4: 实现五个档案**
+- [x] **Step 4: 实现五个档案**
 
 `AbstractMySqlProfile.java`（包私有）：
 
@@ -274,7 +274,7 @@ abstract class AbstractMySqlProfile implements DatabaseProfile {
 `Oracle11Profile.java`：`@Component`；id `ORACLE:11g`；displayName `Oracle 11g`；defaultConnectType `SID`；defaultDriverKey `builtin-ojdbc8`。
 `Oracle12Profile.java`：`@Component`；id `ORACLE:12c+`；displayName `Oracle 12c 及以上`；defaultConnectType `SERVICE`；defaultDriverKey `builtin-ojdbc11`。
 
-- [ ] **Step 5: 实现注册表**
+- [x] **Step 5: 实现注册表**
 
 ```java
 package com.example.governance.assets.driver;
@@ -307,7 +307,7 @@ public final class DatabaseProfileRegistry {
 }
 ```
 
-- [ ] **Step 6: 跑测试绿 + Commit**
+- [x] **Step 6: 跑测试绿 + Commit**
 
 `mvn -q test -Dtest=DatabaseProfileTest` → PASS。
 `git add -A && git commit -m "feat(datasource): 数据库版本档案策略与参数白名单"`
@@ -326,7 +326,7 @@ public final class DatabaseProfileRegistry {
 - Modify(test): `DataSourceDefinitionTest.java`、`DataSourceStoreTest.java`、`DatabaseInspectorTest.java`、`ExecutionDataSourceProviderTest.java` 及所有构造旧 record 的测试
 - Create(test): `.../assets/driver/ConnectionFactoryTest.java`（H2 TCP 全链路）
 
-- [ ] **Step 1: 重写 DataSourceDefinition（先改测试再改实现）**
+- [x] **Step 1: 重写 DataSourceDefinition（先改测试再改实现）**
 
 新 record（完整代码）：
 
@@ -354,11 +354,11 @@ public record DataSourceDefinition(String name, String profileId, String host, i
 
 `DataSourceDefinitionTest` 重写：URL 断言移到档案测试（Task 1），这里保留注入/端口/库名校验断言（用 `"MYSQL:8.x"` 等 profileId），新增：profileId 非法拒绝、`type()` 派生、options 不可变、driverId<1 拒绝。
 
-- [ ] **Step 2: 全仓修复旧 record 引用**
+- [x] **Step 2: 全仓修复旧 record 引用**
 
 `grep -rn "DataSourceDefinition.Type\|new DataSourceDefinition(" backend/src` 逐处改为新构造（`Type.MYSQL`→`"MYSQL:8.x"`、`Type.POSTGRESQL`→`"POSTGRESQL:general"`、`Type.ORACLE`→`"ORACLE:12c+"`）。`ExecutionDataSourceProviderTest` 改为断言工厂委托（见 Step 5）。此时编译仍红（Store/Inspector 未改），继续。
 
-- [ ] **Step 3: V30 迁移 + Store 改造**
+- [x] **Step 3: V30 迁移 + Store 改造**
 
 `backend/src/main/resources/db/mysql/V30__jdbc_driver_management.sql`：
 
@@ -402,7 +402,7 @@ VALUES (23,2,'驱动管理','M','/assets/drivers','assets/drivers','','driver',3
 `DataSourceStore`：INSERT/UPDATE 增加 `version_profile,driver_id,extra_options`，`source_type` 写 `definition.type()`；find/list/credentialsForLockedRefresh 的 SELECT 与行映射读新列；options JSON 用静态 `ObjectMapper`（写：`writeValueAsString`，读：`readValue(..., new TypeReference<Map<String,String>>(){})`，null/空→`Map.of()`）；driver_id 用 `rs.getLong` + `wasNull`。
 所有测试中裸 `INSERT INTO data_sources(...)` 增加 `version_profile` 列值（`'MYSQL:8.x'` 等）。
 
-- [ ] **Step 4: ConnectionFactory + Inspector/Provider 委托（先写全链路失败测试）**
+- [x] **Step 4: ConnectionFactory + Inspector/Provider 委托（先写全链路失败测试）**
 
 `ConnectionFactoryTest.java`（纯对象，无 Spring；H2 TCP 全链路）：
 
@@ -487,7 +487,7 @@ class ConnectionFactoryTest {
 }
 ```
 
-- [ ] **Step 5: 实现 ConnectionFactory、IsolatedDriverLoader、DriverStore（使上测试绿）**
+- [x] **Step 5: 实现 ConnectionFactory、IsolatedDriverLoader、DriverStore（使上测试绿）**
 
 `ConnectionFactory.java`：
 
@@ -533,7 +533,7 @@ public final class ConnectionFactory {
 `ExecutionDataSourceProvider`：构造器加 `ConnectionFactory`；`get` 返回 `AbstractDataSource` 匿名实现，`getConnection()` → `factory.open(definition, password)`，`getConnection(u,p)` → 用 u 替换 username 后 open。
 `ExecutionDataSourceProviderTest` 重写：mock store + 真实 factory（H2 fixture 同上）或 mock factory 验证委托与 unknown 拒绝。
 
-- [ ] **Step 6: Bean 接线**
+- [x] **Step 6: Bean 接线**
 
 `DataSourceConfiguration` 增加：
 
@@ -560,11 +560,11 @@ spring.servlet.multipart.max-request-size: 52MB
 governance.driver-dir: ${GOVERNANCE_DRIVER_DIR:./drivers}
 ```
 
-- [ ] **Step 7: 内置驱动打包（pom）**
+- [x] **Step 7: 内置驱动打包（pom）**
 
 `pom.xml` build/plugins 增加 maven-dependency-plugin：process-resources 阶段 `copy` 五个 artifactItem 到 `${project.build.outputDirectory}/drivers-builtin`，destFileName 分别 `builtin-mysql-5.jar`（mysql:mysql-connector-java:5.1.49）、`builtin-mysql-8.jar`（com.mysql:mysql-connector-j:${mysql.version}）、`builtin-postgresql.jar`（org.postgresql:postgresql:${postgresql.version}）、`builtin-ojdbc8.jar`（com.oracle.database.jdbc:ojdbc8:19.3.0.0）、`builtin-ojdbc11.jar`（com.oracle.database.jdbc:ojdbc11:${oracle-database.version}）。保留现有 runtime 依赖不动。
 
-- [ ] **Step 8: 全量测试绿 + Commit**
+- [x] **Step 8: 全量测试绿 + Commit**
 
 `mvn -q test`（此时 DataSourceController 仍用旧请求记录会编译失败——Step 2 已把 controller 的 `CreateRequest/Item` 一并改为 profileId 形态，见 Task 3 Step 1 前置；若编译红先完成 Task 3 的 controller 改造再回跑）。
 `git add -A && git commit -m "feat(datasource): 连接工厂与隔离驱动加载，数据源按版本档案存储"`
@@ -581,7 +581,7 @@ governance.driver-dir: ${GOVERNANCE_DRIVER_DIR:./drivers}
 - Test: `backend/src/test/java/com/example/governance/assets/DriverApiTest.java`
 - Modify(test): `DataSourceApiTest.java`（请求体 type→profileId）
 
-- [ ] **Step 1: DataSourceController 改造（Task 2 编译依赖，先行）**
+- [x] **Step 1: DataSourceController 改造（Task 2 编译依赖，先行）**
 
 `CreateRequest(String name, String profileId, String host, int port, String database, String username, String password, Long driverId, Map<String,String> options)`；
 `Item(long id, String name, String type, String profileId, String profileName, String host, int port, String database, String username, Long driverId, Map<String,String> options)`；
@@ -594,7 +594,7 @@ List<DatabaseProfileRegistry.ProfileView> profiles() { return registry.views(); 
 
 `DataSourceApiTest` 所有请求体 `"type":"MYSQL"` → `"profileId":"MYSQL:8.x"`（POSTGRESQL/ORACLE 同理）。
 
-- [ ] **Step 2: 写失败 API 测试 DriverApiTest**
+- [x] **Step 2: 写失败 API 测试 DriverApiTest**
 
 沿用 `DataSourceApiTest` 的 setup/login 模式（@SpringBootTest + @AutoConfigureMockMvc + @MockitoBean DatabaseInspector/CamelTaskRunner/ExecutionDataSourceProvider/IncrementalSyncExecutor）。用例：
 1. `driverEndpointsRequirePermission`：无权限 GET /api/drivers → 403；插入 `datasource.driver.read` 后 → 200 且含 5 个内置驱动（`$[?(@.builtin==true)]` 长度 5）。
@@ -605,9 +605,9 @@ List<DatabaseProfileRegistry.ProfileView> profiles() { return registry.views(); 
 6. `profilesCatalogRequiresSourceRead`：无权限 GET /api/data-sources/profiles → 403；授 `datasource.source.read` → 200，`$[0].id` 存在、MYSQL:8.x 项含 extraParams 白名单（allowPublicKeyRetrieval）。
 7. `createWithProfileAndOptionsPersists`：授 source.create/read；POST profileId=MYSQL:8.x + options{serverTimezone:Asia/Shanghai} → 201；GET 列表 profileId/options 回显；非法 options（allowLoadLocalInfile）→ 400；未知 profileId → 400。
 
-- [ ] **Step 3: 运行确认红**（404/编译失败）
+- [x] **Step 3: 运行确认红**（404/编译失败）
 
-- [ ] **Step 4: PermissionCatalog + AuditCatalog**
+- [x] **Step 4: PermissionCatalog + AuditCatalog**
 
 PermissionCatalog：
 - `add()` switch 增 `case "上传" -> "upload";`
@@ -618,7 +618,7 @@ PermissionCatalog：
 
 AuditCatalog：ACTIONS 增 `Map.entry("driver.upload", "上传驱动"), Map.entry("driver.delete", "删除驱动")`；OBJECT_TYPES 增 `Map.entry("driver", "JDBC 驱动")`。
 
-- [ ] **Step 5: DriverController 实现**
+- [x] **Step 5: DriverController 实现**
 
 ```java
 package com.example.governance.assets;
@@ -670,7 +670,7 @@ public class DriverController {
 }
 ```
 
-- [ ] **Step 6: 全量测试绿 + Commit**
+- [x] **Step 6: 全量测试绿 + Commit**
 
 `mvn -q test` → 全绿。`git add -A && git commit -m "feat(datasource): 驱动管理 API、档案目录与权限审计接入"`
 
@@ -682,7 +682,7 @@ public class DriverController {
 - Create: `backend/src/test/java/com/example/governance/assets/driver/IsolatedDriverLoaderTest.java`
 - Create: `backend/src/test/java/com/example/governance/assets/driver/DriverStoreTest.java`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 IsolatedDriverLoaderTest：
 1. `loadsSameJarInTwoIsolatedLoaders`：h2Jar 用两个 driverId（1、2）分别 connect（URL `jdbc:h2:mem:iso1/iso2`，props user=sa/password 空串），两个连接的 `org.h2.Driver` 类对象不同（`connection.getMetaData().getDriverName()` 相同但通过 unwrap 后 getClass().getClassLoader() 不同）；断言两连接都可用。
@@ -696,7 +696,7 @@ DriverStoreTest（H2 + Flyway，参照 ConnectionFactoryTest.fixture）：
 3. `deleteRemovesFileAndRow`：上传→delete→行消失、jar 文件不存在。
 4. `deleteBuiltinRejected`、`deleteReferencedListsNames`（INSERT data_sources 引用）。
 
-- [ ] **Step 2: 红 → 实现补齐（若 Task 2 实现已覆盖则直接绿；缺口补实现）→ 全量绿 → Commit**
+- [x] **Step 2: 红 → 实现补齐（若 Task 2 实现已覆盖则直接绿；缺口补实现）→ 全量绿 → Commit**
 
 `git add -A && git commit -m "test(datasource): 隔离加载与驱动仓库专项覆盖"`
 
@@ -708,7 +708,7 @@ DriverStoreTest（H2 + Flyway，参照 ConnectionFactoryTest.fixture）：
 - Create: `frontend/src/datasource-form.js`
 - Create: `frontend/tests/datasource-form.test.js`
 
-- [ ] **Step 1: 写失败测试**（node --test，覆盖下列每个函数）
+- [x] **Step 1: 写失败测试**（node --test，覆盖下列每个函数）
 
 ```js
 import { test } from 'node:test'
@@ -749,7 +749,7 @@ test('buildPayload nulls blank password on edit and drops empty options', () => 
 })
 ```
 
-- [ ] **Step 2: 红 → 实现 datasource-form.js**
+- [x] **Step 2: 红 → 实现 datasource-form.js**
 
 ```js
 export const typeLabels = { MYSQL: 'MySQL', POSTGRESQL: 'PostgreSQL', ORACLE: 'Oracle' }
@@ -779,7 +779,7 @@ export function buildPayload(form, editing) {
 }
 ```
 
-- [ ] **Step 3: 绿 + Commit**
+- [x] **Step 3: 绿 + Commit**
 
 `node --test tests/datasource-form.test.js` → PASS。`git add -A && git commit -m "feat(frontend): 数据源表单纯函数与测试"`
 
@@ -791,11 +791,11 @@ export function buildPayload(form, editing) {
 - Modify: `frontend/src/DataSources.vue`
 - Modify: `frontend/src/menu-icons.js`（增 driver 图标与标签）
 
-- [ ] **Step 1: menu-icons.js**
+- [x] **Step 1: menu-icons.js**
 
 `menuIconPaths` 增 `driver: 'M9 3v4m6-4v4M7 7h10v3a5 5 0 0 1-10 0V7Zm5 8v6'`；labels 增 `driver: '驱动管理'`。
 
-- [ ] **Step 2: DataSources.vue script 改造**
+- [x] **Step 2: DataSources.vue script 改造**
 
 - import 增加 `profileTypes, versionsForType, defaultForm, databaseLabel, driversForType, paramRows, buildPayload`。
 - 新状态：`profiles = ref([])`、`drivers = ref([])`、`driverSearch = ref('')`、`driverPage = ref(1)`、`driverSize = ref(10)`、`uploadOpen = ref(false)`、`uploadForm = ref({ name: '', dbType: 'MYSQL', driverClass: '', versionLabel: '', file: null })`、`uploading = ref(false)`、`advanced = ref([])`（行 {key,value}）。
@@ -813,7 +813,7 @@ export function buildPayload(form, editing) {
 - `deleteDriver(item)`：DELETE；409 → `驱动被数据源引用：${payload.references.join('、')}`；400 → payload.error；成功 loadDrivers。
 - `loadForView()`：sources → load()+loadProfiles()；datasets → loadDatasets()；drivers → loadDrivers()。
 
-- [ ] **Step 3: DataSources.vue template 改造**
+- [x] **Step 3: DataSources.vue template 改造**
 
 - sources 表格增列：`<el-table-column prop="profileName" label="版本" min-width="120"/>`（type 列保留）。
 - 表单对话框：类型下拉用 typeOptions（@change=selectType）；新增"大版本"下拉 versionOptions（label=displayName，value=id，@change=applyProfile）；端口默认随档案；Oracle 时显示 connectType el-radio-group（SID/服务名）；"数据库或服务名" label 改 `:label="dbLabel"`；驱动 el-select（clearable，placeholder="内置默认驱动"，选项 typeDrivers，label=`${name} ${versionLabel||''}${builtin?'（内置）':''}`，value=id）；"高级参数" el-collapse：行=key el-select（currentProfile.extraParams，allow-create=false）+ value el-input（hint 占位）+ 删除按钮；"添加参数"按钮 push {key:'',value:''}。
@@ -821,7 +821,7 @@ export function buildPayload(form, editing) {
 - 上传对话框：名称、类型下拉（typeOptions）、驱动类输入、版本标签输入（可空，占位"自动探测"）、el-upload（drag accept=".jar" :auto-upload="false" :limit="1" :on-change="f => uploadForm.file = f.raw" :on-remove="() => uploadForm.file = null"）、保存按钮。
 - 现有 `v-else`（datasets）改 `v-else-if="view === 'datasets'"`。
 
-- [ ] **Step 4: 前端验证 + Commit**
+- [x] **Step 4: 前端验证 + Commit**
 
 ```bash
 cd frontend && node --test tests/*.test.js && npm run build
@@ -836,23 +836,23 @@ cd frontend && node --test tests/*.test.js && npm run build
 - Modify: `docs/verification/database-matrix.md`（新增待验证行）
 - Modify: `README.md`（驱动管理说明 + GOVERNANCE_DRIVER_DIR）
 
-- [ ] **Step 1: 后端全量**
+- [x] **Step 1: 后端全量**
 
 `cd backend && mvn -q test` → Failures 0 / Errors 0。
 
-- [ ] **Step 2: 前端全量**
+- [x] **Step 2: 前端全量**
 
 `cd frontend && node --test tests/*.test.js && npm run build` → 全绿。
 
-- [ ] **Step 3: database-matrix.md 增行**
+- [x] **Step 3: database-matrix.md 增行**
 
 MySQL 5.7（MYSQL:5.x + 5.1.49）、MySQL 8.0（MYSQL:8.x + Connector/J 9.5）、PostgreSQL（42.7.8）、Oracle 11.2.0.4（ojdbc8 19.3）、Oracle 19c（ojdbc11 23.7）：状态全部"待验证（无真实环境）"，注明 H2 全链路自动化已通过。
 
-- [ ] **Step 4: README 增补**
+- [x] **Step 4: README 增补**
 
 数据源能力段落补充：类型+大版本档案、内置驱动清单、管理员上传 jar（驱动管理页）、白名单高级参数、`GOVERNANCE_DRIVER_DIR`（默认 ./drivers）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 `git add -A && git commit -m "docs: 驱动管理验证矩阵与运行说明"`
 
@@ -860,7 +860,7 @@ MySQL 5.7（MYSQL:5.x + 5.1.49）、MySQL 8.0（MYSQL:8.x + Connector/J 9.5）�
 
 ### Task 8: 重启服务并交付
 
-- [ ] **Step 1: 停旧后端**
+- [x] **Step 1: 停旧后端**
 
 ```bash
 kill 47935 47958 2>/dev/null; sleep 3
@@ -868,7 +868,7 @@ lsof -iTCP:8080 -sTCP:LISTEN -P | tail -1   # 确认已释放
 ```
 （PID 以实际 `ps aux | grep GovernanceApplication` 为准；前端 vite 41516 保留，HMR 自动生效。）
 
-- [ ] **Step 2: 启动新后端**
+- [x] **Step 2: 启动新后端**
 
 ```bash
 cd ~/Documents/project/data_process/backend
@@ -876,7 +876,7 @@ set -a; source ~/.local/share/data-governance/backend.env; set +a
 nohup mvn spring-boot:run >> ~/.local/share/data-governance/backend.log 2>&1 &
 ```
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
 ```bash
 for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/api/health && break; sleep 3; done
@@ -886,7 +886,7 @@ tail -30 ~/.local/share/data-governance/backend.log | grep -E "Flyway|Migrating|
 ```
 确认 V30 迁移成功、内置驱动注册日志、无启动异常。若启动失败：读日志定位、修复、重跑相关测试后再启动（systematic-debugging）。
 
-- [ ] **Step 4: 交付**
+- [x] **Step 4: 交付**
 
 向用户报告：服务地址 http://127.0.0.1:5173（后端 API http://127.0.0.1:8080）、本次变更摘要、测试证据、真实库待验证项说明。
 
