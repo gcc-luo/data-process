@@ -1,28 +1,27 @@
 package com.example.governance.assets;
 
+import com.example.governance.assets.driver.ConnectionFactory;
 import com.example.governance.workflow.CamelTaskRunner;
 import java.security.GeneralSecurityException;
-import java.util.Properties;
+import java.sql.Connection;
+import java.sql.SQLException;
 import javax.sql.DataSource;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.AbstractDataSource;
 
 /** Internal execution identity; never expose this object or decrypted credentials through an API. */
 public final class ExecutionDataSourceProvider implements CamelTaskRunner.DataSourceProvider {
     private final DataSourceStore store;
-    public ExecutionDataSourceProvider(DataSourceStore store) { this.store = store; }
+    private final ConnectionFactory factory;
+    public ExecutionDataSourceProvider(DataSourceStore store, ConnectionFactory factory) { this.store = store; this.factory = factory; }
     @Override public DataSource get(long sourceId) throws GeneralSecurityException {
         var definition = store.find(sourceId).orElseThrow(() -> new IllegalArgumentException("Unknown data source"));
-        var source = new DriverManagerDataSource();
-        source.setUrl(definition.jdbcUrl());
-        source.setUsername(definition.username());
-        source.setPassword(store.passwordForExecution(sourceId));
-        var props = new Properties();
-        switch (definition.type()) {
-            case MYSQL -> { props.setProperty("connectTimeout", "5000"); props.setProperty("socketTimeout", "10000"); }
-            case POSTGRESQL -> { props.setProperty("connectTimeout", "5"); props.setProperty("socketTimeout", "10"); }
-            case ORACLE -> { props.setProperty("oracle.net.CONNECT_TIMEOUT", "5000"); props.setProperty("oracle.jdbc.ReadTimeout", "10000"); }
-        }
-        source.setConnectionProperties(props);
-        return source;
+        String password = store.passwordForExecution(sourceId);
+        return new AbstractDataSource() {
+            @Override public Connection getConnection() throws SQLException { return factory.open(definition, password); }
+            @Override public Connection getConnection(String username, String overridePassword) throws SQLException {
+                var overridden = new DataSourceDefinition(definition.name(), definition.profileId(), definition.host(), definition.port(), definition.database(), username, definition.driverId(), definition.options());
+                return factory.open(overridden, overridePassword);
+            }
+        };
     }
 }

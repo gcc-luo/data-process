@@ -45,7 +45,7 @@ class DataSourceApiTest {
     @Test void createDoesNotReturnPassword() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         mvc.perform(post("/api/data-sources").session(login()).with(csrf()).contentType("application/json").content("""
-            {"name":"db1","type":"MYSQL","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
+            {"name":"db1","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
             """))
             .andExpect(status().isCreated()).andExpect(jsonPath("$.id").isNumber()).andExpect(jsonPath("$.password").doesNotExist());
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='datasource.create' AND actor_id=10", Integer.class));
@@ -58,7 +58,7 @@ class DataSourceApiTest {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         var session = login();
         mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("""
-            {"name":"db2","type":"POSTGRESQL","host":"localhost","port":5432,"database":"warehouse","username":"reader","password":"sensitive"}
+            {"name":"db2","profileId":"POSTGRESQL:general","host":"localhost","port":5432,"database":"warehouse","username":"reader","password":"sensitive"}
             """)).andExpect(status().isCreated());
         mvc.perform(get("/api/data-sources").session(session)).andExpect(status().isOk())
             .andExpect(jsonPath("$[0].name").value("db2"))
@@ -69,7 +69,7 @@ class DataSourceApiTest {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         var session = login();
         var result = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("""
-            {"name":"db3","type":"MYSQL","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
+            {"name":"db3","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
             """)).andReturn();
         var json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString());
         when(inspector.test(any(), eq("sensitive"))).thenReturn(true);
@@ -80,7 +80,7 @@ class DataSourceApiTest {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         var session = login();
         var result = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("""
-            {"name":"db4","type":"MYSQL","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
+            {"name":"db4","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
             """)).andReturn();
         long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).get("id").asLong();
         when(inspector.tables(any(), eq("sensitive"), isNull(), eq("sales"))).thenReturn(java.util.List.of(new DatabaseInspector.Table(null, "sales", "orders", "TABLE")));
@@ -91,7 +91,7 @@ class DataSourceApiTest {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         var session = login();
         var result = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("""
-            {"name":"db5","type":"MYSQL","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
+            {"name":"db5","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
             """)).andReturn();
         long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).get("id").asLong();
         when(inspector.columns(any(), eq("sensitive"), isNull(), eq("sales"), eq("orders")))
@@ -108,7 +108,7 @@ class DataSourceApiTest {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read'),(10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
         var session = login();
         var created = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("""
-            {"name":"tasks-db","type":"MYSQL","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
+            {"name":"tasks-db","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
             """)).andReturn();
         long source = new com.fasterxml.jackson.databind.ObjectMapper().readTree(created.getResponse().getContentAsString()).get("id").asLong();
         mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
@@ -209,7 +209,7 @@ class DataSourceApiTest {
     }
     @Test void datasetPreviewEnforcesDepartmentAndFieldMasking() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read'),(10,'report.report.read'),(10,'report.report.create'),(10,'report.report.update'),(10,'report.report.delete'),(10,'report.report.execute'),(10,'report.dashboard.read'),(10,'report.dashboard.create'),(10,'report.dashboard.update'),(10,'report.dashboard.delete')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,schema_name,table_name) VALUES (15,15,'clients','PUBLIC','CLIENTS')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (15,0,'DEPARTMENT_ID','BIGINT',FALSE),(15,1,'ID','INTEGER',FALSE),(15,2,'PHONE','VARCHAR',TRUE)");
         var business = new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:" + java.util.UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
@@ -261,7 +261,7 @@ class DataSourceApiTest {
     }
     @Test void externalServiceUsesCallerPolicyAndRateLimit() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read'),(10,'service.service.read'),(10,'service.service.create'),(10,'service.service.submit'),(10,'service.service.approve'),(10,'service.caller.read'),(10,'service.caller.create'),(10,'service.caller.manage_grant'),(10,'service.caller.disable')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,schema_name,table_name) VALUES (15,15,'clients','PUBLIC','CLIENTS')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (15,0,'DEPARTMENT_ID','BIGINT',FALSE),(15,1,'ID','INTEGER',FALSE),(15,2,'PHONE','VARCHAR',TRUE)");
         var business = new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:" + java.util.UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
@@ -293,7 +293,7 @@ class DataSourceApiTest {
     }
     @Test void realtimeJobCanBeStartedAndStoppedByAuthorizedUser() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (15,'source','MYSQL','localhost',3306,'db','u','cipher'),(16,'target','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (15,'source','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher'),(16,'target','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var session = login();
         var response = mvc.perform(post("/api/realtime-jobs").session(session).with(csrf()).contentType("application/json").content("""
           {"name":"incremental","config":{"sourceId":15,"targetId":16,"intervalSeconds":10,"mapping":{"sourceTable":"src","targetTable":"dst","sourceColumns":["id"],"targetColumns":["id"],"watermarkColumn":"seq","tieColumn":"id","targetKeys":["id"],"watermarkType":"LONG","batchSize":100}}}
@@ -306,7 +306,7 @@ class DataSourceApiTest {
     }
     @Test void workflowAndTaskCanReceiveNewImmutableVersions() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var session = login();
         var task = mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json").content("""
           {"name":"daily","type":"SQL","configuration":{"sourceId":15,"sql":"UPDATE t SET x=1","parameters":[]}}
@@ -342,10 +342,10 @@ class DataSourceApiTest {
     @Test void updatingSourceRetainsPasswordWhenOmittedAndAuditsChange() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         var session = login();
-        var created = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"original\",\"type\":\"MYSQL\",\"host\":\"localhost\",\"port\":3306,\"database\":\"db\",\"username\":\"u\",\"password\":\"secret\"}")).andExpect(status().isCreated()).andReturn();
+        var created = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"original\",\"profileId\":\"MYSQL:8.x\",\"host\":\"localhost\",\"port\":3306,\"database\":\"db\",\"username\":\"u\",\"password\":\"secret\"}")).andExpect(status().isCreated()).andReturn();
         long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(created.getResponse().getContentAsString()).get("id").asLong();
         String before = jdbc.queryForObject("SELECT password_cipher FROM data_sources WHERE id=?", String.class, id);
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/data-sources/"+id).session(session).with(csrf()).contentType("application/json").content("{\"name\":\"updated\",\"type\":\"MYSQL\",\"host\":\"localhost\",\"port\":3306,\"database\":\"db\",\"username\":\"u\"}")).andExpect(status().isNoContent());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/data-sources/"+id).session(session).with(csrf()).contentType("application/json").content("{\"name\":\"updated\",\"profileId\":\"MYSQL:8.x\",\"host\":\"localhost\",\"port\":3306,\"database\":\"db\",\"username\":\"u\"}")).andExpect(status().isNoContent());
         org.junit.jupiter.api.Assertions.assertEquals(before, jdbc.queryForObject("SELECT password_cipher FROM data_sources WHERE id=?", String.class, id));
         org.junit.jupiter.api.Assertions.assertEquals("updated", jdbc.queryForObject("SELECT name FROM data_sources WHERE id=?", String.class, id));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='datasource.update'", Integer.class));
@@ -371,7 +371,7 @@ class DataSourceApiTest {
         mvc.perform(get("/api/organization/audit?limit=101").session(session)).andExpect(status().isBadRequest());
     }
     @Test void datasetPoliciesCanBeInspectedAndRevokedOnlyByManagers() throws Exception {
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (10,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (10,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name,department_field) VALUES (10,10,'data','t','DEPT')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (10,0,'DEPT','BIGINT',FALSE),(10,1,'ID','INT',FALSE)");
         jdbc.update("INSERT INTO dataset_role_rules(dataset_id,role_id,scope) VALUES (10,10,'OWN')");

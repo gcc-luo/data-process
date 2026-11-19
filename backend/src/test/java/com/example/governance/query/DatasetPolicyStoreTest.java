@@ -22,7 +22,7 @@ class DatasetPolicyStoreTest {
         jdbc.update("INSERT INTO roles(id,name) VALUES (1,'analyst')");
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,1)");
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'datasource.query.read'),(1,'datasource.dataset.read')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,schema_name,table_name) VALUES (1,1,'clients','PUBLIC','CLIENTS')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'DEPARTMENT_ID','BIGINT',FALSE),(1,1,'ID','INTEGER',FALSE),(1,2,'PHONE','VARCHAR',TRUE)");
         var store = new DatasetPolicyStore(jdbc, tx);
@@ -45,7 +45,7 @@ class DatasetPolicyStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
         jdbc.update("INSERT INTO roles(id,name) VALUES (1,'a'),(2,'b')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'data','t')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'DEPT','BIGINT',FALSE),(1,1,'OTHER_DEPT','BIGINT',FALSE),(1,2,'ID','INTEGER',FALSE)");
         var store = new DatasetPolicyStore(jdbc,tx);
@@ -83,7 +83,7 @@ class DatasetPolicyStoreTest {
         setup.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         setup.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'u','h',1,TRUE,'v')");
         setup.update("INSERT INTO roles(id,name) VALUES (1,'role')"); setup.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,1)"); setup.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'datasource.query.read'),(1,'datasource.dataset.read')");
-        setup.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        setup.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         setup.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'data','t')");
         setup.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'DEPT_A','BIGINT',FALSE),(1,1,'DEPT_B','BIGINT',FALSE),(1,2,'SECRET','VARCHAR',FALSE)");
         var writer = new DatasetPolicyStore(setup,tx); writer.configure(1,"DEPT_A",1,AccessPolicy.Scope.OWN,Map.of("SECRET",DatasetAccess.Field.MASKED));

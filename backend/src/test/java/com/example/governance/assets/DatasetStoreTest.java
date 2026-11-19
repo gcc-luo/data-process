@@ -14,7 +14,7 @@ class DatasetStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var store = new DatasetStore(jdbc, new DataSourceTransactionManager(db));
         var fields = List.of(new DatasetStore.Field("id", "BIGINT", false), new DatasetStore.Field("name", "VARCHAR", true));
         long id = store.create(1, "customers", null, "sales", "customers", fields);
@@ -30,7 +30,7 @@ class DatasetStoreTest {
             Flyway.configure().dataSource(db).load().migrate();
             db.getHikariConfigMXBean().setMaximumPoolSize(1);
             var jdbc = new JdbcTemplate(db);
-            jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+            jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
             var store = new DatasetStore(jdbc, new DataSourceTransactionManager(db));
             store.create(1, "orders", null, null, "orders", List.of(new DatasetStore.Field("id", "BIGINT", false)));
             assertEquals("id", store.list().getFirst().fields().getFirst().name());
@@ -39,7 +39,7 @@ class DatasetStoreTest {
     @Test void refreshOnlyAddsNewFieldsAndRejectsBreakingChangesAtomically() {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var store = new DatasetStore(jdbc, new DataSourceTransactionManager(db));
         var original = List.of(new DatasetStore.Field("id","BIGINT",false), new DatasetStore.Field("name","VARCHAR",true));
         long id = store.create(1,"data",null,null,"t",original);
@@ -55,7 +55,7 @@ class DatasetStoreTest {
     @Test void refreshSerializesWithPolicyUpdatesAndNewFieldsRemainDenied() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db); var manager = new DataSourceTransactionManager(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO roles(id,name) VALUES (1,'role')");
         var store = new DatasetStore(jdbc,manager); long id=store.create(1,"data",null,null,"t",List.of(new DatasetStore.Field("dept","BIGINT",false),new DatasetStore.Field("id","BIGINT",false)));
         var tx = new org.springframework.transaction.support.TransactionTemplate(manager);

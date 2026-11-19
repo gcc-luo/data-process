@@ -17,7 +17,7 @@ public class WorkflowConfiguration {
     @Bean TaskVersionStore taskVersionStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new TaskVersionStore(jdbc, tx); }
     @Bean WorkflowDefinitionStore workflowDefinitionStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new WorkflowDefinitionStore(jdbc, tx); }
     @Bean WorkflowRunStore workflowRunStore(JdbcTemplate jdbc, PlatformTransactionManager tx, WorkflowDefinitionStore definitions) { return new WorkflowRunStore(jdbc, tx, definitions); }
-    @Bean ExecutionDataSourceProvider executionDataSourceProvider(DataSourceStore sources) { return new ExecutionDataSourceProvider(sources); }
+    @Bean ExecutionDataSourceProvider executionDataSourceProvider(DataSourceStore sources, com.example.governance.assets.driver.ConnectionFactory factory) { return new ExecutionDataSourceProvider(sources, factory); }
     @Bean(destroyMethod = "close") CamelTaskRunner camelTaskRunner(ExecutionDataSourceProvider provider) throws Exception { return new CamelTaskRunner(provider); }
     @Bean ThreadPoolTaskScheduler taskScheduler() {
         var scheduler = new ThreadPoolTaskScheduler(); scheduler.setPoolSize(3); scheduler.setThreadNamePrefix("scheduler-");

@@ -17,7 +17,7 @@ class ServiceCatalogStoreTest {
         var jdbc = new JdbcTemplate(db);
         jdbc.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'a','hash',1,TRUE,'v')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'dataset','data')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'ID','BIGINT',FALSE)");
         var store = new ServiceCatalogStore(jdbc, new DataSourceTransactionManager(db));
@@ -44,7 +44,7 @@ class ServiceCatalogStoreTest {
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
         jdbc.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'a','hash',1,TRUE,'v')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'dataset','data')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'ID','BIGINT',FALSE)");
         var store = new ServiceCatalogStore(jdbc, new DataSourceTransactionManager(db));

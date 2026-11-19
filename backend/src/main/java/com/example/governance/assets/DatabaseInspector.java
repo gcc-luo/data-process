@@ -2,11 +2,9 @@ package com.example.governance.assets;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 
 /** Read-only JDBC discovery. The caller enforces authorization and handles secret access. */
 public final class DatabaseInspector {
@@ -19,19 +17,7 @@ public final class DatabaseInspector {
     }
     private final Connector connector;
     DatabaseInspector(Connector connector) { this.connector = connector; }
-    public DatabaseInspector() { this(DatabaseInspector::connect); }
-
-    private static Connection connect(DataSourceDefinition definition, String password) throws SQLException {
-        Properties properties = new Properties();
-        properties.setProperty("user", definition.username());
-        properties.setProperty("password", password);
-        switch (definition.type()) {
-            case MYSQL -> { properties.setProperty("connectTimeout", "5000"); properties.setProperty("socketTimeout", "10000"); }
-            case POSTGRESQL -> { properties.setProperty("connectTimeout", "5"); properties.setProperty("socketTimeout", "10"); }
-            case ORACLE -> { properties.setProperty("oracle.net.CONNECT_TIMEOUT", "5000"); properties.setProperty("oracle.jdbc.ReadTimeout", "10000"); }
-        }
-        return DriverManager.getConnection(definition.jdbcUrl(), properties);
-    }
+    public DatabaseInspector(com.example.governance.assets.driver.ConnectionFactory factory) { this(factory::open); }
 
     public boolean test(DataSourceDefinition definition, String password) {
         try (Connection connection = connector.connect(definition, password)) { return connection.isValid(5); }

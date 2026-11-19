@@ -27,7 +27,7 @@ class DatasetRefreshApiTest {
         jdbc.update("INSERT INTO departments(id,name) VALUES (10,'department')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (10,'manager',?,10,TRUE,'v')",encoder.encode("password"));
         jdbc.update("INSERT INTO roles(id,name) VALUES (10,'manager')"); jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (10,10)");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','localhost',3306,'db','u',?)",cipher.encrypt("secret"));
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u',?)",cipher.encrypt("secret"));
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name,department_field) VALUES (20,15,'dataset','orders','dept')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (20,0,'dept','BIGINT',FALSE),(20,1,'id','BIGINT',FALSE)");
         jdbc.update("INSERT INTO dataset_role_rules(dataset_id,role_id,scope) VALUES (20,10,'OWN')");

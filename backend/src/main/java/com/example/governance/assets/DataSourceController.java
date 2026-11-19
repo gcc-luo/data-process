@@ -23,21 +23,28 @@ public class DataSourceController {
     private final DataSourceStore store;
     private final DatabaseInspector inspector;
     private final AuditLog audit;
-    public DataSourceController(DataSourceStore store, DatabaseInspector inspector, AuditLog audit) { this.store = store; this.inspector = inspector; this.audit = audit; }
-    record CreateRequest(String name, DataSourceDefinition.Type type, String host, int port, String database, String username, String password) {}
-    record Item(long id, String name, DataSourceDefinition.Type type, String host, int port, String database, String username) {}
+    private final com.example.governance.assets.driver.ConnectionFactory factory;
+    private final com.example.governance.assets.driver.DatabaseProfileRegistry registry;
+    public DataSourceController(DataSourceStore store, DatabaseInspector inspector, AuditLog audit, com.example.governance.assets.driver.ConnectionFactory factory, com.example.governance.assets.driver.DatabaseProfileRegistry registry) { this.store = store; this.inspector = inspector; this.audit = audit; this.factory = factory; this.registry = registry; }
+    record CreateRequest(String name, String profileId, String host, int port, String database, String username, String password, Long driverId, Map<String, String> options) {}
+    record Item(long id, String name, String type, String profileId, String profileName, String host, int port, String database, String username, Long driverId, Map<String, String> options) {}
+    @GetMapping("/api/data-sources/profiles")
+    List<com.example.governance.assets.driver.DatabaseProfileRegistry.ProfileView> profiles() { return registry.views(); }
     @GetMapping("/api/data-sources")
     List<Item> list() {
         return store.list().stream().map(entry -> {
             var d = entry.definition();
-            return new Item(entry.id(), d.name(), d.type(), d.host(), d.port(), d.database(), d.username());
+            String profileName;
+            try { profileName = registry.resolve(d.profileId()).displayName(); } catch (IllegalArgumentException unknown) { profileName = d.profileId(); }
+            return new Item(entry.id(), d.name(), d.type(), d.profileId(), profileName, d.host(), d.port(), d.database(), d.username(), d.driverId(), d.options());
         }).toList();
     }
     @PostMapping("/api/data-sources")
     @Transactional
     ResponseEntity<Map<String, Object>> create(@RequestBody CreateRequest request, Authentication authentication) throws GeneralSecurityException {
         try {
-            var definition = new DataSourceDefinition(request.name(), request.type(), request.host(), request.port(), request.database(), request.username());
+            var definition = new DataSourceDefinition(request.name(), request.profileId(), request.host(), request.port(), request.database(), request.username(), request.driverId(), request.options());
+            factory.validate(definition);
             long id = store.create(definition, request.password());
             audit.success(authentication, "datasource.create", "datasource", id);
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id, "name", definition.name()));
@@ -48,7 +55,8 @@ public class DataSourceController {
     @PutMapping("/api/data-sources/{id}") @Transactional
     ResponseEntity<Void> update(@PathVariable long id, @RequestBody CreateRequest request, Authentication authentication) throws GeneralSecurityException {
         try {
-            var definition = new DataSourceDefinition(request.name(), request.type(), request.host(), request.port(), request.database(), request.username());
+            var definition = new DataSourceDefinition(request.name(), request.profileId(), request.host(), request.port(), request.database(), request.username(), request.driverId(), request.options());
+            factory.validate(definition);
             if (!store.update(id, definition, request.password())) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
             audit.success(authentication, "datasource.update", "datasource", id);
             return ResponseEntity.noContent().build();

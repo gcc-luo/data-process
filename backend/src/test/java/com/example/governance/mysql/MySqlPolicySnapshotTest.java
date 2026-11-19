@@ -18,7 +18,7 @@ class MySqlPolicySnapshotTest {
         setup.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         setup.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'u','h',1,TRUE,'v')");
         setup.update("INSERT INTO roles(id,name) VALUES (1,'role')"); setup.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,1)"); setup.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'datasource.query.read'),(1,'datasource.dataset.read')");
-        setup.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        setup.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         setup.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'data','t')");
         setup.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'DEPT_A','BIGINT',FALSE),(1,1,'DEPT_B','BIGINT',FALSE),(1,2,'SECRET','VARCHAR',FALSE)");
         var writer = new DatasetPolicyStore(setup,tx); writer.configure(1,"DEPT_A",1,AccessPolicy.Scope.OWN,Map.of("SECRET",DatasetAccess.Field.MASKED));

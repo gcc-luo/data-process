@@ -28,7 +28,7 @@ class DataSourceDeletionApiTest {
         jdbc.update("INSERT INTO departments(id,name) VALUES (10,'test')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (10,'manager',?,10,TRUE,'v')", encoder.encode("password"));
         jdbc.update("INSERT INTO roles(id,name) VALUES (10,'manager')"); jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (10,10)");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
     }
     private MockHttpSession login() throws Exception { return (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","manager").param("password","password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false); }
     @Test void deleteRequiresPermissionAndAuditsSuccess() throws Exception {

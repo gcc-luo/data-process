@@ -16,7 +16,7 @@ class ReportStoreTest {
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
         jdbc.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'a','hash',1,TRUE,'a'),(2,'b','hash',1,TRUE,'b')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'dataset','data')");
         var store = new ReportStore(jdbc, tx);
         long report = store.createReport(1, 1, "Sales", "TABLE", "PREVIEW", "{\"fields\":[\"ID\"],\"limit\":100}");
@@ -32,7 +32,7 @@ class ReportStoreTest {
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
         jdbc.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'a','hash',1,TRUE,'a'),(2,'b','hash',1,TRUE,'b')");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'dataset','data')");
         var store = new ReportStore(jdbc, tx);
         long first = store.createReport(1,1,"First","TABLE","PREVIEW","{}");

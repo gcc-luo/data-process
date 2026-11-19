@@ -15,7 +15,7 @@ class DataSourceStoreTest {
         var jdbc = new JdbcTemplate(db);
         var cipher = new CredentialCipher(Base64.getEncoder().encodeToString(new byte[32]));
         var store = new DataSourceStore(jdbc, cipher);
-        var definition = new DataSourceDefinition("业务库", DataSourceDefinition.Type.MYSQL, "db.example", 3306, "orders", "reader");
+        var definition = new DataSourceDefinition("业务库", "MYSQL:8.x", "db.example", 3306, "orders", "reader");
         long id = store.create(definition, "secret-password");
         assertEquals(definition, store.find(id).orElseThrow());
         String ciphertext = jdbc.queryForObject("SELECT password_cipher FROM data_sources WHERE id=?", String.class, id);
@@ -27,7 +27,7 @@ class DataSourceStoreTest {
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
         var tx = new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.datasource.DataSourceTransactionManager(db));
         var store = new DataSourceStore(jdbc, new CredentialCipher(Base64.getEncoder().encodeToString(new byte[32])));
-        var definition = new DataSourceDefinition("db", DataSourceDefinition.Type.MYSQL, "localhost", 3306, "db", "reader");
+        var definition = new DataSourceDefinition("db", "MYSQL:8.x", "localhost", 3306, "db", "reader");
         long source = store.create(definition, "secret");
         jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (8,'job','SQL',2)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (8,1,?),(8,2,?)", "{\"sourceId\":" + source + ",\"sql\":\"select 1\",\"parameters\":[]}", "{\"sourceId\":999,\"sql\":\"select 1\",\"parameters\":[]}");
@@ -43,7 +43,7 @@ class DataSourceStoreTest {
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
         var manager = new org.springframework.jdbc.datasource.DataSourceTransactionManager(db);
         var store = new DataSourceStore(jdbc, new CredentialCipher(Base64.getEncoder().encodeToString(new byte[32])));
-        long source = store.create(new DataSourceDefinition("db", DataSourceDefinition.Type.MYSQL, "localhost", 3306, "db", "reader"), "secret");
+        long source = store.create(new DataSourceDefinition("db", "MYSQL:8.x", "localhost", 3306, "db", "reader"), "secret");
         jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (8,'job','SQL',1)");
         var locked = new java.util.concurrent.CountDownLatch(1); var release = new java.util.concurrent.CountDownLatch(1);
         var pool = java.util.concurrent.Executors.newFixedThreadPool(2);

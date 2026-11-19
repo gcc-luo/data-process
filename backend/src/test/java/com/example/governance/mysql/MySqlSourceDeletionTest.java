@@ -22,7 +22,7 @@ class MySqlSourceDeletionTest {
         Flyway.configure().dataSource(db).locations("classpath:db/mysql").load().migrate();
         var jdbc = new JdbcTemplate(db); var manager = new DataSourceTransactionManager(db);
         var store = new DataSourceStore(jdbc,new CredentialCipher(Base64.getEncoder().encodeToString(new byte[32])));
-        long source = store.create(new DataSourceDefinition("snapshot-" + java.util.UUID.randomUUID(), DataSourceDefinition.Type.MYSQL,"localhost",3306,"db","u"), "secret");
+        long source = store.create(new DataSourceDefinition("snapshot-" + java.util.UUID.randomUUID(), "MYSQL:8.x","localhost",3306,"db","u"), "secret");
         var outer = new TransactionTemplate(manager); var inner = new TransactionTemplate(manager); inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         assertThrows(IllegalStateException.class, () -> outer.executeWithoutResult(tx -> {
             jdbc.queryForObject("SELECT COUNT(*) FROM processing_task_versions", Integer.class); // establish REPEATABLE READ snapshot

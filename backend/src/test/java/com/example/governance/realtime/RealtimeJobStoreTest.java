@@ -15,7 +15,7 @@ class RealtimeJobStoreTest {
     @Test void cursorAdvancesOnlyAfterSuccessfulTargetCommitAndSurvivesRestart() {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','localhost',3306,'db','u','cipher'),(2,'b','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher'),(2,'b','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var calls = new AtomicInteger();
         RealtimeJobStore.Processor processor = (config, cursor) -> {
             if (calls.getAndIncrement() == 1) throw new IllegalStateException("sensitive");
@@ -36,7 +36,7 @@ class RealtimeJobStoreTest {
     @Test void concurrentPollsClaimOneBatch() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','localhost',3306,'db','u','cipher'),(2,'b','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher'),(2,'b','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var calls = new AtomicInteger();
         var store = new RealtimeJobStore(jdbc, new DataSourceTransactionManager(db), (config,cursor) -> { calls.incrementAndGet(); return new IncrementalSyncExecutor.Result(1, new IncrementalSyncExecutor.Cursor("10",1)); });
         var mapping = new IncrementalSyncExecutor.Config("src","dst",List.of("id"),List.of("id"),"seq","id",List.of("id"),"LONG",100);

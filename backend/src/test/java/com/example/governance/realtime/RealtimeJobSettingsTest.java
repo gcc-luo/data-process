@@ -16,7 +16,7 @@ class RealtimeJobSettingsTest {
     @Test void updatesOnlyBatchAndIntervalWhileStoppedAndPreservesCursorAndMapping() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','localhost',3306,'db','u','cipher'),(2,'b','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher'),(2,'b','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var observed = new AtomicReference<RealtimeJobStore.JobConfig>();
         var store = new RealtimeJobStore(jdbc,new DataSourceTransactionManager(db),(config,cursor) -> { observed.set(config); return new IncrementalSyncExecutor.Result(1,new IncrementalSyncExecutor.Cursor(cursor == null ? "5" : "6",1)); });
         var mapping = new IncrementalSyncExecutor.Config("src","dst",List.of("id"),List.of("id"),"seq","id",List.of("id"),"LONG",100);
@@ -32,7 +32,7 @@ class RealtimeJobSettingsTest {
     @Test void settingsCanBeUpdatedAfterFailureWithoutLosingFailureOrCursor() {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var store=new RealtimeJobStore(jdbc,new DataSourceTransactionManager(db),(config,cursor) -> { throw new IllegalStateException(); });
         var mapping=new IncrementalSyncExecutor.Config("src","dst",List.of("id"),List.of("id"),"seq","id",List.of("id"),"LONG",100);
         long id=store.create("job",new RealtimeJobStore.JobConfig(1,1,mapping,5)); var now=Instant.now();store.start(id,now); assertFalse(store.poll(id,now));
@@ -41,7 +41,7 @@ class RealtimeJobSettingsTest {
     @Test void concurrentStartAndEditAreSerialized() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc=new JdbcTemplate(db);
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'a','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var store=new RealtimeJobStore(jdbc,new DataSourceTransactionManager(db),(config,cursor) -> new IncrementalSyncExecutor.Result(0,cursor));
         var mapping=new IncrementalSyncExecutor.Config("src","dst",List.of("id"),List.of("id"),"seq","id",List.of("id"),"LONG",100);
         long id=store.create("job",new RealtimeJobStore.JobConfig(1,1,mapping,5)); var gate=new java.util.concurrent.CountDownLatch(1); var pool=java.util.concurrent.Executors.newFixedThreadPool(2);

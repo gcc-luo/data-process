@@ -15,6 +15,7 @@ public final class AuditCatalog {
             Map.entry("user.create", "新增用户"), Map.entry("user.update", "修改用户"), Map.entry("user.delete", "删除用户"), Map.entry("user.roles", "分配用户角色"), Map.entry("user.enabled", "启停用户账号"), Map.entry("user.password", "重置用户密码"), Map.entry("user.password.self", "修改本人密码"), Map.entry("user.kick", "踢出在线会话"),
             Map.entry("menu.create", "新增菜单"), Map.entry("menu.update", "修改菜单"), Map.entry("menu.delete", "删除菜单"), Map.entry("menu.reorder", "菜单排序"),
             Map.entry("datasource.create", "新增数据源"), Map.entry("datasource.update", "修改数据源"), Map.entry("datasource.delete", "删除数据源"),
+            Map.entry("driver.upload", "上传驱动"), Map.entry("driver.delete", "删除驱动"),
             Map.entry("dataset.create", "登记数据集"), Map.entry("dataset.delete", "删除数据集"), Map.entry("dataset.refresh", "刷新数据集"), Map.entry("dataset.policy", "配置数据范围"), Map.entry("dataset.policy.revoke", "撤销数据范围"),
             Map.entry("task.create", "新增任务"), Map.entry("task.version", "保存任务版本"), Map.entry("task.run", "执行任务"), Map.entry("task.retry", "重试任务"),
             Map.entry("workflow.create", "新增工作流"), Map.entry("workflow.version", "保存工作流版本"), Map.entry("workflow.run", "执行工作流"), Map.entry("workflow.retry", "重试工作流"), Map.entry("workflow.backfill", "补跑工作流"), Map.entry("workflow.schedule.fire", "调度触发"),
@@ -27,7 +28,7 @@ public final class AuditCatalog {
 
     private static final Map<String, String> OBJECT_TYPES = Map.ofEntries(
             Map.entry("user", "用户"), Map.entry("account", "账号"), Map.entry("department", "部门"), Map.entry("role", "角色"), Map.entry("menu", "菜单"),
-            Map.entry("datasource", "数据源"), Map.entry("dataset", "数据集"), Map.entry("task", "任务"), Map.entry("workflow", "工作流"), Map.entry("run", "运行实例"),
+            Map.entry("datasource", "数据源"), Map.entry("driver", "JDBC 驱动"), Map.entry("dataset", "数据集"), Map.entry("task", "任务"), Map.entry("workflow", "工作流"), Map.entry("run", "运行实例"),
             Map.entry("schedule", "调度"), Map.entry("realtime", "实时同步"), Map.entry("service", "数据服务"), Map.entry("caller", "调用方"), Map.entry("report", "报表"), Map.entry("dashboard", "看板"));
 
     private static final Map<String, String> RESULTS = Map.of("SUCCESS", "成功", "FAILURE", "失败");

@@ -42,8 +42,8 @@ class OrganizationNavigationTest {
         var roots = rows.stream().filter(menu -> menu.parentId() == null).map(OrganizationService.Menu::component).toList();
         assertEquals(List.of("assets", "system"), roots);
         var components = components(f, "admin");
-        assertEquals(10, components.size());
-        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/datasets", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
+        assertEquals(11, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/datasets", "assets/drivers", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
     }
 
     @Test void singleSystemGrantOnlyOpensItsOwnPage() {

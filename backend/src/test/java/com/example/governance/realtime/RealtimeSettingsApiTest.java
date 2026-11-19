@@ -24,7 +24,7 @@ class RealtimeSettingsApiTest {
         jdbc.update("INSERT INTO departments(id,name) VALUES (1001,'dept')"); jdbc.update("INSERT INTO roles(id,name) VALUES (1001,'role')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1001,'rt-settings',?,1001,TRUE,'v')",encoder.encode("password"));
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (1001,1001)");
-        jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1001,'db','MYSQL','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1001,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var mapping=new IncrementalSyncExecutor.Config("src","dst",List.of("id"),List.of("id"),"seq","id",List.of("id"),"LONG",10);
         long id=jobs.create("job",new RealtimeJobStore.JobConfig(1001,1001,mapping,5));
         var session=(MockHttpSession)mvc.perform(post("/api/login").with(csrf()).param("username","rt-settings").param("password","password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
