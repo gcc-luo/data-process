@@ -20,6 +20,10 @@ export function databaseLabel(profile, options) {
 
 export function driversForType(drivers, type) { return (drivers || []).filter(d => d.dbType === type) }
 
+export function driverLabel(driver) {
+  return `${driver.name}${driver.versionLabel ? ' ' + driver.versionLabel : ''}${driver.builtin ? '（内置）' : '（上传）'}`
+}
+
 export function paramRows(profile, options) {
   const fields = new Set((profile?.extraFields || []).map(f => f.key))
   return Object.entries(options || {}).filter(([k, v]) => !fields.has(k) && v !== '' && v != null).map(([key, value]) => ({ key, value }))

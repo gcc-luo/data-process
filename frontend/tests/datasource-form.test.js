@@ -46,3 +46,10 @@ test('buildPayload nulls blank password on edit and drops empty options', () => 
   assert.equal(buildPayload({ ...form, password: '' }, false).password, '')
   assert.equal(buildPayload({ ...form, driverId: 7 }, true).driverId, 7)
 })
+
+test('driverLabel marks builtin and uploaded drivers with version', async () => {
+  const { driverLabel } = await import('../src/datasource-form.js')
+  assert.equal(driverLabel({ name: 'MySQL Connector/J', versionLabel: '9.5', builtin: true }), 'MySQL Connector/J 9.5（内置）')
+  assert.equal(driverLabel({ name: 'ojdbc6', versionLabel: '', builtin: false }), 'ojdbc6（上传）')
+  assert.equal(driverLabel({ name: 'pg', versionLabel: null, builtin: false }), 'pg（上传）')
+})
