@@ -1,11 +1,13 @@
 <script setup>
 import { computed, inject, onMounted, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { assetPage } from './asset-pagination.js'
 import { authorizedRequest } from './auth.js'
-import { profileTypes, versionsForType, defaultForm, databaseLabel, driversForType, driverLabel, paramRows, buildPayload } from './datasource-form.js'
+import { profileTypes, versionsForType, defaultForm, databaseLabel, driversForType, driverLabel, paramRows, buildPayload, connectionKey, saveAllowed, testOutcome, batchDeleteSummary } from './datasource-form.js'
 const can = inject('canPermission', () => false)
 const props = defineProps({ view: { type: String, default: 'sources' } })
 const items = ref([]), error = ref(''), message = ref(''), busy = ref(false), registering = ref(false), show = ref(false)
+const selectedSources = ref([]), batchDeleting = ref(false)
 const datasets = ref([]), tables = ref([]), selectedSource = ref(null), schema = ref(''), datasetName = ref('')
 const policyOpen = ref(false), policyDataset = ref(null), roleOptions = ref([]), policyForm = ref({ departmentField: '', roleId: null, scope: 'OWN', fields: {} })
 const policyRules = ref([]), storedDepartmentField = ref('')
@@ -17,6 +19,7 @@ const tablesPage = computed(() => assetPage(tables.value, tableSearch.value, tab
 const catalogOpen = ref(false), fieldsOpen = ref(false), fieldsDataset = ref(null), catalogSourceId = ref(null)
 let inspectSequence = 0
 const editingId = ref(null)
+const testing = ref(false), testedKey = ref('')
 const form = ref({ name: '', type: 'MYSQL', profileId: '', host: '', port: 3306, database: '', username: '', password: '', driverId: null, connectType: 'SERVICE' })
 const profiles = ref([]), drivers = ref([]), advanced = ref([])
 const driverSearch = ref(''), driverPage = ref(1), driverSize = ref(10)
@@ -120,13 +123,30 @@ async function deleteSource(item) {
     await load()
   } catch (e) { error.value = e.message }
 }
+async function deleteSelectedSources() {
+  if (!selectedSources.value.length || batchDeleting.value) return
+  batchDeleting.value = true; error.value = ''; message.value = ''
+  try {
+    const response = await authorizedRequest('/api/data-sources/batch-delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: selectedSources.value.map(item => item.id) }) })
+    if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有数据源管理权限' : response.status === 400 ? '批量删除参数无效，请刷新后重试' : '批量删除失败，请刷新后重试')
+    const result = await response.json()
+    const summary = batchDeleteSummary(result, items.value)
+    message.value = summary.message; error.value = summary.error
+    const deletedIds = new Set(result.deleted || [])
+    if (selectedSource.value && deletedIds.has(selectedSource.value.id)) { selectedSource.value = null; tables.value = []; catalogOpen.value = false }
+    selectedSources.value = []
+    await load()
+  } catch (e) { error.value = e.message } finally { batchDeleting.value = false }
+}
 async function testConnection(item) {
   error.value = ''
   try {
     const response = await authorizedRequest(`/api/data-sources/${item.id}/test`, { method: 'POST' })
     if (!response.ok) throw new Error('连接测试请求失败')
-    const result = await response.json()
-    item.testStatus = result.connected ? '连接成功' : '连接失败，请检查配置'
+    const outcome = testOutcome(await response.json())
+    item.testStatus = outcome.ok ? '连接成功' : ''
+    if (outcome.ok) ElMessage.success(`数据源「${item.name}」连接成功`)
+    else void ElMessageBox.alert(outcome.message, '测试连接', { type: 'error', confirmButtonText: '知道了' })
   } catch (e) { error.value = e.message }
 }
 async function loadDatasets() {
@@ -232,7 +252,7 @@ async function savePolicy() {
 }
 function showFields(dataset) { fieldsDataset.value = dataset; fieldsOpen.value = true }
 function createSource() {
-  error.value = ''; editingId.value = null
+  error.value = ''; editingId.value = null; testedKey.value = ''
   form.value = { name: '', type: 'MYSQL', profileId: '', host: '', port: 3306, database: '', username: '', password: '', driverId: null, connectType: 'SERVICE' }
   advanced.value = []
   const mysql8 = profiles.value.find(p => p.id === 'MYSQL:8.x') || profiles.value[0]
@@ -240,18 +260,35 @@ function createSource() {
   show.value = true
 }
 function editSource(item) {
-  error.value = ''; editingId.value = item.id
+  error.value = ''; editingId.value = item.id; testedKey.value = ''
   const profile = profiles.value.find(p => p.id === item.profileId)
   form.value = { name: item.name, type: item.type, profileId: item.profileId, host: item.host, port: item.port, database: item.database, username: item.username, password: '', driverId: item.driverId || null, connectType: item.options?.connectType || defaultForm(profile).options.connectType || 'SERVICE' }
   advanced.value = paramRows(profile, item.options)
   show.value = true
 }
+function testPayload() {
+  const options = Object.fromEntries(advanced.value.filter(r => r.key).map(r => [r.key, r.value]))
+  if (hasConnectType.value) options.connectType = form.value.connectType
+  return { ...buildPayload({ ...form.value, options }, Boolean(editingId.value)), id: editingId.value }
+}
+const testPassed = computed(() => saveAllowed(testedKey.value, testPayload()))
+async function testForm() {
+  if (testing.value) return
+  testing.value = true; error.value = ''
+  try {
+    const payload = testPayload()
+    const response = await authorizedRequest('/api/data-sources/test-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有测试连接权限' : '连接测试请求失败')
+    const outcome = testOutcome(await response.json())
+    if (outcome.ok) { testedKey.value = connectionKey(payload); ElMessage.success('连接成功，可以保存') }
+    else { testedKey.value = ''; void ElMessageBox.alert(outcome.message, '测试连接', { type: 'error', confirmButtonText: '知道了' }) }
+  } catch (e) { testedKey.value = ''; error.value = e.message } finally { testing.value = false }
+}
 async function save() {
+  if (!testPassed.value) { error.value = '请先测试连接，测试通过后才能保存'; return }
   busy.value = true; error.value = ''
   try {
-    const options = Object.fromEntries(advanced.value.filter(r => r.key).map(r => [r.key, r.value]))
-    if (hasConnectType.value) options.connectType = form.value.connectType
-    const payload = buildPayload({ ...form.value, options }, Boolean(editingId.value))
+    const { id, ...payload } = testPayload()
     const response = await authorizedRequest(editingId.value ? `/api/data-sources/${editingId.value}` : '/api/data-sources', { method: editingId.value ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有数据源管理权限' : '保存失败，请检查配置和名称是否重复')
     form.value.password = ''; show.value = false; await load()
@@ -272,8 +309,9 @@ watch(() => props.view, loadForView)
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon />
     <template v-if="view === 'sources'">
-        <div class="toolbar"><el-input v-model="sourceSearch" clearable placeholder="搜索名称、主机或数据库" @input="sourcePage = 1"/><el-button v-if="can('datasource.source.create')" type="primary" @click="createSource">新建数据源</el-button><el-button @click="load">刷新</el-button></div>
-        <el-table :data="sourcesPage.rows" empty-text="暂无数据源" row-key="id">
+        <div class="toolbar"><el-input v-model="sourceSearch" clearable placeholder="搜索名称、主机或数据库" @input="sourcePage = 1"/><el-button v-if="can('datasource.source.create')" type="primary" @click="createSource">新建数据源</el-button><el-popconfirm v-if="can('datasource.source.delete')" :title="`确定删除选中的 ${selectedSources.length} 个数据源？被引用的数据源将保留。`" width="280" @confirm="deleteSelectedSources"><template #reference><el-button type="danger" :disabled="!selectedSources.length" :loading="batchDeleting">批量删除</el-button></template></el-popconfirm><el-button @click="load">刷新</el-button></div>
+        <el-table :data="sourcesPage.rows" empty-text="暂无数据源" row-key="id" @selection-change="selectedSources = $event">
+          <el-table-column v-if="can('datasource.source.delete')" type="selection" width="45"/>
           <el-table-column prop="name" label="名称" min-width="150"/><el-table-column prop="type" label="类型" min-width="100"/><el-table-column prop="profileName" label="版本" min-width="120"/><el-table-column prop="host" label="主机" min-width="150"/><el-table-column prop="port" label="端口" width="85"/><el-table-column prop="database" label="数据库 / 服务名" min-width="150"/><el-table-column prop="username" label="用户名" min-width="110"/>
           <el-table-column label="操作" min-width="300" fixed="right"><template #default="scope"><el-button v-if="can('datasource.source.test')" text type="primary" @click="testConnection(scope.row)">测试连接</el-button><el-button v-if="can('datasource.source.test')" text @click="openCatalog(scope.row)">查看表</el-button><el-button v-if="can('datasource.source.update')" text @click="editSource(scope.row)">编辑</el-button><el-popconfirm v-if="can('datasource.source.delete')" :title="`确定删除数据源 ${scope.row.name}？`" @confirm="deleteSource(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm><div class="status-text">{{ scope.row.testStatus }}</div></template></el-table-column>
         </el-table>
@@ -326,7 +364,7 @@ watch(() => props.view, loadForView)
           <el-form-item label="JDBC 驱动" class="span-2"><div class="driver-row"><el-select v-model="form.driverId" clearable placeholder="内置默认驱动"><el-option v-for="d in typeDrivers" :key="d.id" :label="driverLabel(d)" :value="d.id" /></el-select><el-button v-if="can('datasource.driver.upload')" @click="openUpload">上传驱动</el-button></div></el-form-item>
           <el-collapse class="advanced-params span-2"><el-collapse-item :title="`高级参数（${advanced.length}）`" name="params"><div v-for="(row, index) in advanced" :key="index" class="param-row"><el-select v-model="row.key" placeholder="参数名" filterable><el-option v-for="spec in currentProfile?.extraParams || []" :key="spec.key" :label="spec.key" :value="spec.key"><span>{{ spec.key }}</span><span class="param-hint">{{ spec.label }}</span></el-option></el-select><el-input v-model="row.value" :placeholder="(currentProfile?.extraParams || []).find(s => s.key === row.key)?.hint || '参数值'" /><el-button text type="danger" @click="advanced.splice(index, 1)">移除</el-button></div><el-button text type="primary" :disabled="!currentProfile || !(currentProfile.extraParams || []).length" @click="advanced.push({ key: '', value: '' })">添加参数</el-button></el-collapse-item></el-collapse>
         </div>
-        <div class="form-actions"><el-button type="primary" native-type="submit" :loading="busy">保存</el-button></div>
+        <div class="form-actions"><span class="test-hint" :class="{ ok: testPassed }">{{ testPassed ? '连接测试已通过' : '测试连接通过后才能保存' }}</span><el-button :loading="testing" @click="testForm">测试连接</el-button><el-button type="primary" native-type="submit" :loading="busy" :disabled="!testPassed">保存</el-button></div>
       </el-form>
     </el-dialog>
     <el-dialog v-model="uploadOpen" title="上传 JDBC 驱动" width="min(520px, 95vw)" append-to-body><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><el-alert title="驱动 jar 会在隔离类加载器中运行，仅管理员可上传；上传前请确认来源可信。" type="warning" :closable="false" show-icon/><el-form label-position="top" @submit.prevent="submitUpload"><el-form-item label="驱动名称"><el-input v-model="uploadForm.name" placeholder="如 MySQL Connector/J 8.4" /></el-form-item><el-form-item label="数据库类型"><el-select v-model="uploadForm.dbType"><el-option v-for="t in typeOptions" :key="t.value" :label="t.label" :value="t.value" /></el-select></el-form-item><el-form-item label="驱动类"><el-input v-model="uploadForm.driverClass" placeholder="如 com.mysql.cj.jdbc.Driver" /></el-form-item><el-form-item label="版本标签（可留空自动探测）"><el-input v-model="uploadForm.versionLabel" placeholder="如 8.4.0" /></el-form-item><el-form-item label="jar 文件（≤50MB）"><el-upload v-model:file-list="uploadFiles" drag accept=".jar" :auto-upload="false" :limit="1" :on-change="f => uploadForm.file = f.raw" :on-remove="() => uploadForm.file = null"><div class="upload-drag">将 jar 拖到此处，或点击选择</div></el-upload></el-form-item><el-button type="primary" native-type="submit" :loading="uploading">上传</el-button></el-form></el-dialog>
@@ -334,5 +372,5 @@ watch(() => props.view, loadForView)
 </template>
 
 <style scoped>
-.toolbar,.catalog-controls{display:flex;gap:12px;align-items:center;margin:16px 0}.toolbar .el-input{max-width:320px}.catalog-controls > *{flex:1;min-width:0}.pagination{display:flex;justify-content:flex-end;margin:18px 0}.status-text{font-size:12px;color:#718581}.el-alert{margin:10px 0}.advanced-params{margin-bottom:14px}.source-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.source-form-grid .span-2{grid-column:1/-1}.source-form-grid .el-select{width:100%}.source-form-grid .port-input{width:100%}.source-form-grid .el-form-item{margin-bottom:16px}.form-actions{display:flex;justify-content:flex-end;margin-top:6px}.driver-row{display:flex;gap:8px;width:100%}.driver-row .el-select{flex:1}.param-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}.param-row .el-select{width:46%}.param-row .el-input{flex:1}.param-hint{float:right;color:#8b98a8;font-size:12px}.upload-drag{padding:18px 10px;color:#66778c;font-size:13px}@media(max-width:700px){.toolbar,.catalog-controls{flex-wrap:wrap}.toolbar .el-input{max-width:none}.pagination{justify-content:flex-start;overflow:auto}.param-row{flex-wrap:wrap}.param-row .el-select{width:100%}.source-form-grid{grid-template-columns:1fr}}
+.toolbar,.catalog-controls{display:flex;gap:12px;align-items:center;margin:16px 0}.toolbar .el-input{max-width:320px}.catalog-controls > *{flex:1;min-width:0}.pagination{display:flex;justify-content:flex-end;margin:18px 0}.status-text{font-size:12px;color:#718581}.el-alert{margin:10px 0}.advanced-params{margin-bottom:14px}.source-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.source-form-grid .span-2{grid-column:1/-1}.source-form-grid .el-select{width:100%}.source-form-grid .port-input{width:100%}.source-form-grid .el-form-item{margin-bottom:16px}.form-actions{display:flex;justify-content:flex-end;align-items:center;margin-top:6px}.test-hint{margin-right:auto;font-size:12px;color:#8b98a8}.test-hint.ok{color:#67c23a}.driver-row{display:flex;gap:8px;width:100%}.driver-row .el-select{flex:1}.param-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}.param-row .el-select{width:46%}.param-row .el-input{flex:1}.param-hint{float:right;color:#8b98a8;font-size:12px}.upload-drag{padding:18px 10px;color:#66778c;font-size:13px}@media(max-width:700px){.toolbar,.catalog-controls{flex-wrap:wrap}.toolbar .el-input{max-width:none}.pagination{justify-content:flex-start;overflow:auto}.param-row{flex-wrap:wrap}.param-row .el-select{width:100%}.source-form-grid{grid-template-columns:1fr}}
 </style>

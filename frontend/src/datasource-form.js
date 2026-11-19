@@ -29,6 +29,32 @@ export function paramRows(profile, options) {
   return Object.entries(options || {}).filter(([k, v]) => !fields.has(k) && v !== '' && v != null).map(([key, value]) => ({ key, value }))
 }
 
+export function connectionKey(payload) {
+  const p = payload || {}
+  const options = Object.fromEntries(Object.entries(p.options || {}).sort(([a], [b]) => a.localeCompare(b)))
+  return JSON.stringify({ id: p.id ?? null, profileId: p.profileId, host: p.host, port: p.port, database: p.database, username: p.username, password: p.password ?? null, driverId: p.driverId ?? null, options })
+}
+
+export function saveAllowed(testedKey, payload) {
+  return Boolean(testedKey) && testedKey === connectionKey(payload)
+}
+
+export function testOutcome(result) {
+  if (result?.connected) return { ok: true, message: '连接成功' }
+  return { ok: false, message: result?.error || '连接失败，请检查配置' }
+}
+
+export function batchDeleteSummary(result, items) {
+  const deleted = result?.deleted || []
+  const failed = result?.failed || []
+  const reasons = { REFERENCED: '被引用，无法删除', NOT_FOUND: '不存在' }
+  const nameOf = id => (items || []).find(item => item.id === id)?.name || `编号 ${id}`
+  return {
+    message: deleted.length ? `已删除 ${deleted.length} 个数据源` : '',
+    error: failed.length ? `以下数据源未删除：${failed.map(f => `${nameOf(f.id)}（${reasons[f.reason] || '删除失败'}）`).join('、')}` : ''
+  }
+}
+
 export function buildPayload(form, editing) {
   const options = {}
   for (const [k, v] of Object.entries(form.options || {})) if (v !== '' && v != null) options[k] = String(v)

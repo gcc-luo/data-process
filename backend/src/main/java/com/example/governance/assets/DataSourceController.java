@@ -72,10 +72,54 @@ public class DataSourceController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Data source is referenced or references cannot be verified");
         }
     }
+    record BatchDeleteRequest(List<Long> ids) {}
+    @PostMapping("/api/data-sources/batch-delete") @Transactional
+    ResponseEntity<Map<String, Object>> batchDelete(@RequestBody BatchDeleteRequest request, Authentication authentication) {
+        List<Long> ids = request == null ? null : request.ids();
+        if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(id -> id == null || id < 1))
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid data source IDs"));
+        List<Long> deleted = new java.util.ArrayList<>();
+        List<Map<String, Object>> failed = new java.util.ArrayList<>();
+        for (Long id : ids.stream().distinct().toList()) {
+            try {
+                if (!store.deleteUnused(id)) { failed.add(Map.of("id", id, "reason", "NOT_FOUND")); continue; }
+                audit.success(authentication, "datasource.delete", "datasource", id);
+                deleted.add(id);
+            } catch (IllegalStateException | org.springframework.dao.DataIntegrityViolationException ex) {
+                failed.add(Map.of("id", id, "reason", "REFERENCED"));
+            }
+        }
+        return ResponseEntity.ok(Map.of("deleted", deleted, "failed", failed));
+    }
     @PostMapping("/api/data-sources/{id}/test")
-    Map<String, Boolean> test(@PathVariable long id) throws GeneralSecurityException {
+    Map<String, Object> test(@PathVariable long id) throws GeneralSecurityException {
         var definition = store.find(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        return Map.of("connected", inspector.test(definition, store.passwordForExecution(id)));
+        return testBody(inspector.probe(definition, store.passwordForExecution(id)));
+    }
+    record DraftTestRequest(Long id, String name, String profileId, String host, int port, String database, String username, String password, Long driverId, Map<String, String> options) {}
+    /** Tests an unsaved form configuration; a blank password with an existing id reuses the stored credential. */
+    @PostMapping("/api/data-sources/test-config")
+    Map<String, Object> testConfig(@RequestBody DraftTestRequest request) throws GeneralSecurityException {
+        String password = request.password();
+        if (password == null || password.isEmpty()) {
+            if (request.id() == null) return Map.of("connected", false, "error", "请填写密码后再测试连接");
+            if (store.find(request.id()).isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            password = store.passwordForExecution(request.id());
+        }
+        String name = request.name() == null || request.name().isBlank() ? "connection-test" : request.name();
+        DataSourceDefinition definition;
+        try {
+            definition = new DataSourceDefinition(name, request.profileId(), request.host(), request.port(), request.database(), request.username(), request.driverId(), request.options());
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            return Map.of("connected", false, "error", "连接配置无效：" + ex.getMessage());
+        }
+        return testBody(inspector.probe(definition, password));
+    }
+    private static Map<String, Object> testBody(DatabaseInspector.TestResult result) {
+        var body = new java.util.LinkedHashMap<String, Object>();
+        body.put("connected", result.connected());
+        if (result.error() != null) body.put("error", result.error());
+        return body;
     }
     @GetMapping("/api/data-sources/{id}/tables")
     List<DatabaseInspector.Table> tables(@PathVariable long id, @RequestParam(required=false) String catalog,

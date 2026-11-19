@@ -183,9 +183,11 @@ public final class PermissionCatalog {
         route(routes, "GET", "/api/data-sources/profiles", "datasource.source.read");
         route(routes, "GET", "/api/data-sources", "datasource.source.read");
         route(routes, "POST", "/api/data-sources", "datasource.source.create");
+        route(routes, "POST", "/api/data-sources/batch-delete", "datasource.source.delete");
         route(routes, "GET", "/api/data-sources/*/tables", "datasource.source.test");
         route(routes, "GET", "/api/data-sources/*/columns", "datasource.source.test");
         route(routes, "POST", "/api/data-sources/*/test", "datasource.source.test");
+        route(routes, "POST", "/api/data-sources/test-config", "datasource.source.test");
         route(routes, "PUT", "/api/data-sources/*", "datasource.source.update");
         route(routes, "DELETE", "/api/data-sources/*", "datasource.source.delete");
         route(routes, "GET", "/api/drivers", "datasource.driver.read");

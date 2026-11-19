@@ -72,9 +72,50 @@ class DataSourceApiTest {
             {"name":"db3","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
             """)).andReturn();
         var json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString());
-        when(inspector.test(any(), eq("sensitive"))).thenReturn(true);
+        when(inspector.probe(any(), eq("sensitive"))).thenReturn(new DatabaseInspector.TestResult(true, null));
         mvc.perform(post("/api/data-sources/" + json.get("id").asLong() + "/test").session(session).with(csrf()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.connected").value(true)).andExpect(jsonPath("$.password").doesNotExist());
+    }
+    @Test void connectionTestFailureReturnsErrorMessage() throws Exception {
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.test')");
+        var session = login();
+        var result = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("""
+            {"name":"db-err","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
+            """)).andReturn();
+        long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        when(inspector.probe(any(), eq("sensitive"))).thenReturn(new DatabaseInspector.TestResult(false, "Access denied for user 'reader'"));
+        mvc.perform(post("/api/data-sources/" + id + "/test").session(session).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.connected").value(false))
+            .andExpect(jsonPath("$.error").value("Access denied for user 'reader'"));
+    }
+    @Test void draftConnectionTestReusesStoredPasswordWhenBlank() throws Exception {
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.test')");
+        var session = login();
+        var result = mvc.perform(post("/api/data-sources").session(session).with(csrf()).contentType("application/json").content("""
+            {"name":"db-draft","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":"sensitive"}
+            """)).andReturn();
+        long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        when(inspector.probe(argThat(d -> d != null && d.port() == 3307), eq("sensitive"))).thenReturn(new DatabaseInspector.TestResult(true, null));
+        mvc.perform(post("/api/data-sources/test-config").session(session).with(csrf()).contentType("application/json").content("""
+            {"id":%d,"name":"db-draft","profileId":"MYSQL:8.x","host":"localhost","port":3307,"database":"orders","username":"reader","password":null}
+            """.formatted(id)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.connected").value(true)).andExpect(jsonPath("$.password").doesNotExist());
+        verify(inspector).probe(argThat(d -> d != null && d.port() == 3307), eq("sensitive"));
+    }
+    @Test void draftConnectionTestRequiresPasswordForNewSourceAndPermission() throws Exception {
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create')");
+        var session = login();
+        mvc.perform(post("/api/data-sources/test-config").session(session).with(csrf()).contentType("application/json").content("""
+            {"name":"x","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader"}
+            """)).andExpect(status().isForbidden());
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.test')");
+        mvc.perform(post("/api/data-sources/test-config").session(session).with(csrf()).contentType("application/json").content("""
+            {"name":"x","profileId":"MYSQL:8.x","host":"localhost","port":3306,"database":"orders","username":"reader","password":""}
+            """)).andExpect(status().isOk()).andExpect(jsonPath("$.connected").value(false)).andExpect(jsonPath("$.error").isNotEmpty());
+        mvc.perform(post("/api/data-sources/test-config").session(session).with(csrf()).contentType("application/json").content("""
+            {"name":"x","profileId":"MYSQL:8.x","host":"bad host!","port":3306,"database":"orders","username":"reader","password":"p"}
+            """)).andExpect(status().isOk()).andExpect(jsonPath("$.connected").value(false)).andExpect(jsonPath("$.error").isNotEmpty());
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM data_sources", Integer.class));
     }
     @Test void authorizedUserCanReadDiscoveredTables() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");

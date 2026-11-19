@@ -19,9 +19,27 @@ public final class DatabaseInspector {
     DatabaseInspector(Connector connector) { this.connector = connector; }
     public DatabaseInspector(com.example.governance.assets.driver.ConnectionFactory factory) { this(factory::open); }
 
+    public record TestResult(boolean connected, String error) {}
+
+    /** Connection probe for the test button: returns the driver error so the UI can show it, with the password masked. */
+    public TestResult probe(DataSourceDefinition definition, String password) {
+        try (Connection connection = connector.connect(definition, password)) {
+            return connection.isValid(5) ? new TestResult(true, null) : new TestResult(false, "连接校验超时，驱动未确认连接有效");
+        } catch (SQLException ex) {
+            return new TestResult(false, sanitize(ex.getMessage(), password));
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            return new TestResult(false, sanitize("连接配置无效：" + ex.getMessage(), password));
+        }
+    }
+
+    private static String sanitize(String message, String password) {
+        if (message == null || message.isBlank()) return "连接失败，请检查配置";
+        if (password != null && !password.isEmpty()) message = message.replace(password, "******");
+        return message;
+    }
+
     public boolean test(DataSourceDefinition definition, String password) {
-        try (Connection connection = connector.connect(definition, password)) { return connection.isValid(5); }
-        catch (SQLException ex) { return false; }
+        return probe(definition, password).connected();
     }
 
     private static String literalPattern(String value, String escape) throws SQLException {
