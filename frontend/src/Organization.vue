@@ -613,7 +613,7 @@ onMounted(load)
         <el-table-column prop="ip" label="IP" min-width="130" />
         <el-table-column label="登录时间" min-width="160"><template #default="scope">{{ fmtEpoch(scope.row.loginAt) }}</template></el-table-column>
         <el-table-column prop="userAgent" label="终端" min-width="200" show-overflow-tooltip />
-        <el-table-column label="操作" width="100"><template #default="scope"><el-button v-if="can('system.user.set_status')" link type="danger" @click="kickSession(scope.row)">踢下线</el-button></template></el-table-column>
+        <el-table-column label="操作" width="100"><template #default="scope"><el-button v-if="can('system.user.set_status')" link type="primary" @click="kickSession(scope.row)">踢下线</el-button></template></el-table-column>
       </el-table>
       <template #footer><el-button @click="openOnline">刷新</el-button><el-button @click="onlineDialog = false">关闭</el-button></template>
     </el-dialog>

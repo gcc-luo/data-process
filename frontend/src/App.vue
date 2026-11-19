@@ -272,6 +272,9 @@ onMounted(async () => {
   </main>
 </template>
 <style>
+/* 表格行操作按钮：删除（danger）红色，其余统一主题蓝；收紧间距与内边距 */
+.el-table .cell .el-button.is-text:not(.el-button--danger):not(.is-disabled),.el-table .cell .el-button.is-link:not(.el-button--danger):not(.is-disabled){color:var(--el-color-primary)}
+.el-table .cell .el-button.is-text:not(.el-button--danger):not(.is-disabled):hover,.el-table .cell .el-button.is-link:not(.el-button--danger):not(.is-disabled):hover{color:var(--el-color-primary-light-3)}
 /* User-provided data governance background */
 .login-screen{position:relative;isolation:isolate;overflow:hidden;min-height:100vh;min-height:100svh;display:flex;align-items:center;justify-content:flex-end;padding:32px clamp(24px,3vw,64px);background:#123f78;color:#173654}
 .login-screen::before,.login-screen::after{content:"";position:absolute;inset:0;pointer-events:none}
