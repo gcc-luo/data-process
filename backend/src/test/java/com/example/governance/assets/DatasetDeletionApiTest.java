@@ -35,7 +35,7 @@ class DatasetDeletionApiTest {
     private MockHttpSession login() throws Exception { return (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","manager").param("password","password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false); }
     @Test void deletionRequiresPermissionRemovesFieldsAndAuditsWithoutTouchingBusinessData() throws Exception {
         var session=login(); mvc.perform(delete("/api/datasets/20").session(session).with(csrf())).andExpect(status().isForbidden());
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.manage')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         mvc.perform(delete("/api/datasets/20").session(session).with(csrf())).andExpect(status().isNoContent());
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM dataset_fields WHERE dataset_id=20",Integer.class));
         assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM data_sources WHERE id=15",Integer.class));
@@ -43,7 +43,7 @@ class DatasetDeletionApiTest {
         mvc.perform(delete("/api/datasets/20").session(session).with(csrf())).andExpect(status().isNotFound());
     }
     @Test void deletionRejectsExistingPoliciesReportsAndServices() throws Exception {
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.manage')"); var session=login();
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')"); var session=login();
         jdbc.update("INSERT INTO dataset_role_rules(dataset_id,role_id,scope) VALUES (20,10,'OWN')");
         mvc.perform(delete("/api/datasets/20").session(session).with(csrf())).andExpect(status().isConflict());
         jdbc.update("DELETE FROM dataset_role_rules WHERE dataset_id=20");

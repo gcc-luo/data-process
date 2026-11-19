@@ -35,7 +35,7 @@ class DatasetRefreshApiTest {
         when(inspector.columns(any(),eq("secret"),isNull(),isNull(),eq("orders"))).thenReturn(List.of(new DatabaseInspector.Column("dept","BIGINT",0,false),new DatabaseInspector.Column("id","BIGINT",0,false),new DatabaseInspector.Column("secret","VARCHAR",20,true)));
         var session=(org.springframework.mock.web.MockHttpSession)mvc.perform(post("/api/login").with(csrf()).param("username","manager").param("password","password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
         mvc.perform(post("/api/datasets/20/refresh").session(session).with(csrf())).andExpect(status().isForbidden());
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.manage'),(10,'dataset.read')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         mvc.perform(post("/api/datasets/20/refresh").session(session).with(csrf())).andExpect(status().isOk()).andExpect(jsonPath("$.added").value(1));
         assertEquals(3,jdbc.queryForObject("SELECT COUNT(*) FROM dataset_fields WHERE dataset_id=20",Integer.class));
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM dataset_role_fields WHERE field_name='secret'",Integer.class));

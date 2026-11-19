@@ -21,7 +21,7 @@ class DatasetPolicyStoreTest {
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'a','hash',1,TRUE,'v'),(2,'b','hash',3,TRUE,'v2')");
         jdbc.update("INSERT INTO roles(id,name) VALUES (1,'analyst')");
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,1)");
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'dataset.read')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'datasource.query.read'),(1,'datasource.dataset.read')");
         jdbc.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
         jdbc.update("INSERT INTO datasets(id,source_id,name,schema_name,table_name) VALUES (1,1,'clients','PUBLIC','CLIENTS')");
         jdbc.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'DEPARTMENT_ID','BIGINT',FALSE),(1,1,'ID','INTEGER',FALSE),(1,2,'PHONE','VARCHAR',TRUE)");
@@ -34,7 +34,7 @@ class DatasetPolicyStoreTest {
         assertThrows(IllegalArgumentException.class, () -> store.configure(1, "PHONE", 1, AccessPolicy.Scope.OWN, Map.of("ID", DatasetAccess.Field.FULL)));
         jdbc.update("INSERT INTO roles(id,name) VALUES (2,'restricted')");
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,2)");
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (2,'dataset.read')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (2,'datasource.query.read'),(2,'datasource.dataset.read')");
         store.configure(1, "DEPARTMENT_ID", 1, AccessPolicy.Scope.OWN, Map.of("ID", DatasetAccess.Field.FULL, "PHONE", DatasetAccess.Field.FULL));
         store.configure(1, "DEPARTMENT_ID", 2, AccessPolicy.Scope.OWN_AND_DESCENDANTS, Map.of("ID", DatasetAccess.Field.FULL, "PHONE", DatasetAccess.Field.MASKED));
         var combined = store.resolve(1, 1).policy();
@@ -63,7 +63,7 @@ class DatasetPolicyStoreTest {
         jdbc.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'u','h',1,TRUE,'v')");
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,1)");
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'dataset.read')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'datasource.query.read'),(1,'datasource.dataset.read')");
         try (var pool = new com.zaxxer.hikari.HikariDataSource()) {
             pool.setJdbcUrl(db.getUrl()); pool.setUsername("sa"); pool.setPassword(""); pool.setMaximumPoolSize(1); pool.setConnectionTimeout(1000);
             var singleManager = new DataSourceTransactionManager(pool);
@@ -82,7 +82,7 @@ class DatasetPolicyStoreTest {
         Flyway.configure().dataSource(db).load().migrate(); var setup = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
         setup.update("INSERT INTO departments(id,name) VALUES (1,'dept')");
         setup.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (1,'u','h',1,TRUE,'v')");
-        setup.update("INSERT INTO roles(id,name) VALUES (1,'role')"); setup.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,1)"); setup.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'dataset.read')");
+        setup.update("INSERT INTO roles(id,name) VALUES (1,'role')"); setup.update("INSERT INTO user_roles(user_id,role_id) VALUES (1,1)"); setup.update("INSERT INTO role_permissions(role_id,permission) VALUES (1,'datasource.query.read'),(1,'datasource.dataset.read')");
         setup.update("INSERT INTO data_sources(id,name,source_type,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','localhost',3306,'db','u','cipher')");
         setup.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,1,'data','t')");
         setup.update("INSERT INTO dataset_fields(dataset_id,ordinal_no,field_name,data_type,nullable) VALUES (1,0,'DEPT_A','BIGINT',FALSE),(1,1,'DEPT_B','BIGINT',FALSE),(1,2,'SECRET','VARCHAR',FALSE)");

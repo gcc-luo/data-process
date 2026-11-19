@@ -8,15 +8,15 @@ import static org.junit.jupiter.api.Assertions.*;
 class AccessPolicyTest {
     private final AccessPolicy policy = new AccessPolicy(
         Map.of("sales", "root", "east", "sales", "west", "sales", "finance", "root"),
-        Map.of("analyst", Set.of("dataset.read"), "editor", Set.of("task.run")));
+        Map.of("analyst", Set.of("datasource.query.read"), "editor", Set.of("task.run")));
 
     @Test void requiresExplicitRoleGrantAndDeniesDisabledOrUnknownUsers() {
         var user = new AccessPolicy.User("u1", "sales", Set.of("analyst"), true);
-        assertTrue(policy.allowed(user, "dataset.read"));
+        assertTrue(policy.allowed(user, "datasource.query.read"));
         assertFalse(policy.allowed(user, "task.run"));
-        assertFalse(policy.allowed(new AccessPolicy.User("u2", "sales", Set.of("unknown"), true), "dataset.read"));
-        assertFalse(policy.allowed(new AccessPolicy.User("u3", "sales", Set.of("analyst"), false), "dataset.read"));
-        assertFalse(policy.allowed(null, "dataset.read"));
+        assertFalse(policy.allowed(new AccessPolicy.User("u2", "sales", Set.of("unknown"), true), "datasource.query.read"));
+        assertFalse(policy.allowed(new AccessPolicy.User("u3", "sales", Set.of("analyst"), false), "datasource.query.read"));
+        assertFalse(policy.allowed(null, "datasource.query.read"));
     }
 
     @Test void derivesDepartmentScopeFromTrustedOrganizationTree() {
@@ -28,7 +28,7 @@ class AccessPolicyTest {
     }
 
     @Test void grantsScopeForStandaloneDepartment() {
-        var standalone = new AccessPolicy(Set.of("only"), Map.of(), Map.of("reader", Set.of("dataset.read")));
+        var standalone = new AccessPolicy(Set.of("only"), Map.of(), Map.of("reader", Set.of("datasource.query.read")));
         var user = new AccessPolicy.User("u", "only", Set.of("reader"), true);
         assertEquals(Set.of("only"), standalone.departments(user, AccessPolicy.Scope.OWN));
         assertEquals(Set.of("only"), standalone.departments(user, AccessPolicy.Scope.OWN_AND_DESCENDANTS));

@@ -8,7 +8,7 @@ test('login fetches CSRF token and submits encoded credentials', async () => {
     requests.push([url, options])
     return url === '/api/csrf' ? { ok: true, json: async () => ({ headerName: 'X-CSRF-TOKEN', token: 'abc' }) } : { ok: true, status: 204 }
   }
-  await login('alice', 'p&ss', fetcher)
+  await login('alice', 'p&ss', null, fetcher)
   assert.equal(requests[1][0], '/api/login')
   assert.equal(requests[1][1].headers['X-CSRF-TOKEN'], 'abc')
   assert.equal(new URLSearchParams(requests[1][1].body).get('password'), 'p&ss')

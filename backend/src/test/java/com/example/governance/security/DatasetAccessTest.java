@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DatasetAccessTest {
-    private final AccessPolicy policy = new AccessPolicy(Map.of("team", "company", "child", "team"), Map.of("analyst", Set.of("dataset.read")));
+    private final AccessPolicy policy = new AccessPolicy(Map.of("team", "company", "child", "team"), Map.of("analyst", Set.of("datasource.query.read")));
     private final DatasetAccess access = new DatasetAccess(policy);
     private final AccessPolicy.User user = new AccessPolicy.User("u", "team", Set.of("analyst"), true);
     private final DatasetAccess.Rule rule = new DatasetAccess.Rule(Set.of("analyst"), AccessPolicy.Scope.OWN_AND_DESCENDANTS,

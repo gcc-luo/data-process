@@ -31,7 +31,7 @@ class WorkflowValidationApiTest {
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES(9999,'user','unused',9999,TRUE,'149870bb-9168-469d-9139-d4656b295773')");
         jdbc.update("INSERT INTO roles(id,name) VALUES(9999,'Workflow test role')");
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES(9999,9999)");
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES(9999,'workflow.validate')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (9999,'workflow.workflow.validate')");
     }
 
     @Test void acceptsValidDependencies() throws Exception {

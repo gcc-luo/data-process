@@ -34,14 +34,14 @@ class DataSourceDeletionApiTest {
     @Test void deleteRequiresPermissionAndAuditsSuccess() throws Exception {
         var session = login();
         mvc.perform(delete("/api/data-sources/15").session(session).with(csrf())).andExpect(status().isForbidden());
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.manage')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')");
         mvc.perform(delete("/api/data-sources/15").session(session).with(csrf())).andExpect(status().isNoContent());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM data_sources WHERE id=15", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='datasource.delete' AND actor_id=10", Integer.class));
         mvc.perform(delete("/api/data-sources/15").session(session).with(csrf())).andExpect(status().isNotFound());
     }
     @Test void rejectsDatasetAndTaskVersionReferences() throws Exception {
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.manage')"); var session = login();
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'datasource.source.read'),(10,'datasource.source.create'),(10,'datasource.source.update'),(10,'datasource.source.delete'),(10,'datasource.source.test'),(10,'datasource.dataset.read'),(10,'datasource.dataset.create'),(10,'datasource.dataset.delete'),(10,'datasource.dataset.refresh'),(10,'datasource.dataset.manage_policy'),(10,'datasource.query.read')"); var session = login();
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,15,'dataset','orders')");
         mvc.perform(delete("/api/data-sources/15").session(session).with(csrf())).andExpect(status().isConflict());
         jdbc.update("DELETE FROM datasets WHERE id=1");

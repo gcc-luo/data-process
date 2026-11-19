@@ -33,7 +33,7 @@ class StandaloneTaskRetryApiTest {
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,finished_at,error_message) VALUES (501,1,'FAILED',CURRENT_TIMESTAMP,'任务执行失败')");
         var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","retry-user").param("password","password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
         mvc.perform(post("/api/tasks/501/runs/501/retry").session(session).with(csrf())).andExpect(status().isForbidden());
-        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (501,'workflow.manage')");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (501,'workflow.task.read'),(501,'workflow.task.create'),(501,'workflow.task.update'),(501,'workflow.task.execute'),(501,'workflow.task.retry'),(501,'workflow.workflow.read'),(501,'workflow.workflow.create'),(501,'workflow.workflow.update'),(501,'workflow.workflow.execute'),(501,'workflow.workflow.retry'),(501,'workflow.workflow.validate'),(501,'workflow.schedule.read'),(501,'workflow.schedule.create'),(501,'workflow.schedule.update'),(501,'workflow.schedule.backfill'),(501,'workflow.realtime.read'),(501,'workflow.realtime.create'),(501,'workflow.realtime.update'),(501,'workflow.realtime.start'),(501,'workflow.realtime.stop')");
         mvc.perform(post("/api/tasks/502/runs/501/retry").session(session).with(csrf())).andExpect(status().isNotFound());
         mvc.perform(post("/api/tasks/501/runs/501/retry").session(session).with(csrf())).andExpect(status().isAccepted());
         for (int i=0;i<100 && !"SUCCEEDED".equals(jdbc.queryForObject("SELECT state FROM task_runs WHERE id=501",String.class));i++) Thread.sleep(20);
