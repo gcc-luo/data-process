@@ -89,12 +89,12 @@ Oracle 两个档案均提供额外表单字段 `connectType`（`SID` / `SERVICE`
 | driver_key | 坐标 | 驱动类 | 服务档案 |
 |---|---|---|---|
 | builtin-mysql-5 | `mysql:mysql-connector-java:5.1.49` | `com.mysql.jdbc.Driver` | MYSQL:5.x |
-| builtin-mysql-8 | `com.mysql:mysql-connector-j:8.0.33` | `com.mysql.cj.jdbc.Driver` | MYSQL:8.x |
-| builtin-postgresql | `org.postgresql:postgresql:42.7.3` | `org.postgresql.Driver` | POSTGRESQL:general |
+| builtin-mysql-8 | `com.mysql:mysql-connector-j`（BOM 管理，当前 9.5.0，面向 MySQL 8.x 服务端） | `com.mysql.cj.jdbc.Driver` | MYSQL:8.x |
+| builtin-postgresql | `org.postgresql:postgresql`（BOM 管理，当前 42.7.8） | `org.postgresql.Driver` | POSTGRESQL:general |
 | builtin-ojdbc8 | `com.oracle.database.jdbc:ojdbc8:19.3.0.0` | `oracle.jdbc.OracleDriver` | ORACLE:11g |
-| builtin-ojdbc11 | `com.oracle.database.jdbc:ojdbc11:21.9.0.0` | `oracle.jdbc.OracleDriver` | ORACLE:12c+ |
+| builtin-ojdbc11 | `com.oracle.database.jdbc:ojdbc11`（BOM 管理，当前 23.7.0.25.01） | `oracle.jdbc.OracleDriver` | ORACLE:12c+ |
 
-说明：ojdbc8 19.3 官方互操作矩阵支持 11.2.0.4+；更老的 11.2.0.1~3 或特殊场景由用户上传 ojdbc6 等驱动解决——这正是上传能力的价值。MySQL 5/8 驱动类名与包名不同，天然可共存；PG/Oracle 同包名多版本靠隔离加载共存。
+说明：ojdbc8 19.3 官方互操作矩阵支持 11.2.0.4+；更老的 11.2.0.1~3 或特殊场景由用户上传 ojdbc6 等驱动解决——这正是上传能力的价值。MySQL 5/8 驱动类名与包名不同，天然可共存；PG/Oracle 同包名多版本靠隔离加载共存。内置版本标签在注册时通过驱动实例 `getMajorVersion()/getMinorVersion()` 探测，不硬编码。另：实施前基线测试存在 RBAC 改造遗留的旧权限码失败（后端 34 个、前端 1 个），随本次一并做测试侧修复，不改生产行为。
 
 打包方式：`maven-dependency-plugin` 在构建期把五个 jar 复制为 classpath 资源（`target/classes/drivers-builtin/`，随 boot jar 分发）；启动时 `DriverStore` 解压到驱动目录并按 `driver_key` 幂等注册。应用升级时若内置 jar SHA-256 变化则覆盖文件并更新元数据，引用不受影响。元数据库自身的 mysql-connector-j 仍保留为 runtime 依赖，与业务隔离加载互不干扰。
 

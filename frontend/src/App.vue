@@ -117,12 +117,13 @@ const menu = computed(() => {
   })
   return build(null)
 })
-const systemPages = computed(() => menu.value.find(item => item.component === 'system')?.children || [])
-const systemPage = ref('departments')
-const systemExpanded = ref(false)
+const groupPages = ref({})
+const expandedGroups = ref({})
+const pageKey = component => { const value = String(component || ''); const index = value.indexOf('/'); return index >= 0 ? value.slice(index + 1) : value }
 const sectionItem = computed(() => menu.value.find(item => item.component === section.value))
 const sectionLabel = computed(() => sectionItem.value?.label ?? '工作空间')
-const systemPageLabel = computed(() => systemPages.value.find(item => item.component === `system/${systemPage.value}`)?.label ?? '部门管理')
+const sectionChildren = computed(() => sectionItem.value?.children || [])
+const activeChildLabel = computed(() => sectionChildren.value.find(child => pageKey(child.component) === groupPages.value[section.value])?.label ?? '')
 const pendingMenus = new Set(['overview', 'operations'])
 async function loadNavigation() {
   try {
@@ -133,10 +134,12 @@ async function loadNavigation() {
     navigation.value = rows
     if (!rows.some(item => item.component === section.value)) {
       const first = rows.find(item => item.parentId == null)
-      section.value = first ? (first.component === 'system' ? 'system' : first.component) : ''
+      section.value = first ? first.component : ''
     }
-    const firstSystemPage = rows.find(item => item.parentId != null && item.component?.startsWith('system/'))
-    if (firstSystemPage && !rows.some(item => item.component === `system/${systemPage.value}`)) systemPage.value = firstSystemPage.component.slice('system/'.length)
+    for (const parent of rows.filter(item => item.parentId == null)) {
+      const children = rows.filter(item => item.parentId === parent.id)
+      if (children.length && !children.some(child => pageKey(child.component) === groupPages.value[parent.component])) groupPages.value[parent.component] = pageKey(children[0].component)
+    }
   } catch { navigation.value = []; section.value = '' }
 }
 const taskStudio = ref(null)
@@ -149,21 +152,20 @@ async function navigate(item) {
     if (section.value !== item.component) {
       if (!(await canLeave())) return
       section.value = item.component
-      const initialPage = item.children.find(child => child.component?.startsWith('system/'))
-      if (initialPage) systemPage.value = initialPage.component.slice('system/'.length)
-      systemExpanded.value = true
-    } else systemExpanded.value = !systemExpanded.value
+      if (!groupPages.value[item.component]) groupPages.value[item.component] = pageKey(item.children[0]?.component)
+      expandedGroups.value[item.component] = true
+    } else expandedGroups.value[item.component] = !expandedGroups.value[item.component]
     return
   }
   const target = typeof item === 'string' ? item : item.component
-  if (target !== section.value && await canLeave()) { section.value = target; systemExpanded.value = false; mobileNavigationOpen.value = false }
+  if (target !== section.value && await canLeave()) { section.value = target; expandedGroups.value = {}; mobileNavigationOpen.value = false }
   else if (target === section.value) mobileNavigationOpen.value = false
 }
-async function navigateSystemPage(item) {
-  if (section.value !== 'system' && !(await canLeave())) return
-  section.value = 'system'
-  systemPage.value = item.component?.startsWith('system/') ? item.component.slice('system/'.length) : item.id
-  systemExpanded.value = true
+async function navigateChild(parent, child) {
+  if (section.value !== parent.component && !(await canLeave())) return
+  section.value = parent.component
+  groupPages.value[parent.component] = pageKey(child.component)
+  expandedGroups.value[parent.component] = true
   mobileNavigationOpen.value = false
 }
 onMounted(async () => {
@@ -197,13 +199,13 @@ onMounted(async () => {
       <div class="brand"><svg class="brand-cube" viewBox="0 0 48 48" aria-hidden="true"><path fill="#55D6F0" d="M24 2 43 13v22L24 46 5 35V13L24 2Z"/><path fill="#1685E7" d="M24 2v22L5 13 24 2Z"/><path fill="#36BFE8" d="M24 24 43 13v22L24 46V24Z"/><path fill="#195CB8" d="M5 13 24 24v22L5 35V13Z"/><path fill="#D8F8FF" d="m24 15 8 4.5v9L24 33l-8-4.5v-9l8-4.5Z"/></svg><div><strong>DataSphere</strong><small>DATA OPERATIONS</small></div></div>
       <nav class="primary-nav" aria-label="平台导航">
         <div v-for="item in menu" :key="item.component" class="nav-group">
-          <button type="button" :class="{ active: section === item.component, 'has-children': !!item.children, expanded: !!item.children && systemExpanded }" :aria-current="section === item.component ? 'page' : undefined" :aria-expanded="item.children ? systemExpanded : undefined" @click="navigate(item)">
+          <button type="button" :class="{ active: section === item.component, 'has-children': !!item.children, expanded: !!item.children && expandedGroups[item.component] }" :aria-current="section === item.component ? 'page' : undefined" :aria-expanded="item.children ? !!expandedGroups[item.component] : undefined" @click="navigate(item)">
             <span class="nav-leading"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="item.icon" /></svg><span>{{ item.label }}</span></span>
             <span v-if="pendingMenus.has(item.component)" class="pending">待接入</span>
             <svg v-else-if="item.children" class="nav-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
           </button>
-          <div v-if="item.children && systemExpanded" class="submenu" aria-label="系统管理子菜单">
-            <button v-for="child in item.children" :key="child.component" type="button" :class="{ active: section === item.component && systemPage === child.component?.slice('system/'.length) }" :aria-current="section === item.component && systemPage === child.component?.slice('system/'.length) ? 'page' : undefined" @click.stop="navigateSystemPage(child)">
+          <div v-if="item.children && expandedGroups[item.component]" class="submenu" :aria-label="`${item.label}子菜单`">
+            <button v-for="child in item.children" :key="child.component" type="button" :class="{ active: section === item.component && groupPages[item.component] === pageKey(child.component) }" :aria-current="section === item.component && groupPages[item.component] === pageKey(child.component) ? 'page' : undefined" @click.stop="navigateChild(item, child)">
               <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="child.icon" /></svg><span>{{ child.label }}</span>
             </button>
           </div>
@@ -215,7 +217,7 @@ onMounted(async () => {
       <header>
         <div class="header-leading">
           <button class="mobile-nav-trigger" type="button" aria-label="打开导航菜单" :aria-expanded="mobileNavigationOpen" @click="mobileNavigationOpen = !mobileNavigationOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" /></svg></button>
-          <div class="breadcrumbs"><span>工作空间</span><span class="slash">/</span><strong>{{ sectionLabel }}</strong><template v-if="section === 'system'"><span class="slash">/</span><strong>{{ systemPageLabel }}</strong></template></div>
+          <div class="breadcrumbs"><span>工作空间</span><span class="slash">/</span><strong>{{ sectionLabel }}</strong><template v-if="sectionChildren.length"><span class="slash">/</span><strong>{{ activeChildLabel }}</strong></template></div>
         </div>
         <div class="header-actions">
           <span class="status"><i :class="{ offline: status !== '服务正常' }"></i>{{ status }}</span>
@@ -231,9 +233,9 @@ onMounted(async () => {
           <button class="logout-button" type="button" @click="signOut"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4.8A1.8 1.8 0 0 0 3 5.8v8.4A1.8 1.8 0 0 0 4.8 16H8m3-9 4 3-4 3m4-3H7" /></svg><span>退出</span></button>
         </div>
       </header>
-      <div v-if="section === 'assets'" class="content"><DataSources /></div>
+      <div v-if="section === 'assets'" class="content"><DataSources :view="groupPages.assets || 'sources'" /></div>
       <div v-else-if="section === 'tasks'" class="content"><TaskStudio ref="taskStudio" /></div>
-      <div v-else-if="section === 'system'" class="content"><Organization :view="systemPage" @navigation-updated="loadSession" /></div>
+      <div v-else-if="section === 'system'" class="content"><Organization :view="groupPages.system || 'departments'" @navigation-updated="loadSession" /></div>
       <div v-else-if="section === 'query'" class="content"><DataExplorer /></div>
       <div v-else-if="section === 'reports'" class="content"><Reports /></div>
       <div v-else-if="section === 'services'" class="content"><Services /></div>

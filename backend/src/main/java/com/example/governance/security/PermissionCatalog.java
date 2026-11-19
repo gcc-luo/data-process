@@ -29,7 +29,8 @@ public final class PermissionCatalog {
             case "system/menus" -> "system.menu";
             case "system/permissions" -> "system.permission";
             case "system/audit" -> "system.audit";
-            case "assets" -> "datasource.source";
+            case "assets", "assets/sources" -> "datasource.source";
+            case "assets/datasets" -> "datasource.dataset";
             case "query" -> "datasource.query";
             case "tasks" -> "workflow.workflow";
             case "realtime" -> "workflow.realtime";

@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Navigation keeps only System Management and its pages; platform modules are intentionally not menu entries. */
+/** Navigation exposes the Data Assets directory for datasource grants, plus System Management and its pages. */
 class OrganizationNavigationTest {
     private record Fixture(JdbcTemplate jdbc, OrganizationService org) {}
 
@@ -35,15 +35,15 @@ class OrganizationNavigationTest {
         return f.org.navigation(username).stream().map(OrganizationService.Menu::component).toList();
     }
 
-    @Test void fullGrantsSeeOnlySystemManagementAndItsPages() {
+    @Test void fullGrantsSeeAssetDirectoryAndSystemManagement() {
         var f = fixture();
         grantUser(f, 10, "admin", 10, true, PermissionCatalog.codes());
         var rows = f.org.navigation("admin");
         var roots = rows.stream().filter(menu -> menu.parentId() == null).map(OrganizationService.Menu::component).toList();
-        assertEquals(List.of("system"), roots);
+        assertEquals(List.of("assets", "system"), roots);
         var components = components(f, "admin");
-        assertEquals(7, components.size());
-        assertTrue(components.containsAll(List.of("system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
+        assertEquals(10, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/datasets", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
     }
 
     @Test void singleSystemGrantOnlyOpensItsOwnPage() {
@@ -54,10 +54,20 @@ class OrganizationNavigationTest {
         assertTrue(components.containsAll(List.of("system", "system/departments")));
     }
 
-    @Test void platformOnlyGrantsProduceNoNavigation() {
+    @Test void platformGrantsOpenMatchingAssetPages() {
         var f = fixture();
         grantUser(f, 10, "operator", 10, true, Set.of("datasource.source.create", "workflow.task.execute"));
-        assertEquals(List.of(), components(f, "operator"));
+        var components = components(f, "operator");
+        assertEquals(2, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/sources")));
+    }
+
+    @Test void datasetGrantOpensDatasetPageOnly() {
+        var f = fixture();
+        grantUser(f, 10, "dataset", 10, true, Set.of("datasource.dataset.read"));
+        var components = components(f, "dataset");
+        assertEquals(2, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/datasets")));
     }
 
     @Test void noGrantsOrDisabledRoleMeansEmptyNavigation() {

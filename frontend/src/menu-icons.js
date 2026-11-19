@@ -1,6 +1,8 @@
 export const menuIconPaths = Object.freeze({
   grid: 'M4 4h7v7H4z M13 4h7v5h-7z M13 11h7v9h-7z M4 13h7v7H4z',
   database: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6m-16 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6',
+  assets: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm0 4h18',
+  dataset: 'M4 5h16v14H4zM4 10h16M10 10v9',
   workflow: 'M6 4v4a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4m-12 0v-3m12-13v3',
   pulse: 'M3 12h4l3-7 4 14 3-7h4',
   settings: 'M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4m0-12.8L17 7M7 17l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
@@ -19,6 +21,8 @@ export const menuIconPaths = Object.freeze({
 const labels = {
   grid: '概览',
   database: '数据源',
+  assets: '数据资产',
+  dataset: '数据集',
   workflow: '工作流',
   pulse: '实时同步',
   settings: '运维设置',

@@ -152,6 +152,7 @@ const roleForm = ref({ id: null, name: '', roleKey: '', description: '', sortOrd
 const userForm = ref({ id: null, username: '', nickname: '', email: '', phone: '', password: '', departmentId: null, enabled: true, roles: [] })
 const menuForm = ref({ id: null, name: '', parentId: null, menuType: 'M', sortOrder: 0, routePath: '', component: '', icon: '', visible: true, enabled: true })
 const selectedMenuIcon = computed(() => menuIconOptions.find(item => item.key === menuForm.value.icon) || null)
+const platformMenu = row => !!row.component && !row.component.startsWith('system')
 
 const componentOptions = [
   ['system', '系统管理目录'],
@@ -445,9 +446,9 @@ onMounted(load)
         <el-table-column label="图标" width="130"><template #default="scope"><span v-if="scope.row.icon" class="menu-icon-cell"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="menuIconPath(scope.row.icon)" /></svg><span>{{ scope.row.icon }}</span></span><span v-else>—</span></template></el-table-column>
         <el-table-column prop="routePath" label="路由地址" min-width="190"><template #default="scope">{{ scope.row.routePath || '—' }}</template></el-table-column>
         <el-table-column prop="sortOrder" label="排序" width="85" />
-        <el-table-column label="显示" width="100"><template #default="scope"><el-switch :model-value="scope.row.visible" :disabled="!can('system.menu.update') || [9,94].includes(scope.row.id) || ['system','system/permissions'].includes(scope.row.component)" @change="setMenuVisible(scope.row, $event)" /></template></el-table-column>
+        <el-table-column label="显示" width="100"><template #default="scope"><el-switch :model-value="scope.row.visible" :disabled="!can('system.menu.update') || [9,94].includes(scope.row.id) || ['system','system/permissions'].includes(scope.row.component) || platformMenu(scope.row)" @change="setMenuVisible(scope.row, $event)" /></template></el-table-column>
         <el-table-column label="状态" width="90"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'" effect="light">{{ scope.row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
-        <el-table-column v-if="can('system.menu.update') || can('system.menu.delete')" label="操作" width="150" fixed="right"><template #default="scope"><el-button v-if="can('system.menu.update')" link type="primary" @click="openMenu(scope.row)">修改</el-button><el-button v-if="can('system.menu.delete')" link type="danger" :disabled="[94].includes(scope.row.id) || ['system/permissions'].includes(scope.row.component)" @click="confirmDelete(`/menus/${scope.row.id}`, `菜单「${scope.row.name}」`, '菜单已删除')">删除</el-button></template></el-table-column>
+        <el-table-column v-if="can('system.menu.update') || can('system.menu.delete')" label="操作" width="150" fixed="right"><template #default="scope"><el-button v-if="can('system.menu.update')" link type="primary" :disabled="platformMenu(scope.row)" @click="openMenu(scope.row)">修改</el-button><el-button v-if="can('system.menu.delete')" link type="danger" :disabled="[94].includes(scope.row.id) || ['system/permissions'].includes(scope.row.component) || platformMenu(scope.row)" @click="confirmDelete(`/menus/${scope.row.id}`, `菜单「${scope.row.name}」`, '菜单已删除')">删除</el-button></template></el-table-column>
       </el-table>
     </template>
 

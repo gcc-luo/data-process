@@ -1,13 +1,14 @@
 <script setup>
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { assetPage } from './asset-pagination.js'
 import { authorizedRequest } from './auth.js'
 const can = inject('canPermission', () => false)
+const props = defineProps({ view: { type: String, default: 'sources' } })
 const items = ref([]), error = ref(''), message = ref(''), busy = ref(false), registering = ref(false), show = ref(false)
 const datasets = ref([]), tables = ref([]), selectedSource = ref(null), schema = ref(''), datasetName = ref('')
 const policyOpen = ref(false), policyDataset = ref(null), roleOptions = ref([]), policyForm = ref({ departmentField: '', roleId: null, scope: 'OWN', fields: {} })
 const policyRules = ref([]), storedDepartmentField = ref('')
-const activeTab = ref('sources'), sourceSearch = ref(''), datasetSearch = ref(''), tableSearch = ref('')
+const sourceSearch = ref(''), datasetSearch = ref(''), tableSearch = ref('')
 const sourcePage = ref(1), datasetPage = ref(1), tablePage = ref(1), sourceSize = ref(10), datasetSize = ref(10), tableSize = ref(10)
 const sourcesPage = computed(() => assetPage(items.value, sourceSearch.value, sourcePage.value, sourceSize.value))
 const datasetsPage = computed(() => assetPage(datasets.value, datasetSearch.value, datasetPage.value, datasetSize.value))
@@ -75,6 +76,7 @@ async function deleteDataset(item) {
 async function openCatalog(item = null) {
   schema.value = ''; datasetName.value = ''; tableSearch.value = ''; tablePage.value = 1; tables.value = []; selectedSource.value = null
   catalogSourceId.value = item?.id ?? null; catalogOpen.value = true
+  if (!items.value.length) await load()
   if (item) await inspect(item)
 }
 async function selectCatalogSource(id) {
@@ -100,7 +102,7 @@ async function register(table) {
   try {
     const response = await authorizedRequest('/api/datasets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId: selectedSource.value.id, name: datasetName.value, catalog: table.catalog, schema: table.schema, table: table.name }) })
     if (!response.ok) throw new Error('登记失败，请检查权限、名称和数据库连接')
-    datasetName.value = ''; activeTab.value = 'datasets'; catalogOpen.value = false
+    datasetName.value = ''; catalogOpen.value = false
     message.value = '数据集已登记'
     try { await loadDatasets() } catch { error.value = '数据集已登记，但列表刷新失败，请手动刷新' }
   } catch (e) { error.value = e.message } finally { registering.value = false }
@@ -156,30 +158,34 @@ async function save() {
   } catch (e) { error.value = e.message }
   finally { busy.value = false }
 }
-onMounted(async () => { await load(); try { await loadDatasets() } catch (e) { error.value = e.message } })
+async function loadForView() {
+  error.value = ''
+  if (props.view === 'sources') await load()
+  else { try { await loadDatasets() } catch (e) { error.value = e.message } }
+}
+onMounted(loadForView)
+watch(() => props.view, loadForView)
 </script>
 <template>
   <section>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon />
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="数据源" name="sources">
+    <template v-if="view === 'sources'">
         <div class="toolbar"><el-input v-model="sourceSearch" clearable placeholder="搜索名称、主机或数据库" @input="sourcePage = 1"/><el-button v-if="can('datasource.source.create')" type="primary" @click="createSource">新建数据源</el-button><el-button @click="load">刷新</el-button></div>
         <el-table :data="sourcesPage.rows" empty-text="暂无数据源" row-key="id">
           <el-table-column prop="name" label="名称" min-width="150"/><el-table-column prop="type" label="类型" min-width="110"/><el-table-column prop="host" label="主机" min-width="150"/><el-table-column prop="port" label="端口" width="85"/><el-table-column prop="database" label="数据库 / 服务名" min-width="150"/><el-table-column prop="username" label="用户名" min-width="110"/>
           <el-table-column label="操作" min-width="300" fixed="right"><template #default="scope"><el-button v-if="can('datasource.source.test')" text type="primary" @click="testConnection(scope.row)">测试连接</el-button><el-button v-if="can('datasource.source.test')" text @click="openCatalog(scope.row)">查看表</el-button><el-button v-if="can('datasource.source.update')" text @click="editSource(scope.row)">编辑</el-button><el-popconfirm v-if="can('datasource.source.delete')" :title="`确定删除数据源 ${scope.row.name}？`" @confirm="deleteSource(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm><div class="status-text">{{ scope.row.testStatus }}</div></template></el-table-column>
         </el-table>
         <div class="pagination"><el-pagination :current-page="sourcesPage.page" :page-size="sourceSize" :page-sizes="[10, 20, 50]" :total="sourcesPage.total" layout="total, sizes, prev, pager, next" @current-change="sourcePage = $event" @size-change="sourceSize = $event; sourcePage = 1"/></div>
-      </el-tab-pane>
-      <el-tab-pane label="数据集" name="datasets">
+    </template>
+    <template v-else>
         <div class="toolbar"><el-input v-model="datasetSearch" clearable placeholder="搜索数据集名称或表名" @input="datasetPage = 1"/><el-button v-if="can('datasource.dataset.create') && can('datasource.source.read') && can('datasource.source.test')" type="primary" @click="openCatalog()">登记数据集</el-button><el-button @click="refreshDatasetList">刷新</el-button></div>
         <el-table :data="datasetsPage.rows" empty-text="暂无数据集" row-key="id">
           <el-table-column prop="name" label="名称" min-width="150"/><el-table-column prop="sourceId" label="数据源编号" width="110"/><el-table-column prop="schema" label="Schema" min-width="120"/><el-table-column prop="table" label="表名" min-width="150"/><el-table-column label="字段" width="90"><template #default="scope">{{ scope.row.fields.length }} 个</template></el-table-column>
           <el-table-column label="操作" min-width="310" fixed="right"><template #default="scope"><el-button v-if="can('datasource.dataset.read')" text @click="showFields(scope.row)">字段详情</el-button><el-button v-if="can('datasource.dataset.manage_policy')" text type="primary" @click="openPolicy(scope.row)">数据范围</el-button><el-button v-if="can('datasource.dataset.refresh')" text @click="refreshDataset(scope.row)">重新采集</el-button><el-popconfirm v-if="can('datasource.dataset.delete')" :title="`确定删除数据集 ${scope.row.name} 的登记信息？业务表不会删除。`" @confirm="deleteDataset(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm><div class="status-text">{{ scope.row.refreshStatus }}</div></template></el-table-column>
         </el-table>
         <div class="pagination"><el-pagination :current-page="datasetsPage.page" :page-size="datasetSize" :page-sizes="[10, 20, 50]" :total="datasetsPage.total" layout="total, sizes, prev, pager, next" @current-change="datasetPage = $event" @size-change="datasetSize = $event; datasetPage = 1"/></div>
-      </el-tab-pane>
-    </el-tabs>
+    </template>
     <el-dialog v-model="catalogOpen" title="选择数据库表并登记数据集" width="min(850px, 95vw)" @closed="inspectSequence++">
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
       <div class="catalog-controls"><el-select v-model="catalogSourceId" placeholder="选择数据源" @change="selectCatalogSource"><el-option v-for="source in items" :key="source.id" :label="source.name" :value="source.id"/></el-select><el-input v-model="schema" placeholder="Schema（可留空）"/><el-button :disabled="!selectedSource" @click="inspect(selectedSource)">查询表</el-button></div>
