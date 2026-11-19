@@ -2,6 +2,7 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { assetPage } from './asset-pagination.js'
 import { authorizedRequest } from './auth.js'
+import { profileTypes, versionsForType, defaultForm, databaseLabel, driversForType, paramRows, buildPayload } from './datasource-form.js'
 const can = inject('canPermission', () => false)
 const props = defineProps({ view: { type: String, default: 'sources' } })
 const items = ref([]), error = ref(''), message = ref(''), busy = ref(false), registering = ref(false), show = ref(false)
@@ -16,7 +17,88 @@ const tablesPage = computed(() => assetPage(tables.value, tableSearch.value, tab
 const catalogOpen = ref(false), fieldsOpen = ref(false), fieldsDataset = ref(null), catalogSourceId = ref(null)
 let inspectSequence = 0
 const editingId = ref(null)
-const form = ref({ name: '', type: 'MYSQL', host: '', port: 3306, database: '', username: '', password: '' })
+const form = ref({ name: '', type: 'MYSQL', profileId: '', host: '', port: 3306, database: '', username: '', password: '', driverId: null, connectType: 'SERVICE' })
+const profiles = ref([]), drivers = ref([]), advanced = ref([])
+const driverSearch = ref(''), driverPage = ref(1), driverSize = ref(10)
+const uploadOpen = ref(false), uploading = ref(false)
+const uploadForm = ref({ name: '', dbType: 'MYSQL', driverClass: '', versionLabel: '', file: null })
+const typeOptions = computed(() => profileTypes(profiles.value))
+const versionOptions = computed(() => versionsForType(profiles.value, form.value.type))
+const currentProfile = computed(() => profiles.value.find(p => p.id === form.value.profileId))
+const typeDrivers = computed(() => driversForType(drivers.value, form.value.type))
+const dbLabel = computed(() => databaseLabel(currentProfile.value, { connectType: form.value.connectType }))
+const hasConnectType = computed(() => (currentProfile.value?.extraFields || []).some(f => f.key === 'connectType'))
+const driversPage = computed(() => assetPage(drivers.value, driverSearch.value, driverPage.value, driverSize.value))
+function applyProfile(profile) {
+  if (!profile) return
+  const defaults = defaultForm(profile)
+  form.value.profileId = defaults.profileId
+  form.value.port = defaults.port
+  form.value.connectType = defaults.options.connectType || 'SERVICE'
+  form.value.driverId = null
+  advanced.value = []
+}
+function selectType(type) {
+  form.value.type = type
+  applyProfile(versionsForType(profiles.value, type)[0])
+}
+function selectProfile(profileId) {
+  applyProfile(profiles.value.find(p => p.id === profileId))
+}
+async function loadProfiles() {
+  if (!can('datasource.source.read')) { profiles.value = []; return }
+  try {
+    const response = await fetch('/api/data-sources/profiles', { credentials: 'same-origin' })
+    if (response.ok) profiles.value = await response.json()
+  } catch { /* 表单目录加载失败时保留空列表，保存仍会被后端校验 */ }
+}
+async function loadDrivers() {
+  if (!can('datasource.driver.read')) { drivers.value = []; return }
+  try {
+    const response = await fetch('/api/drivers', { credentials: 'same-origin' })
+    if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有驱动管理权限' : '无法读取驱动列表')
+    drivers.value = await response.json()
+  } catch (e) { error.value = e.message }
+}
+function openUpload() {
+  error.value = ''
+  uploadForm.value = { name: '', dbType: form.value.type || 'MYSQL', driverClass: '', versionLabel: '', file: null }
+  uploadOpen.value = true
+}
+async function submitUpload() {
+  if (uploading.value) return
+  if (!uploadForm.value.file) { error.value = '请选择 jar 文件'; return }
+  if (!uploadForm.value.name.trim() || !uploadForm.value.driverClass.trim()) { error.value = '请填写驱动名称和驱动类'; return }
+  uploading.value = true; error.value = ''
+  try {
+    const data = new FormData()
+    data.append('file', uploadForm.value.file)
+    data.append('name', uploadForm.value.name.trim())
+    data.append('dbType', uploadForm.value.dbType)
+    data.append('driverClass', uploadForm.value.driverClass.trim())
+    if (uploadForm.value.versionLabel.trim()) data.append('versionLabel', uploadForm.value.versionLabel.trim())
+    const response = await authorizedRequest('/api/drivers', { method: 'POST', body: data })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      throw new Error(payload?.error || '上传失败，请检查文件与权限')
+    }
+    uploadOpen.value = false
+    message.value = '驱动已上传'
+    await loadDrivers()
+  } catch (e) { error.value = e.message } finally { uploading.value = false }
+}
+async function deleteDriver(item) {
+  error.value = ''
+  try {
+    const response = await authorizedRequest(`/api/drivers/${item.id}`, { method: 'DELETE' })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      if (response.status === 409) throw new Error(`驱动被数据源引用：${(payload?.references || []).join('、')}`)
+      throw new Error(payload?.error || '删除失败，请刷新后重试')
+    }
+    await loadDrivers()
+  } catch (e) { error.value = e.message }
+}
 async function load() {
   error.value = ''
   if (!can('datasource.source.read')) { items.value = []; return }
@@ -146,12 +228,27 @@ async function savePolicy() {
   } catch (e) { error.value = e.message }
 }
 function showFields(dataset) { fieldsDataset.value = dataset; fieldsOpen.value = true }
-function createSource() { error.value = ''; editingId.value = null; form.value = { name: '', type: 'MYSQL', host: '', port: 3306, database: '', username: '', password: '' }; show.value = true }
-function editSource(item) { error.value = ''; editingId.value = item.id; form.value = { name: item.name, type: item.type, host: item.host, port: item.port, database: item.database, username: item.username, password: '' }; show.value = true }
+function createSource() {
+  error.value = ''; editingId.value = null
+  form.value = { name: '', type: 'MYSQL', profileId: '', host: '', port: 3306, database: '', username: '', password: '', driverId: null, connectType: 'SERVICE' }
+  advanced.value = []
+  const mysql8 = profiles.value.find(p => p.id === 'MYSQL:8.x') || profiles.value[0]
+  if (mysql8) { form.value.type = mysql8.type; applyProfile(mysql8) }
+  show.value = true
+}
+function editSource(item) {
+  error.value = ''; editingId.value = item.id
+  const profile = profiles.value.find(p => p.id === item.profileId)
+  form.value = { name: item.name, type: item.type, profileId: item.profileId, host: item.host, port: item.port, database: item.database, username: item.username, password: '', driverId: item.driverId || null, connectType: item.options?.connectType || defaultForm(profile).options.connectType || 'SERVICE' }
+  advanced.value = paramRows(profile, item.options)
+  show.value = true
+}
 async function save() {
   busy.value = true; error.value = ''
   try {
-    const payload = { ...form.value, password: editingId.value && !form.value.password ? null : form.value.password }
+    const options = Object.fromEntries(advanced.value.filter(r => r.key).map(r => [r.key, r.value]))
+    if (hasConnectType.value) options.connectType = form.value.connectType
+    const payload = buildPayload({ ...form.value, options }, Boolean(editingId.value))
     const response = await authorizedRequest(editingId.value ? `/api/data-sources/${editingId.value}` : '/api/data-sources', { method: editingId.value ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有数据源管理权限' : '保存失败，请检查配置和名称是否重复')
     form.value.password = ''; show.value = false; await load()
@@ -160,7 +257,8 @@ async function save() {
 }
 async function loadForView() {
   error.value = ''
-  if (props.view === 'sources') await load()
+  if (props.view === 'sources') { await loadProfiles(); await load() }
+  else if (props.view === 'drivers') await loadDrivers()
   else { try { await loadDatasets() } catch (e) { error.value = e.message } }
 }
 onMounted(loadForView)
@@ -173,18 +271,31 @@ watch(() => props.view, loadForView)
     <template v-if="view === 'sources'">
         <div class="toolbar"><el-input v-model="sourceSearch" clearable placeholder="搜索名称、主机或数据库" @input="sourcePage = 1"/><el-button v-if="can('datasource.source.create')" type="primary" @click="createSource">新建数据源</el-button><el-button @click="load">刷新</el-button></div>
         <el-table :data="sourcesPage.rows" empty-text="暂无数据源" row-key="id">
-          <el-table-column prop="name" label="名称" min-width="150"/><el-table-column prop="type" label="类型" min-width="110"/><el-table-column prop="host" label="主机" min-width="150"/><el-table-column prop="port" label="端口" width="85"/><el-table-column prop="database" label="数据库 / 服务名" min-width="150"/><el-table-column prop="username" label="用户名" min-width="110"/>
+          <el-table-column prop="name" label="名称" min-width="150"/><el-table-column prop="type" label="类型" min-width="100"/><el-table-column prop="profileName" label="版本" min-width="120"/><el-table-column prop="host" label="主机" min-width="150"/><el-table-column prop="port" label="端口" width="85"/><el-table-column prop="database" label="数据库 / 服务名" min-width="150"/><el-table-column prop="username" label="用户名" min-width="110"/>
           <el-table-column label="操作" min-width="300" fixed="right"><template #default="scope"><el-button v-if="can('datasource.source.test')" text type="primary" @click="testConnection(scope.row)">测试连接</el-button><el-button v-if="can('datasource.source.test')" text @click="openCatalog(scope.row)">查看表</el-button><el-button v-if="can('datasource.source.update')" text @click="editSource(scope.row)">编辑</el-button><el-popconfirm v-if="can('datasource.source.delete')" :title="`确定删除数据源 ${scope.row.name}？`" @confirm="deleteSource(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm><div class="status-text">{{ scope.row.testStatus }}</div></template></el-table-column>
         </el-table>
         <div class="pagination"><el-pagination :current-page="sourcesPage.page" :page-size="sourceSize" :page-sizes="[10, 20, 50]" :total="sourcesPage.total" layout="total, sizes, prev, pager, next" @current-change="sourcePage = $event" @size-change="sourceSize = $event; sourcePage = 1"/></div>
     </template>
-    <template v-else>
+    <template v-else-if="view === 'datasets'">
         <div class="toolbar"><el-input v-model="datasetSearch" clearable placeholder="搜索数据集名称或表名" @input="datasetPage = 1"/><el-button v-if="can('datasource.dataset.create') && can('datasource.source.read') && can('datasource.source.test')" type="primary" @click="openCatalog()">登记数据集</el-button><el-button @click="refreshDatasetList">刷新</el-button></div>
         <el-table :data="datasetsPage.rows" empty-text="暂无数据集" row-key="id">
           <el-table-column prop="name" label="名称" min-width="150"/><el-table-column prop="sourceId" label="数据源编号" width="110"/><el-table-column prop="schema" label="Schema" min-width="120"/><el-table-column prop="table" label="表名" min-width="150"/><el-table-column label="字段" width="90"><template #default="scope">{{ scope.row.fields.length }} 个</template></el-table-column>
           <el-table-column label="操作" min-width="310" fixed="right"><template #default="scope"><el-button v-if="can('datasource.dataset.read')" text @click="showFields(scope.row)">字段详情</el-button><el-button v-if="can('datasource.dataset.manage_policy')" text type="primary" @click="openPolicy(scope.row)">数据范围</el-button><el-button v-if="can('datasource.dataset.refresh')" text @click="refreshDataset(scope.row)">重新采集</el-button><el-popconfirm v-if="can('datasource.dataset.delete')" :title="`确定删除数据集 ${scope.row.name} 的登记信息？业务表不会删除。`" @confirm="deleteDataset(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm><div class="status-text">{{ scope.row.refreshStatus }}</div></template></el-table-column>
         </el-table>
         <div class="pagination"><el-pagination :current-page="datasetsPage.page" :page-size="datasetSize" :page-sizes="[10, 20, 50]" :total="datasetsPage.total" layout="total, sizes, prev, pager, next" @current-change="datasetPage = $event" @size-change="datasetSize = $event; datasetPage = 1"/></div>
+    </template>
+    <template v-else-if="view === 'drivers'">
+        <div class="toolbar"><el-input v-model="driverSearch" clearable placeholder="搜索驱动名称或类名" @input="driverPage = 1"/><el-button v-if="can('datasource.driver.upload')" type="primary" @click="openUpload">上传驱动</el-button><el-button @click="loadDrivers">刷新</el-button></div>
+        <el-table :data="driversPage.rows" empty-text="暂无驱动" row-key="id">
+          <el-table-column prop="name" label="名称" min-width="170"/>
+          <el-table-column prop="dbType" label="类型" width="110"/>
+          <el-table-column prop="driverClass" label="驱动类" min-width="190"/>
+          <el-table-column prop="versionLabel" label="版本" width="90"/>
+          <el-table-column label="来源" width="90"><template #default="scope"><el-tag :type="scope.row.builtin ? 'info' : 'success'" size="small">{{ scope.row.builtin ? '内置' : '上传' }}</el-tag></template></el-table-column>
+          <el-table-column label="SHA-256" width="130"><template #default="scope"><span class="status-text">{{ (scope.row.sha256 || '').slice(0, 12) }}…</span></template></el-table-column>
+          <el-table-column label="操作" width="100" fixed="right"><template #default="scope"><el-popconfirm v-if="can('datasource.driver.delete') && !scope.row.builtin" :title="`确定删除驱动 ${scope.row.name}？`" @confirm="deleteDriver(scope.row)"><template #reference><el-button text type="danger">删除</el-button></template></el-popconfirm><span v-else class="status-text">{{ scope.row.builtin ? '不可删除' : '' }}</span></template></el-table-column>
+        </el-table>
+        <div class="pagination"><el-pagination :current-page="driversPage.page" :page-size="driverSize" :page-sizes="[10, 20, 50]" :total="driversPage.total" layout="total, sizes, prev, pager, next" @current-change="driverPage = $event" @size-change="driverSize = $event; driverPage = 1"/></div>
     </template>
     <el-dialog v-model="catalogOpen" title="选择数据库表并登记数据集" width="min(850px, 95vw)" @closed="inspectSequence++">
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
@@ -195,10 +306,11 @@ watch(() => props.view, loadForView)
     </el-dialog>
     <el-dialog v-model="fieldsOpen" :title="`${fieldsDataset?.name || ''} 的字段`" width="min(650px, 95vw)"><el-table :data="fieldsDataset?.fields || []" max-height="450"><el-table-column prop="name" label="字段名"/><el-table-column prop="dataType" label="类型"/><el-table-column label="可为空"><template #default="scope">{{ scope.row.nullable ? '是' : '否' }}</template></el-table-column></el-table></el-dialog>
     <el-dialog v-model="policyOpen" title="数据集角色权限" width="min(600px, 95vw)"><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><p>选择保存部门编号的数字字段；未授权字段不可查询。保存会替换该角色在此数据集上的原有规则。</p><p v-if="policyRules.length">已授权角色：<el-button v-for="rule in policyRules" :key="rule.roleId" text type="primary" @click="policyForm.roleId = rule.roleId; selectPolicyRole(rule.roleId)">{{ roleOptions.find(r => r.id === rule.roleId)?.name || `角色 ${rule.roleId}` }}</el-button></p><el-form label-position="top"><el-form-item label="部门字段"><el-select v-model="policyForm.departmentField"><el-option v-for="f in policyDataset?.fields || []" :key="f.name" :label="`${f.name} (${f.dataType})`" :value="f.name" /></el-select></el-form-item><el-form-item label="角色"><el-select v-if="roleOptions.length" v-model="policyForm.roleId" @change="selectPolicyRole"><el-option v-for="r in roleOptions" :key="r.id" :label="r.name" :value="r.id" /></el-select><el-input-number v-else v-model="policyForm.roleId" :min="1" placeholder="角色编号" @change="selectPolicyRole" /></el-form-item><el-form-item label="数据范围"><el-select v-model="policyForm.scope"><el-option label="本部门" value="OWN" /><el-option label="本部门及下级部门" value="OWN_AND_DESCENDANTS" /></el-select></el-form-item><el-form-item v-for="f in policyDataset?.fields || []" :key="f.name" :label="f.name"><el-radio-group v-model="policyForm.fields[f.name]"><el-radio-button value="NONE">不允许</el-radio-button><el-radio-button value="MASKED">脱敏</el-radio-button><el-radio-button value="FULL">明文</el-radio-button></el-radio-group></el-form-item></el-form><template #footer><el-popconfirm v-if="can('datasource.dataset.manage_policy') && policyRules.some(r => r.roleId === policyForm.roleId)" title="撤销该角色对数据集的授权？" @confirm="revokePolicy"><template #reference><el-button type="danger">撤销该角色授权</el-button></template></el-popconfirm><el-button @click="policyOpen = false">取消</el-button><el-button v-if="can('datasource.dataset.manage_policy')" type="primary" @click="savePolicy">保存范围</el-button></template></el-dialog>
-    <el-dialog v-model="show" :title="editingId ? '编辑数据源' : '新建数据源'" width="min(520px, 95vw)" @closed="form.password = ''"><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><el-alert v-if="editingId" title="修改连接会影响引用此数据源的任务和数据集；密码留空时保留原密码。" type="warning" :closable="false" show-icon/><el-form label-position="top" @submit.prevent="save"><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item><el-form-item label="数据库类型"><el-select v-model="form.type"><el-option label="MySQL" value="MYSQL" /><el-option label="PostgreSQL" value="POSTGRESQL" /><el-option label="Oracle" value="ORACLE" /></el-select></el-form-item><el-form-item label="主机"><el-input v-model="form.host" /></el-form-item><el-form-item label="端口"><el-input-number v-model="form.port" :min="1" :max="65535" /></el-form-item><el-form-item label="数据库或服务名"><el-input v-model="form.database" /></el-form-item><el-form-item label="用户名"><el-input v-model="form.username" /></el-form-item><el-form-item label="密码"><el-input v-model="form.password" type="password" show-password autocomplete="new-password" /></el-form-item><el-button type="primary" native-type="submit" :loading="busy">保存</el-button></el-form></el-dialog>
+    <el-dialog v-model="show" :title="editingId ? '编辑数据源' : '新建数据源'" width="min(560px, 95vw)" @closed="form.password = ''"><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><el-alert v-if="editingId" title="修改连接会影响引用此数据源的任务和数据集；密码留空时保留原密码。" type="warning" :closable="false" show-icon/><el-form label-position="top" @submit.prevent="save"><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item><el-form-item label="数据库类型"><el-select v-model="form.type" @change="selectType"><el-option v-for="t in typeOptions" :key="t.value" :label="t.label" :value="t.value" /></el-select></el-form-item><el-form-item label="大版本"><el-select v-model="form.profileId" @change="selectProfile"><el-option v-for="p in versionOptions" :key="p.id" :label="p.displayName" :value="p.id" /></el-select></el-form-item><el-form-item v-if="hasConnectType" label="连接方式"><el-radio-group v-model="form.connectType"><el-radio-button value="SID">SID</el-radio-button><el-radio-button value="SERVICE">服务名</el-radio-button></el-radio-group></el-form-item><el-form-item label="主机"><el-input v-model="form.host" /></el-form-item><el-form-item label="端口"><el-input-number v-model="form.port" :min="1" :max="65535" /></el-form-item><el-form-item :label="dbLabel"><el-input v-model="form.database" /></el-form-item><el-form-item label="用户名"><el-input v-model="form.username" /></el-form-item><el-form-item label="密码"><el-input v-model="form.password" type="password" show-password autocomplete="new-password" /></el-form-item><el-form-item label="JDBC 驱动"><el-select v-model="form.driverId" clearable placeholder="内置默认驱动"><el-option v-for="d in typeDrivers" :key="d.id" :label="`${d.name}${d.versionLabel ? ' ' + d.versionLabel : ''}${d.builtin ? '（内置）' : '（上传）'}`" :value="d.id" /></el-select></el-form-item><el-collapse class="advanced-params"><el-collapse-item :title="`高级参数（${advanced.length}）`" name="params"><div v-for="(row, index) in advanced" :key="index" class="param-row"><el-select v-model="row.key" placeholder="参数名" filterable><el-option v-for="spec in currentProfile?.extraParams || []" :key="spec.key" :label="spec.key" :value="spec.key"><span>{{ spec.key }}</span><span class="param-hint">{{ spec.label }}</span></el-option></el-select><el-input v-model="row.value" :placeholder="(currentProfile?.extraParams || []).find(s => s.key === row.key)?.hint || '参数值'" /><el-button text type="danger" @click="advanced.splice(index, 1)">移除</el-button></div><el-button text type="primary" :disabled="!currentProfile || !(currentProfile.extraParams || []).length" @click="advanced.push({ key: '', value: '' })">添加参数</el-button></el-collapse-item></el-collapse><el-button type="primary" native-type="submit" :loading="busy">保存</el-button></el-form></el-dialog>
+    <el-dialog v-model="uploadOpen" title="上传 JDBC 驱动" width="min(520px, 95vw)"><el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><el-alert title="驱动 jar 会在隔离类加载器中运行，仅管理员可上传；上传前请确认来源可信。" type="warning" :closable="false" show-icon/><el-form label-position="top" @submit.prevent="submitUpload"><el-form-item label="驱动名称"><el-input v-model="uploadForm.name" placeholder="如 MySQL Connector/J 8.4" /></el-form-item><el-form-item label="数据库类型"><el-select v-model="uploadForm.dbType"><el-option v-for="t in typeOptions" :key="t.value" :label="t.label" :value="t.value" /></el-select></el-form-item><el-form-item label="驱动类"><el-input v-model="uploadForm.driverClass" placeholder="如 com.mysql.cj.jdbc.Driver" /></el-form-item><el-form-item label="版本标签（可留空自动探测）"><el-input v-model="uploadForm.versionLabel" placeholder="如 8.4.0" /></el-form-item><el-form-item label="jar 文件（≤50MB）"><el-upload drag accept=".jar" :auto-upload="false" :limit="1" :on-change="f => uploadForm.file = f.raw" :on-remove="() => uploadForm.file = null"><div class="upload-drag">将 jar 拖到此处，或点击选择</div></el-upload></el-form-item><el-button type="primary" native-type="submit" :loading="uploading">上传</el-button></el-form></el-dialog>
   </section>
 </template>
 
 <style scoped>
-.toolbar,.catalog-controls{display:flex;gap:12px;align-items:center;margin:16px 0}.toolbar .el-input{max-width:320px}.catalog-controls > *{flex:1;min-width:0}.pagination{display:flex;justify-content:flex-end;margin:18px 0}.status-text{font-size:12px;color:#718581}.el-alert{margin:10px 0}@media(max-width:700px){.toolbar,.catalog-controls{flex-wrap:wrap}.toolbar .el-input{max-width:none}.pagination{justify-content:flex-start;overflow:auto}}
+.toolbar,.catalog-controls{display:flex;gap:12px;align-items:center;margin:16px 0}.toolbar .el-input{max-width:320px}.catalog-controls > *{flex:1;min-width:0}.pagination{display:flex;justify-content:flex-end;margin:18px 0}.status-text{font-size:12px;color:#718581}.el-alert{margin:10px 0}.advanced-params{margin-bottom:14px}.param-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}.param-row .el-select{width:46%}.param-row .el-input{flex:1}.param-hint{float:right;color:#8b98a8;font-size:12px}.upload-drag{padding:18px 10px;color:#66778c;font-size:13px}@media(max-width:700px){.toolbar,.catalog-controls{flex-wrap:wrap}.toolbar .el-input{max-width:none}.pagination{justify-content:flex-start;overflow:auto}.param-row{flex-wrap:wrap}.param-row .el-select{width:100%}}
 </style>

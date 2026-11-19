@@ -16,6 +16,7 @@ export const menuIconPaths = Object.freeze({
   menu: 'M4 6h16M4 12h16M4 18h16M8 6v.01M8 12v.01M8 18v.01',
   audit: 'M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
   shield: 'M12 3 20 6v5c0 5-3.5 8.3-8 10-4.5-1.7-8-5-8-10V6l8-3Zm-3.5 8.5 2.2 2.2 4.8-4.8',
+  driver: 'M9 3v4m6-4v4M7 7h10v3a5 5 0 0 1-10 0V7Zm5 8v6',
 })
 
 const labels = {
@@ -36,6 +37,7 @@ const labels = {
   menu: '菜单',
   audit: '审计',
   shield: '权限',
+  driver: '驱动管理',
 }
 
 export const menuIconOptions = Object.entries(menuIconPaths).map(([key, path]) => ({ key, path, label: labels[key] || key }))

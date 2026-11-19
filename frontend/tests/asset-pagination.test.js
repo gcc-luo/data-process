@@ -10,3 +10,8 @@ test('empty results remain on first page and case-insensitive search matches con
   assert.deepEqual(assetPage([{ name:'A', host:'DB.EXAMPLE' }], 'db.example', 1, 10).total, 1)
   assert.deepEqual(assetPage([], '', 8, 10), { rows: [], total: 0, page: 1 })
 })
+test('driver rows are searchable by class name and database type', () => {
+  const drivers = [{ name: 'MySQL 8', dbType: 'MYSQL', driverClass: 'com.mysql.cj.jdbc.Driver' }, { name: 'PG', dbType: 'POSTGRESQL', driverClass: 'org.postgresql.Driver' }]
+  assert.deepEqual(assetPage(drivers, 'cj.jdbc', 1, 10).rows, [drivers[0]])
+  assert.deepEqual(assetPage(drivers, 'postgresql', 1, 10).rows, [drivers[1]])
+})
