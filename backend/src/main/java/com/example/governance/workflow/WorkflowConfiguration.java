@@ -15,6 +15,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableScheduling
 public class WorkflowConfiguration {
     @Bean TaskVersionStore taskVersionStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new TaskVersionStore(jdbc, tx); }
+    @Bean TaskDirectoryStore taskDirectoryStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new TaskDirectoryStore(jdbc, tx); }
     @Bean WorkflowDefinitionStore workflowDefinitionStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new WorkflowDefinitionStore(jdbc, tx); }
     @Bean WorkflowRunStore workflowRunStore(JdbcTemplate jdbc, PlatformTransactionManager tx, WorkflowDefinitionStore definitions) { return new WorkflowRunStore(jdbc, tx, definitions); }
     @Bean ExecutionDataSourceProvider executionDataSourceProvider(DataSourceStore sources, com.example.governance.assets.driver.ConnectionFactory factory) { return new ExecutionDataSourceProvider(sources, factory); }

@@ -104,6 +104,7 @@ public final class PermissionCatalog {
         add(values, "workflow.task", "任务管理", "修改", "保存任务版本");
         add(values, "workflow.task", "任务管理", "执行", "运行任务");
         add(values, "workflow.task", "任务管理", "重试", "重试失败任务");
+        add(values, "workflow.task", "任务管理", "删除", "删除任务");
         add(values, "workflow.workflow", "工作流管理", "查看", "读取工作流及运行记录");
         add(values, "workflow.workflow", "工作流管理", "新增", "创建工作流");
         add(values, "workflow.workflow", "工作流管理", "修改", "保存工作流版本");
@@ -206,6 +207,11 @@ public final class PermissionCatalog {
         route(routes, "POST", "/api/datasets/*/analysis", "datasource.query.read");
 
         route(routes, "POST", "/api/workflows/validate", "workflow.workflow.validate");
+        route(routes, "GET", "/api/task-directories", "workflow.task.read");
+        route(routes, "POST", "/api/task-directories", "workflow.task.create");
+        route(routes, "POST", "/api/task-directories/sort", "workflow.task.update");
+        route(routes, "PUT", "/api/task-directories/*", "workflow.task.update");
+        route(routes, "DELETE", "/api/task-directories/*", "workflow.task.delete");
         route(routes, "GET", "/api/tasks", "workflow.task.read");
         route(routes, "POST", "/api/tasks", "workflow.task.create");
         route(routes, "POST", "/api/tasks/*/versions", "workflow.task.update");
