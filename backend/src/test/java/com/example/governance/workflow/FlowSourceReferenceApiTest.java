@@ -66,6 +66,43 @@ class FlowSourceReferenceApiTest {
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM data_sources WHERE id=3", Integer.class));
     }
 
+    @Test void interceptorNodesDoNotBlockUnrelatedSourceDeletion() throws Exception {
+        var session = login();
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (11,'filter-src','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher'),(12,'filter-dst','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher'),(13,'filter-free','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
+        // 含 FIELD_FILTER 的三节点 FLOW：拦截器合法地不含 sourceId，不应影响无关源的删除
+        String flowWithFilter = """
+            {"nodes":[
+              {"key":"s","component":"SOURCE_TABLE","config":{"sourceId":11,"table":"orders"}},
+              {"key":"f","component":"FIELD_FILTER","config":{"expression":"amount > 0"}},
+              {"key":"t","component":"SINK_TABLE","config":{"sourceId":12,"table":"orders_copy","writeMode":"APPEND"}}],
+             "edges":[{"from":"s","to":"f"},{"from":"f","to":"t"}]}
+            """;
+        mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
+                .content("{\"name\":\"flow-filter\",\"type\":\"FLOW\",\"configuration\":" + flowWithFilter + "}"))
+            .andExpect(status().isCreated());
+        // 被引用的来源/目标仍 409
+        mvc.perform(delete("/api/data-sources/11").session(session).with(csrf())).andExpect(status().isConflict());
+        mvc.perform(delete("/api/data-sources/12").session(session).with(csrf())).andExpect(status().isConflict());
+        // 无引用源可删 → 204（缺陷现状：拦截器无 sourceId 被误判 Cannot check → 409）
+        mvc.perform(delete("/api/data-sources/13").session(session).with(csrf())).andExpect(status().isNoContent());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM data_sources WHERE id=13", Integer.class));
+    }
+
+    @Test void corruptedFlowVersionFailsSafeOnDeletion() throws Exception {
+        var session = login();
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (21,'corrupt-src','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (733,'corrupt-flow','FLOW',1)");
+        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (733,1,'{\"nodes\":[{\"key\":\"s\",\"component\":\"SOURCE_TABLE\",\"config\":{\"sourceId\":21,\"table\":\"orders\"}},{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":21,\"table\":\"c\"}}],\"edges\":[{\"from\":\"s\",\"to\":\"t\"}]}')");
+        // 损坏历史行：来源节点缺 sourceId → 真 fail-safe，删除任意源 409
+        jdbc.update("UPDATE processing_task_versions SET configuration='{\"nodes\":[{\"key\":\"s\",\"component\":\"SOURCE_TABLE\",\"config\":{\"table\":\"orders\"}},{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":21,\"table\":\"c\"}}],\"edges\":[{\"from\":\"s\",\"to\":\"t\"}]}' WHERE task_id=733 AND version=1");
+        mvc.perform(delete("/api/data-sources/21").session(session).with(csrf())).andExpect(status().isConflict());
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM data_sources WHERE id=21", Integer.class));
+        // 清理损坏行后恢复可删，证明 409 确由损坏行触发（也避免污染其他用例）
+        jdbc.update("DELETE FROM processing_task_versions WHERE task_id=733");
+        jdbc.update("DELETE FROM processing_tasks WHERE id=733");
+        mvc.perform(delete("/api/data-sources/21").session(session).with(csrf())).andExpect(status().isNoContent());
+    }
+
     @Test void flowSaveErrorPassesThroughNodeMessage() throws Exception {
         var session = login();
         String badConfig = """
@@ -84,5 +121,11 @@ class FlowSourceReferenceApiTest {
                 .content("{\"name\":\"bad-sql\",\"type\":\"SQL\",\"configuration\":{\"sourceId\":1}}"))
             .andExpect(status().isBadRequest())
             .andExpect(result -> assertEquals("Invalid task configuration", ((org.springframework.web.server.ResponseStatusException) result.getResolvedException()).getReason()));
+        // 合法 FLOW 但引用不存在的数据源 → 400 reason 有文案（FLOW 放行）
+        String missingSource = FLOW_CONFIG.replace("\"sourceId\":1", "\"sourceId\":99").replace("\"sourceId\":2", "\"sourceId\":100");
+        mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
+                .content("{\"name\":\"missing-src\",\"type\":\"FLOW\",\"configuration\":" + missingSource + "}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(result -> assertEquals("数据源不存在", ((org.springframework.web.server.ResponseStatusException) result.getResolvedException()).getReason()));
     }
 }

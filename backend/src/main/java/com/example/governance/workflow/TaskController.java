@@ -115,7 +115,7 @@ public class TaskController {
             sourceIds.add(configuration.path("sourceId").longValue());
             if ("SYNC".equals(type)) sourceIds.add(configuration.path("targetId").longValue());
         }
-        if (!sources.lockSources(sourceIds)) throw new IllegalArgumentException();
+        if (!sources.lockSources(sourceIds)) throw new IllegalArgumentException("数据源不存在");
         return config;
     }
 }

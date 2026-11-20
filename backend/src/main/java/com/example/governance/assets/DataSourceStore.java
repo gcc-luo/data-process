@@ -73,8 +73,11 @@ public final class DataSourceStore {
                 var config = mapper.readTree(rs.getString(2)); String type = rs.getString(1);
                 if (config == null || !config.isObject()) throw new IllegalStateException("Cannot check task references safely");
                 if ("FLOW".equals(type)) {
-                    for (var node : config.path("nodes")) {
-                        var sid = node.path("config").path("sourceId");
+                    for (com.fasterxml.jackson.databind.JsonNode node : config.path("nodes")) {
+                        String component = node.path("component").asText("");
+                        if (java.util.Set.of("FIELD_MAP", "FIELD_FILTER", "FIELD_MASK", "FIELD_CALC").contains(component)) continue;
+                        if (!java.util.Set.of("SOURCE_TABLE", "SOURCE_SQL", "SINK_TABLE").contains(component)) throw new IllegalStateException("Cannot check task references safely");
+                        com.fasterxml.jackson.databind.JsonNode sid = node.path("config").path("sourceId");
                         if (!sid.isIntegralNumber() || !sid.canConvertToLong() || sid.longValue() < 1) throw new IllegalStateException("Cannot check task references safely");
                         if (sid.longValue() == id) throw new IllegalStateException("Data source is referenced by a task version");
                     }
