@@ -84,6 +84,17 @@ public final class TaskVersionStore {
             jdbc.update("UPDATE processing_tasks SET name=?,directory_id=?,description=? WHERE id=?", name, directoryId, description, id);
         });
     }
+    /** Conservative delete: workflows pin task versions, so referenced tasks stay. Own run history is removed with the task. */
+    public void delete(long id) {
+        transaction.executeWithoutResult(status -> {
+            if (jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, id).isEmpty()) throw new IllegalArgumentException("Unknown task");
+            if (jdbc.queryForObject("SELECT COUNT(*) FROM workflow_nodes WHERE task_id=?", Integer.class, id) > 0) throw new IllegalStateException("任务被工作流引用，不能删除");
+            // task_run_attempts 对 task_runs ON DELETE CASCADE（V22），删 runs 即级联 attempts
+            jdbc.update("DELETE FROM task_runs WHERE task_id=?", id);
+            jdbc.update("DELETE FROM processing_task_versions WHERE task_id=?", id);
+            jdbc.update("DELETE FROM processing_tasks WHERE id=?", id);
+        });
+    }
     public Optional<Version> findVersion(long taskId, int version) {
         return jdbc.query("SELECT v.task_id,v.version,t.task_type,v.configuration FROM processing_task_versions v JOIN processing_tasks t ON t.id=v.task_id WHERE v.task_id=? AND v.version=?", (rs, row) -> new Version(rs.getLong(1), rs.getInt(2), rs.getString(3), rs.getString(4)), taskId, version).stream().findFirst();
     }

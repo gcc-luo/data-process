@@ -215,6 +215,7 @@ public final class PermissionCatalog {
         route(routes, "GET", "/api/tasks", "workflow.task.read");
         route(routes, "POST", "/api/tasks", "workflow.task.create");
         route(routes, "PUT", "/api/tasks/*", "workflow.task.update");
+        route(routes, "DELETE", "/api/tasks/*", "workflow.task.delete");
         route(routes, "POST", "/api/tasks/*/versions", "workflow.task.update");
         route(routes, "POST", "/api/tasks/*/runs", "workflow.task.execute");
         route(routes, "GET", "/api/tasks/*/runs", "workflow.task.read");

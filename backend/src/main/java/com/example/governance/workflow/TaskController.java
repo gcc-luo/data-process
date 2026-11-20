@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import java.util.List;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -46,6 +47,15 @@ public class TaskController {
         catch (java.util.NoSuchElementException ex) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在"); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "基本信息无效"); }
         audit.success(auth, "task.update", "task", id);
+        return ResponseEntity.noContent().build();
+    }
+    @DeleteMapping("/api/tasks/{id}")
+    ResponseEntity<Void> delete(@PathVariable long id, Authentication auth) {
+        if (runs.hasActiveRun(id)) throw new ResponseStatusException(HttpStatus.CONFLICT, "任务运行中，不能删除");
+        try { tasks.delete(id); }
+        catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在"); }
+        catch (IllegalStateException ex) { throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage()); }
+        audit.success(auth, "task.delete", "task", id);
         return ResponseEntity.noContent().build();
     }
     @PostMapping("/api/tasks")
