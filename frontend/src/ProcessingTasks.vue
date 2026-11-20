@@ -3,10 +3,11 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { authorizedRequest } from './auth.js'
 import { usePagination } from './pagination.js'
-import { filterTasks, batchSummary, flattenTree } from './processing-tasks.js'
+import { filterTasks, batchParts, flattenTree } from './processing-tasks.js'
 import TaskFormDialog from './TaskFormDialog.vue'
 import TaskRunsDialog from './TaskRunsDialog.vue'
 import RefreshIcon from './RefreshIcon.vue'
+// view 预留三期监控视图切换
 defineProps({ view: { type: String, default: 'tasks' } })
 const can = inject('canPermission', () => false)
 const directories = ref([]), tasks = ref([]), sources = ref([]), error = ref(''), message = ref('')
@@ -22,51 +23,75 @@ const treeData = computed(() => {
   return [{ id: 0, name: '全部任务', children: build(null) }]
 })
 async function get(url) { const response = await fetch(url, { credentials: 'same-origin' }); if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有相应权限' : '读取失败，请检查连接'); return response.json() }
-async function load() {
+const runStateLabels = { SUCCEEDED: '成功', FAILED: '失败', INTERRUPTED: '已中断', RUNNING: '运行中', PENDING: '排队', WAITING: '等待' }
+function runStateText(state) { return runStateLabels[state] ?? state }
+function fmtRunTime(value) { return value ? String(value).replace('T', ' ').slice(0, 19) : '' }
+// 序号守卫：丢弃过期的 loadTasks 响应，避免轮询旧结果覆盖新数据
+let taskLoadSequence = 0
+async function loadAll() {
+  error.value = ''
   try {
     const [directoryRows, taskRows, sourceRows] = await Promise.all([
       can('workflow.task.read') ? get('/api/task-directories') : Promise.resolve([]),
       can('workflow.task.read') ? get('/api/tasks') : Promise.resolve([]),
       can('datasource.source.read') ? get('/api/data-sources') : Promise.resolve([])
     ])
+    taskLoadSequence++ // 作废仍在途的 loadTasks 响应
     directories.value = directoryRows; tasks.value = taskRows; sources.value = sourceRows
   } catch (e) { error.value = e.message }
+}
+async function loadTasks() {
+  error.value = ''
+  const sequence = ++taskLoadSequence
+  try {
+    const taskRows = can('workflow.task.read') ? await get('/api/tasks') : []
+    if (sequence === taskLoadSequence) tasks.value = taskRows
+  } catch (e) { if (sequence === taskLoadSequence) error.value = e.message }
+}
+// 批量结果分流：先刷新（loadAll 会清 error）再写提示，避免失败文案被刷新覆盖
+function applyBatchParts(results) {
+  const { okText, failText } = batchParts(results)
+  message.value = okText || (failText ? '' : '没有可操作的任务')
+  if (failText) error.value = failText
 }
 function applyQuery() { nameFilter.value = nameSearch.value.trim(); stateFilter.value = stateSearch.value; paging.page.value = 1 }
 function selectDirectory(node) { currentDirectory.value = node.id; paging.page.value = 1 }
 async function submitSort() {
-  // 拖拽只改 el-tree 内部节点结构，须从 store 读取；根哨兵节点的子节点即顶级目录
+  // 拖拽只改 el-tree 内部节点结构，须从 getNode 读取；根哨兵节点的子节点即顶级目录
   const toPlain = node => ({ id: node.data.id, children: node.childNodes.map(toPlain) })
-  const items = flattenTree(tree.value.store.root.childNodes[0].childNodes.map(toPlain))
+  const items = flattenTree(tree.value.getNode(0).childNodes.map(toPlain))
   try {
     const response = await authorizedRequest('/api/task-directories/sort', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) })
-    if (!response.ok) throw new Error(response.status === 409 ? '目录不能移入自身子孙' : '目录排序保存失败')
-    await load()
-  } catch (e) { error.value = e.message; await load() }
+    if (!response.ok) throw new Error(response.status === 409 ? '目录不能移入自身子孙' : response.status === 403 ? '当前账号没有目录修改权限' : '目录排序保存失败')
+    await loadAll()
+  } catch (e) { await loadAll(); error.value = e.message } // loadAll 会清 error，刷新后再写失败文案
 }
 async function addDirectory(parent) {
+  error.value = ''; message.value = ''
   try {
     const { value } = await ElMessageBox.prompt('请输入目录名称', parent ? '新增子目录' : '新增目录', { confirmButtonText: '保存', cancelButtonText: '取消', inputPattern: /\S+/, inputErrorMessage: '名称不能为空' })
     const response = await authorizedRequest('/api/task-directories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: value, parentId: parent?.id ?? null }) })
     if (!response.ok) throw new Error('目录创建失败')
-    message.value = '目录已创建'; await load()
+    message.value = '目录已创建'; await loadAll()
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 async function renameDirectory(node) {
+  error.value = ''; message.value = ''
   try {
     const { value } = await ElMessageBox.prompt('请输入新名称', '重命名目录', { confirmButtonText: '保存', cancelButtonText: '取消', inputValue: node.name, inputPattern: /\S+/, inputErrorMessage: '名称不能为空' })
     const response = await authorizedRequest(`/api/task-directories/${node.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: value }) })
     if (!response.ok) throw new Error('目录重命名失败')
-    await load()
+    await loadAll()
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 async function deleteDirectory(node) {
+  error.value = ''; message.value = ''
   try {
     await ElMessageBox.confirm(`确定删除目录“${node.name}”？含任务或子目录时无法删除。`, '删除目录', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' })
     const response = await authorizedRequest(`/api/task-directories/${node.id}`, { method: 'DELETE' })
     if (!response.ok) throw new Error(response.status === 409 ? '目录包含子目录或任务，不能删除' : '目录删除失败')
     if (currentDirectory.value === node.id) currentDirectory.value = 0
-    message.value = '目录已删除'; await load()
+    message.value = '目录已删除'; await loadAll()
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 function openCreate() { formTask.value = null; formReadonly.value = false; formOpen.value = true }
@@ -77,49 +102,66 @@ function openStart(targets) { startTargets.value = targets; startDate.value = ne
 async function confirmStart() {
   if (batchBusy.value) return
   batchBusy.value = true; error.value = ''; message.value = ''
+  // 弹窗期间列表可能已轮询刷新，按 id 重新解析最新快照，已运行的直接记失败不重复 POST
+  const targets = startTargets.value.map(t => tasks.value.find(x => x.id === t.id)).filter(Boolean)
   const results = []
-  for (const target of startTargets.value) {
+  for (const target of targets) {
+    if (target.runState === 'RUNNING') { results.push({ name: target.name, ok: false, error: '任务已在运行' }); continue }
     try {
       const response = await authorizedRequest(`/api/tasks/${target.id}/runs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: target.version, businessDate: startDate.value }) })
       if (!response.ok) throw new Error(response.status === 409 ? '任务已在运行' : response.status === 403 ? '没有运行权限' : '启动失败')
       results.push({ name: target.name, ok: true })
     } catch (e) { results.push({ name: target.name, ok: false, error: e.message }) }
   }
-  batchBusy.value = false; startOpen.value = false; message.value = batchSummary(results); await load()
+  batchBusy.value = false; startOpen.value = false
+  await loadAll()
+  applyBatchParts(results)
 }
 async function stopOne(row) {
+  error.value = ''; message.value = ''
   try {
     const response = await authorizedRequest(`/api/tasks/${row.id}/stop`, { method: 'POST' })
     if (!response.ok) throw new Error(response.status === 409 ? '任务未在运行' : '停止失败')
-    message.value = `已停止 ${row.name}`; await load()
+    message.value = `已停止 ${row.name}`; await loadAll()
   } catch (e) { error.value = e.message }
 }
 async function stopBatch() {
   try { await ElMessageBox.confirm(`确定停止选中的 ${selected.value.length} 个任务？停止会中断运行，可能已写入部分数据。`, '批量停止', { confirmButtonText: '停止', cancelButtonText: '取消', type: 'warning' }) } catch { return }
-  batchBusy.value = true; const results = []
-  for (const target of selected.value) {
-    try {
-      const response = await authorizedRequest(`/api/tasks/${target.id}/stop`, { method: 'POST' })
-      if (!response.ok) throw new Error(response.status === 409 ? '任务未在运行' : '停止失败')
-      results.push({ name: target.name, ok: true })
-    } catch (e) { results.push({ name: target.name, ok: false, error: e.message }) }
-  }
-  batchBusy.value = false; message.value = batchSummary(results); await load()
+  error.value = ''; message.value = ''; batchBusy.value = true
+  // 确认框期间列表可能已轮询刷新，按 id 重新解析最新快照
+  const targets = selected.value.map(t => tasks.value.find(x => x.id === t.id)).filter(Boolean)
+  const results = []
+  try {
+    for (const target of targets) {
+      try {
+        const response = await authorizedRequest(`/api/tasks/${target.id}/stop`, { method: 'POST' })
+        if (!response.ok) throw new Error(response.status === 409 ? '任务未在运行' : '停止失败')
+        results.push({ name: target.name, ok: true })
+      } catch (e) { results.push({ name: target.name, ok: false, error: e.message }) }
+    }
+  } finally { batchBusy.value = false }
+  await loadAll()
+  applyBatchParts(results)
 }
 async function removeTask(row) {
+  error.value = ''; message.value = ''
   try {
     const response = await authorizedRequest(`/api/tasks/${row.id}`, { method: 'DELETE' })
     if (!response.ok) throw new Error(response.status === 409 ? '任务运行中或被工作流引用，不能删除' : '删除失败')
-    message.value = `已删除 ${row.name}`; await load()
+    message.value = `已删除 ${row.name}`; await loadAll()
   } catch (e) { error.value = e.message }
 }
 let pollTimer = null
 watch(tasks, rows => {
   const running = rows.some(task => task.runState === 'RUNNING')
-  if (running && !pollTimer) pollTimer = setInterval(load, 5000)
+  if (running && !pollTimer) pollTimer = setInterval(loadTasks, 5000)
   if (!running && pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }, { deep: false })
-onMounted(load)
+// 选中目录被删除/重载后不存在时回退到全部任务
+watch(directories, rows => {
+  if (currentDirectory.value !== 0 && !rows.some(d => d.id === currentDirectory.value)) currentDirectory.value = 0
+})
+onMounted(loadAll)
 onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 </script>
 <template>
@@ -129,7 +171,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
     <div class="processing-layout">
       <aside class="directory-pane">
         <div class="directory-head"><strong>任务目录</strong><el-button v-if="can('workflow.task.create')" text type="primary" @click="addDirectory(null)">新增</el-button></div>
-        <el-tree ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all draggable :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-drop="submitSort">
+        <el-tree ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all :draggable="can('workflow.task.update')" :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-drop="submitSort">
           <template #default="{ data }">
             <span class="tree-node">
               <span>{{ data.name }}</span>
@@ -154,7 +196,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
             <el-button v-if="can('workflow.task.create') && can('datasource.source.read')" type="primary" @click="openCreate">新增</el-button>
             <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="openStart(selected)">批量启动</el-button>
             <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="stopBatch">批量停止</el-button>
-            <el-button class="refresh-button" title="刷新" aria-label="刷新" @click="load"><RefreshIcon /></el-button>
+            <el-button class="refresh-button" title="刷新" aria-label="刷新" @click="loadAll"><RefreshIcon /></el-button>
           </div>
         </div>
         <el-table :data="paging.visible.value" empty-text="暂无任务" row-key="id" @selection-change="selected = $event">
@@ -165,7 +207,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
           <el-table-column prop="version" label="版本" width="70"/>
           <el-table-column label="目录" min-width="110"><template #default="scope">{{ directories.find(d => d.id === scope.row.directoryId)?.name ?? '未分类' }}</template></el-table-column>
           <el-table-column label="运行状态" width="90"><template #default="scope"><el-tag :type="scope.row.runState === 'RUNNING' ? 'success' : 'info'" size="small">{{ scope.row.runState === 'RUNNING' ? '运行中' : '停止' }}</el-tag></template></el-table-column>
-          <el-table-column label="最近运行" min-width="170"><template #default="scope"><span v-if="scope.row.lastRun">{{ scope.row.lastRun.state }} · {{ scope.row.lastRun.finishedAt || scope.row.lastRun.startedAt || '' }}</span><span v-else class="status-text">未运行</span></template></el-table-column>
+          <el-table-column label="最近运行" min-width="170"><template #default="scope"><span v-if="scope.row.lastRun">{{ runStateText(scope.row.lastRun.state) }} · {{ fmtRunTime(scope.row.lastRun.finishedAt || scope.row.lastRun.startedAt) }}</span><span v-else class="status-text">未运行</span></template></el-table-column>
           <el-table-column label="操作" min-width="280" fixed="right"><template #default="scope">
             <el-button v-if="can('workflow.task.execute') && scope.row.runState !== 'RUNNING'" text type="primary" @click="openStart([scope.row])">启动</el-button>
             <el-popconfirm v-if="can('workflow.task.execute') && scope.row.runState === 'RUNNING'" title="停止会中断运行，可能已写入部分数据，确定停止？" @confirm="stopOne(scope.row)"><template #reference><el-button text type="warning">停止</el-button></template></el-popconfirm>
@@ -178,12 +220,12 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
         <div class="pagination"><el-pagination v-model:current-page="paging.page.value" v-model:page-size="paging.pageSize.value" :total="paging.total.value" :page-sizes="[10,20,50]" layout="total, sizes, prev, pager, next"/></div>
       </div>
     </div>
-    <TaskFormDialog v-model:open="formOpen" :task="formTask" :sources="sources" :directories="directories" :readonly="formReadonly" @saved="message = '任务已保存'; load()"/>
+    <TaskFormDialog v-model:open="formOpen" :task="formTask" :sources="sources" :directories="directories" :readonly="formReadonly" @saved="message = '任务已保存'; loadAll()"/>
     <TaskRunsDialog v-model:open="runsOpen" :task="runsTask"/>
     <el-dialog v-model="startOpen" :title="`启动 ${startTargets.length} 个任务`" width="min(480px, 95vw)">
-      <el-form label-position="top"><el-form-item label="业务日期"><el-date-picker v-model="startDate" type="date" value-format="YYYY-MM-DD"/></el-form-item></el-form>
+      <el-form label-position="top"><el-form-item label="业务日期"><el-date-picker v-model="startDate" type="date" value-format="YYYY-MM-DD" :clearable="false"/></el-form-item></el-form>
       <p v-for="target in startTargets" :key="target.id" class="status-text">{{ target.name }}（版本 {{ target.version }}）</p>
-      <template #footer><el-button @click="startOpen = false">取消</el-button><el-button type="primary" :loading="batchBusy" @click="confirmStart">启动</el-button></template>
+      <template #footer><el-button :disabled="batchBusy" @click="startOpen = false">取消</el-button><el-button type="primary" :loading="batchBusy" @click="confirmStart">启动</el-button></template>
     </el-dialog>
   </section>
 </template>
@@ -195,6 +237,8 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 .tree-node{display:flex;justify-content:space-between;align-items:center;gap:6px;flex:1;min-width:0}
 .tree-actions{display:none;white-space:nowrap}
 .el-tree-node__content:hover .tree-actions{display:inline-flex}
+.el-tree-node__content:focus-within .tree-actions{display:inline-flex}
+@media(hover:none){.tree-actions{display:inline-flex}}
 .status-text{color:#728582;font-size:12px}
 .pagination{margin-top:14px;display:flex;justify-content:flex-end}
 @media(max-width:700px){.processing-layout{flex-direction:column}.directory-pane{flex:none;width:100%}}

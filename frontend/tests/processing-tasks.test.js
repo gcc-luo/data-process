@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
-import { subtreeIds, filterTasks, batchSummary, flattenTree } from '../src/processing-tasks.js'
+import { subtreeIds, filterTasks, batchSummary, batchParts, flattenTree } from '../src/processing-tasks.js'
 
 const directories = [
   { id: 1, parentId: null, name: '订单域', sortOrder: 0 },
@@ -65,6 +65,20 @@ test('batch summary falls back to unknown error and handles single branches', ()
   assert.equal(batchSummary([{ name: '丁', ok: false }]), '失败：丁（未知错误）')
   assert.equal(batchSummary([{ name: '甲', ok: true }, { name: '乙', ok: true }]), '成功：甲、乙')
   assert.equal(batchSummary([{ name: '甲', ok: false, error: '超时' }, { name: '乙', ok: false, error: '已在运行' }]), '失败：甲（超时）、乙（已在运行）')
+})
+
+test('batch parts splits successes and failures for separate alerts', () => {
+  assert.deepEqual(batchParts([
+    { name: '甲', ok: true },
+    { name: '乙', ok: false, error: '任务已在运行' },
+    { name: '丙', ok: true }
+  ]), { okText: '成功：甲、丙', failText: '失败：乙（任务已在运行）' })
+})
+
+test('batch parts handles all-success, all-failure and empty results', () => {
+  assert.deepEqual(batchParts([{ name: '甲', ok: true }, { name: '乙', ok: true }]), { okText: '成功：甲、乙', failText: '' })
+  assert.deepEqual(batchParts([{ name: '甲', ok: false, error: '超时' }, { name: '丁', ok: false }]), { okText: '', failText: '失败：甲（超时）、丁（未知错误）' })
+  assert.deepEqual(batchParts([]), { okText: '', failText: '' })
 })
 
 test('flatten tree produces parent links and sibling order', () => {

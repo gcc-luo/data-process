@@ -32,6 +32,16 @@ export function batchSummary(results) {
   return parts.join('；') || '没有可操作的任务'
 }
 
+/** 拆分批量启停结果为成功/失败两段文案，供 success/error 提示分流；无对应结果时为空串。 */
+export function batchParts(results) {
+  const succeeded = results.filter(result => result.ok).map(result => result.name)
+  const failed = results.filter(result => !result.ok)
+  return {
+    okText: succeeded.length ? `成功：${succeeded.join('、')}` : '',
+    failText: failed.length ? `失败：${failed.map(result => `${result.name}（${result.error || '未知错误'}）`).join('、')}` : ''
+  }
+}
+
 /** 先序扁平化目录树为 { id, parentId, sortOrder }，供 el-tree 拖拽后全量排序提交。 */
 export function flattenTree(nodes, parentId = null) {
   const flat = []
