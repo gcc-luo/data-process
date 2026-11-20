@@ -33,6 +33,7 @@ public final class PermissionCatalog {
             case "assets/datasets" -> "datasource.dataset";
             case "assets/drivers" -> "datasource.driver";
             case "query" -> "datasource.query";
+            case "processing/tasks" -> "workflow.task";
             case "tasks" -> "workflow.workflow";
             case "realtime" -> "workflow.realtime";
             case "services" -> "service.service";

@@ -40,10 +40,10 @@ class OrganizationNavigationTest {
         grantUser(f, 10, "admin", 10, true, PermissionCatalog.codes());
         var rows = f.org.navigation("admin");
         var roots = rows.stream().filter(menu -> menu.parentId() == null).map(OrganizationService.Menu::component).toList();
-        assertEquals(List.of("assets", "system"), roots);
+        assertEquals(List.of("assets", "processing", "system"), roots);
         var components = components(f, "admin");
-        assertEquals(10, components.size());
-        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/drivers", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
+        assertEquals(12, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/drivers", "processing", "processing/tasks", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
         assertFalse(components.contains("assets/datasets"));
     }
 
@@ -59,8 +59,16 @@ class OrganizationNavigationTest {
         var f = fixture();
         grantUser(f, 10, "operator", 10, true, Set.of("datasource.source.create", "workflow.task.execute"));
         var components = components(f, "operator");
+        assertEquals(4, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/sources", "processing", "processing/tasks")));
+    }
+
+    @Test void taskGrantOpensProcessingPageOnly() {
+        var f = fixture();
+        grantUser(f, 10, "task", 10, true, Set.of("workflow.task.read"));
+        var components = components(f, "task");
         assertEquals(2, components.size());
-        assertTrue(components.containsAll(List.of("assets", "assets/sources")));
+        assertTrue(components.containsAll(List.of("processing", "processing/tasks")));
     }
 
     @Test void datasetGrantDoesNotShowHiddenDatasetPage() {
