@@ -54,7 +54,9 @@ public final class FlowGraph {
             if (SOURCES.contains(n.component())) { hasSource = true; if (indeg != 0) throw new IllegalArgumentException("来源节点不能有入边: " + n.key()); }
             else if (SINKS.contains(n.component())) { hasSink = true; if (outdeg != 0) throw new IllegalArgumentException("目标节点不能有出边: " + n.key()); if (indeg != 1) throw new IllegalArgumentException("目标节点需恰一个入边: " + n.key()); }
             else if (indeg != 1) throw new IllegalArgumentException("预处理节点需恰一个入边: " + n.key());
-            validateConfig(n);
+            if (!SINKS.contains(n.component()) && outdeg > 1) throw new IllegalArgumentException("节点只能有一条出边: " + n.key());
+            try { validateConfig(n); }
+            catch (IllegalArgumentException ex) { throw new IllegalArgumentException("节点 " + n.key() + ": " + ex.getMessage()); }
         }
         if (!hasSource || !hasSink) throw new IllegalArgumentException("流程需至少一个来源与一个目标");
         var reverse = new HashMap<String, List<String>>();
@@ -85,6 +87,7 @@ public final class FlowGraph {
         return order;
     }
 
+    /** 仅对已通过 validate 的图有意义（单入边约束）。 */
     public static Map<String, String> upstream(Graph g) {
         var map = new HashMap<String, String>();
         for (Edge e : g.edges()) map.put(e.to(), e.from());

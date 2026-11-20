@@ -71,6 +71,68 @@ class FlowGraphTest {
         assertTrue(ex.getMessage().contains("流程存在环"), ex.getMessage());
     }
 
+    @Test void sinkOutEdgeRejected() throws Exception {
+        var g = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("t", "SINK_TABLE", SINK) + "," + node("f", "FIELD_FILTER", "{\"expression\":\"true\"}"),
+                "{\"from\":\"s\",\"to\":\"t\"},{\"from\":\"t\",\"to\":\"f\"}"));
+        var ex = assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(g));
+        assertTrue(ex.getMessage().contains("目标节点不能有出边"), ex.getMessage());
+    }
+
+    @Test void isolatedSinkRejected() throws Exception {
+        var g = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("t1", "SINK_TABLE", SINK) + "," + node("t2", "SINK_TABLE", SINK),
+                "{\"from\":\"s\",\"to\":\"t1\"}"));
+        var ex = assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(g));
+        assertTrue(ex.getMessage().contains("目标节点需恰一个入边"), ex.getMessage());
+    }
+
+    @Test void fanOutRejected() throws Exception {
+        var g = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("f", "FIELD_FILTER", "{\"expression\":\"true\"}") + "," + node("t1", "SINK_TABLE", SINK) + "," + node("t2", "SINK_TABLE", SINK),
+                "{\"from\":\"s\",\"to\":\"f\"},{\"from\":\"f\",\"to\":\"t1\"},{\"from\":\"f\",\"to\":\"t2\"}"));
+        var ex = assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(g));
+        assertTrue(ex.getMessage().contains("只能有一条出边"), ex.getMessage());
+    }
+
+    @Test void duplicateEdgeAndSelfLoopRejected() throws Exception {
+        var dup = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("f", "FIELD_FILTER", "{\"expression\":\"true\"}") + "," + node("t", "SINK_TABLE", SINK),
+                "{\"from\":\"s\",\"to\":\"f\"},{\"from\":\"s\",\"to\":\"f\"},{\"from\":\"f\",\"to\":\"t\"}"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(dup)).getMessage().contains("Invalid edge"));
+        var self = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("f", "FIELD_FILTER", "{\"expression\":\"true\"}") + "," + node("t", "SINK_TABLE", SINK),
+                "{\"from\":\"s\",\"to\":\"f\"},{\"from\":\"f\",\"to\":\"f\"},{\"from\":\"f\",\"to\":\"t\"}"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(self)).getMessage().contains("Invalid edge"));
+    }
+
+    @Test void invalidNodeKeysRejected() throws Exception {
+        var dashed = parse(graph(node("bad-key", "SOURCE_TABLE", SRC) + "," + node("t", "SINK_TABLE", SINK), "{\"from\":\"bad-key\",\"to\":\"t\"}"));
+        assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(dashed));
+        var longKey = "a".repeat(65);
+        var tooLong = parse(graph(node(longKey, "SOURCE_TABLE", SRC) + "," + node("t", "SINK_TABLE", SINK), "{\"from\":\"" + longKey + "\",\"to\":\"t\"}"));
+        assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(tooLong));
+    }
+
+    @Test void parseLimitsEnforced() {
+        var nodes = new StringBuilder();
+        for (int i = 0; i <= 100; i++) { if (i > 0) nodes.append(','); nodes.append(node("n" + i, "SOURCE_TABLE", SRC)); }
+        assertThrows(IllegalArgumentException.class, () -> parse(graph(nodes.toString(), "")));
+        var edges = new StringBuilder();
+        for (int i = 0; i <= 200; i++) { if (i > 0) edges.append(','); edges.append("{\"from\":\"s\",\"to\":\"t\"}"); }
+        String twoNodes = node("s", "SOURCE_TABLE", SRC) + "," + node("t", "SINK_TABLE", SINK);
+        assertThrows(IllegalArgumentException.class, () -> parse(graph(twoNodes, edges.toString())));
+    }
+
+    @Test void upstreamMapsEachNodeToItsSingleParent() throws Exception {
+        var g = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("f", "FIELD_FILTER", "{\"expression\":\"true\"}") + "," + node("t", "SINK_TABLE", SINK),
+                "{\"from\":\"s\",\"to\":\"f\"},{\"from\":\"f\",\"to\":\"t\"}"));
+        FlowGraph.validate(g);
+        assertEquals(java.util.Map.of("f", "s", "t", "f"), FlowGraph.upstream(g));
+    }
+
+    @Test void configErrorMessageCarriesNodeKey() throws Exception {
+        var g = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("f", "FIELD_FILTER", "{\"expression\":\"1 +\"}") + "," + node("t", "SINK_TABLE", SINK),
+                "{\"from\":\"s\",\"to\":\"f\"},{\"from\":\"f\",\"to\":\"t\"}"));
+        var ex = assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(g));
+        assertTrue(ex.getMessage().contains("节点 f"), ex.getMessage());
+    }
+
     @Test void duplicateKeysAndUnknownComponentsRejected() throws Exception {
         assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("s", "SINK_TABLE", SINK), "{\"from\":\"s\",\"to\":\"s\"}"))));
         assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(parse(graph(node("s", "KAFKA", SRC) + "," + node("t", "SINK_TABLE", SINK), "{\"from\":\"s\",\"to\":\"t\"}"))));

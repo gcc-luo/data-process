@@ -71,7 +71,16 @@ public final class DataSourceStore {
         jdbc.query("SELECT t.task_type,v.configuration FROM processing_task_versions v JOIN processing_tasks t ON t.id=v.task_id FOR UPDATE", (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
             try {
                 var config = mapper.readTree(rs.getString(2)); String type = rs.getString(1);
-                if (config == null || !config.isObject() || !java.util.Set.of("SQL", "SYNC").contains(type)) throw new IllegalStateException("Cannot check task references safely");
+                if (config == null || !config.isObject()) throw new IllegalStateException("Cannot check task references safely");
+                if ("FLOW".equals(type)) {
+                    for (var node : config.path("nodes")) {
+                        var sid = node.path("config").path("sourceId");
+                        if (!sid.isIntegralNumber() || !sid.canConvertToLong() || sid.longValue() < 1) throw new IllegalStateException("Cannot check task references safely");
+                        if (sid.longValue() == id) throw new IllegalStateException("Data source is referenced by a task version");
+                    }
+                    return;
+                }
+                if (!java.util.Set.of("SQL", "SYNC").contains(type)) throw new IllegalStateException("Cannot check task references safely");
                 var source = config.get("sourceId");
                 if (source == null || !source.isIntegralNumber() || !source.canConvertToLong() || source.longValue() < 1) throw new IllegalStateException("Cannot check task references safely");
                 var target = config.get("targetId");

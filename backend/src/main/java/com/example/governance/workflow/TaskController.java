@@ -68,18 +68,19 @@ public class TaskController {
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id, "version", 1));
         } catch (IllegalArgumentException ex) {
             // 以异常退出而非直接返回，确保内层事务标记 rollback-only 后外层 @Transactional 正常回滚
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid task configuration");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "FLOW".equals(request.type()) ? ex.getMessage() : "Invalid task configuration");
         }
     }
     record VersionRequest(JsonNode configuration) {}
     @PostMapping("/api/tasks/{id}/versions") @Transactional
     ResponseEntity<Map<String, Object>> version(@PathVariable long id, @RequestBody VersionRequest request, Authentication authentication) {
+        String type = null;
         try {
-            String type = tasks.findVersion(id, 1).orElseThrow(() -> new IllegalArgumentException("Unknown task")).type();
+            type = tasks.findVersion(id, 1).orElseThrow(() -> new IllegalArgumentException("Unknown task")).type();
             int version = tasks.addVersion(id, verify(type, request.configuration()));
             audit.success(authentication, "task.version", "task", id);
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id, "version", version));
-        } catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid task configuration"); }
+        } catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "FLOW".equals(type) ? ex.getMessage() : "Invalid task configuration"); }
     }
     record RunRequest(int version, java.time.LocalDate businessDate) {}
     @PostMapping("/api/tasks/{id}/runs")
@@ -104,8 +105,16 @@ public class TaskController {
     private String verify(String type, JsonNode configuration) {
         if (configuration == null) throw new IllegalArgumentException();
         String config = configuration.toString(); validator.validate(type, config);
-        var sourceIds = new java.util.ArrayList<Long>(); sourceIds.add(configuration.path("sourceId").longValue());
-        if ("SYNC".equals(type)) sourceIds.add(configuration.path("targetId").longValue());
+        var sourceIds = new java.util.ArrayList<Long>();
+        if ("FLOW".equals(type)) {
+            for (JsonNode node : configuration.path("nodes")) {
+                JsonNode sid = node.path("config").path("sourceId");
+                if (sid.isIntegralNumber() && sid.canConvertToLong() && sid.longValue() >= 1) sourceIds.add(sid.longValue());
+            }
+        } else {
+            sourceIds.add(configuration.path("sourceId").longValue());
+            if ("SYNC".equals(type)) sourceIds.add(configuration.path("targetId").longValue());
+        }
         if (!sources.lockSources(sourceIds)) throw new IllegalArgumentException();
         return config;
     }
