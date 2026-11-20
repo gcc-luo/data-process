@@ -33,6 +33,7 @@ public class TaskDirectoryController {
     @PutMapping("/api/task-directories/{id}")
     ResponseEntity<Void> rename(@PathVariable long id, @RequestBody DirectoryRequest request, Authentication auth) {
         try { directories.rename(id, request.name()); }
+        catch (java.util.NoSuchElementException ex) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "目录不存在"); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "目录名称无效"); }
         audit.success(auth, "directory.update", "task_directory", id);
         return ResponseEntity.noContent().build();
@@ -50,6 +51,7 @@ public class TaskDirectoryController {
     @PostMapping("/api/task-directories/sort")
     ResponseEntity<Void> sort(@RequestBody SortRequest request, Authentication auth) {
         if (request.items() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "排序数据无效");
+        if (request.items().stream().anyMatch(java.util.Objects::isNull)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "排序数据无效");
         try { directories.sort(request.items().stream().map(item -> new TaskDirectoryStore.Directory(item.id(), item.parentId(), null, item.sortOrder())).toList()); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "排序数据无效"); }
         catch (IllegalStateException ex) { throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage()); }

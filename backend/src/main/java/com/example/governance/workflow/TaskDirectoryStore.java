@@ -40,7 +40,7 @@ public final class TaskDirectoryStore {
 
     public void rename(long id, String name) {
         String clean = validName(name);
-        if (jdbc.update("UPDATE task_directories SET name=? WHERE id=?", clean, id) != 1) throw new IllegalArgumentException("Unknown directory");
+        if (jdbc.update("UPDATE task_directories SET name=? WHERE id=?", clean, id) != 1) throw new java.util.NoSuchElementException("Unknown directory");
     }
 
     public void delete(long id) {

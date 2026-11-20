@@ -10,6 +10,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import java.util.List;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -80,5 +81,50 @@ class TaskDirectoryApiTest {
         mvc.perform(get("/api/task-directories").session(session)).andExpect(status().isForbidden());
         mvc.perform(post("/api/task-directories").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"x\"}")).andExpect(status().isForbidden());
         mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json").content("{\"items\":[]}")).andExpect(status().isForbidden());
+        mvc.perform(put("/api/task-directories/1").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"x\"}")).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/task-directories/1").session(session).with(csrf())).andExpect(status().isForbidden());
+    }
+
+    @Test void guardBranchesReturnClientErrors() throws Exception {
+        var session = login("dir-guard", 603, "workflow.task.read", "workflow.task.create", "workflow.task.update", "workflow.task.delete");
+        // create 名称守卫：空名/纯空格/121 字符
+        for (String name : List.of("", "   ", "x".repeat(121))) {
+            mvc.perform(post("/api/task-directories").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"" + name + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        // create 未知 parentId
+        mvc.perform(post("/api/task-directories").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"x\",\"parentId\":999999}"))
+                .andExpect(status().isBadRequest());
+        // rename 不存在 id → 404；delete 不存在 id → 404
+        mvc.perform(put("/api/task-directories/999999").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"ok\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/task-directories/999999").session(session).with(csrf())).andExpect(status().isNotFound());
+        // 自建两个目录，覆盖 sort 守卫分支
+        mvc.perform(post("/api/task-directories").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"守卫甲\"}")).andExpect(status().isCreated());
+        mvc.perform(post("/api/task-directories").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"守卫乙\"}")).andExpect(status().isCreated());
+        long a = jdbc.queryForObject("SELECT id FROM task_directories WHERE name='守卫甲'", Long.class);
+        long b = jdbc.queryForObject("SELECT id FROM task_directories WHERE name='守卫乙'", Long.class);
+        // rename 空名 → 400
+        mvc.perform(put("/api/task-directories/" + a).session(session).with(csrf()).contentType("application/json").content("{\"name\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        // sort 重复 id → 400
+        mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json")
+                .content("{\"items\":[{\"id\":" + a + ",\"parentId\":null,\"sortOrder\":0},{\"id\":" + a + ",\"parentId\":null,\"sortOrder\":1}]}"))
+                .andExpect(status().isBadRequest());
+        // sort 覆盖不全（库中至少两个目录，只提交一个）→ 400
+        mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json")
+                .content("{\"items\":[{\"id\":" + a + ",\"parentId\":null,\"sortOrder\":0}]}"))
+                .andExpect(status().isBadRequest());
+        // sort 含未知 id → 400
+        mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json")
+                .content("{\"items\":[{\"id\":999999,\"parentId\":null,\"sortOrder\":0}]}"))
+                .andExpect(status().isBadRequest());
+        // sort items 含 null 元素 → 400
+        mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json")
+                .content("{\"items\":[null]}"))
+                .andExpect(status().isBadRequest());
+        // 清理，避免污染其他用例的全量断言
+        mvc.perform(delete("/api/task-directories/" + a).session(session).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/task-directories/" + b).session(session).with(csrf())).andExpect(status().isNoContent());
     }
 }
