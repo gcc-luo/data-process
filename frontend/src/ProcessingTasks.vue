@@ -62,7 +62,7 @@ async function renameDirectory(node) {
 }
 async function deleteDirectory(node) {
   try {
-    await ElMessageBox.confirm(`确定删除目录“${node.name}？含任务或子目录时无法删除。`, '删除目录', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' })
+    await ElMessageBox.confirm(`确定删除目录“${node.name}”？含任务或子目录时无法删除。`, '删除目录', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' })
     const response = await authorizedRequest(`/api/task-directories/${node.id}`, { method: 'DELETE' })
     if (!response.ok) throw new Error(response.status === 409 ? '目录包含子目录或任务，不能删除' : '目录删除失败')
     if (currentDirectory.value === node.id) currentDirectory.value = 0
@@ -129,7 +129,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
     <div class="processing-layout">
       <aside class="directory-pane">
         <div class="directory-head"><strong>任务目录</strong><el-button v-if="can('workflow.task.create')" text type="primary" @click="addDirectory(null)">新增</el-button></div>
-        <el-tree ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all draggable :allow-drag="node => node.data.id !== 0" :allow-drop="() => true" @node-click="selectDirectory" @node-drop="submitSort">
+        <el-tree ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all draggable :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-drop="submitSort">
           <template #default="{ data }">
             <span class="tree-node">
               <span>{{ data.name }}</span>
