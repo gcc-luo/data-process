@@ -16,7 +16,9 @@ watch(() => props.open, open => {
     directoryId.value = props.task.directoryId ?? null
     description.value = props.task.description ?? ''
   } else { form.value = emptyTask(); directoryId.value = null; description.value = '' }
-})
+}, { immediate: true })
+// 复制/新增态切换类型时丢弃异类原始配置，避免 SQL↔SYNC 残留字段
+watch(() => form.value.type, () => { if (!editing.value) form.value.originalConfiguration = {} })
 async function save() {
   if (busy.value || prefillFailed.value) return
   error.value = ''; busy.value = true
@@ -25,9 +27,9 @@ async function save() {
     const metadata = { name: form.value.name, directoryId: directoryId.value, description: description.value }
     if (editing.value) {
       const put = await authorizedRequest(`/api/tasks/${props.task.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) })
-      if (!put.ok) throw new Error(put.status === 409 ? '任务运行中，不能修改' : '基本信息保存失败')
+      if (!put.ok) throw new Error(put.status === 403 ? '当前账号没有任务修改权限' : put.status === 409 ? '任务运行中，不能修改' : '基本信息保存失败')
       const response = await authorizedRequest(`/api/tasks/${props.task.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ configuration }) })
-      if (!response.ok) throw new Error(response.status === 409 ? '任务运行中，不能修改' : response.status === 403 ? '当前账号没有任务修改权限' : '配置保存失败，请检查表单')
+      if (!response.ok) throw new Error(response.status === 409 ? '任务运行中，配置未保存（基本信息已保存）' : response.status === 403 ? '当前账号没有任务修改权限' : '配置保存失败，请检查表单（基本信息已保存）')
     } else {
       const response = await authorizedRequest('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...metadata, type: form.value.type, configuration }) })
       if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务创建权限' : '任务保存失败，请检查表单')
@@ -37,7 +39,7 @@ async function save() {
 }
 </script>
 <template>
-  <el-dialog :model-value="open" :title="readonly ? '查看任务' : editing ? '编辑任务（保存将创建新版本）' : '新增任务'" width="min(850px, 95vw)" destroy-on-close @update:model-value="emit('update:open', $event)">
+  <el-dialog :model-value="open" :title="readonly ? '查看任务' : editing ? '编辑任务（保存将创建新版本）' : '新增任务'" width="min(850px, 95vw)" destroy-on-close :show-close="!busy" :close-on-click-modal="false" :close-on-press-escape="!busy" @update:model-value="emit('update:open', $event)">
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
     <el-form label-position="top" :disabled="readonly" @submit.prevent="save">
       <div class="grid">
@@ -63,7 +65,7 @@ async function save() {
       </template>
       <div class="parameter-editor">
         <div class="row"><strong>SQL 参数</strong><el-button text type="primary" :disabled="form.parameters.length >= 1000" @click="form.parameters.push(newParameter())">添加参数</el-button></div>
-        <p>按照 SQL 中占位符的顺序填写。业务日期由每次运行时传入。</p>
+        <p>按照 SQL 中占位符的顺序填写。业务日期由每次运行时传入。数字超过安全精度时请使用数据库支持的文本转换。</p>
         <div v-for="(parameter, index) in form.parameters" :key="index" class="row parameter-row">
           <span>第 {{ index + 1 }} 个</span>
           <el-select :model-value="parameter.kind" aria-label="参数类型" @change="form.parameters[index] = newParameter($event)"><el-option label="文本" value="string"/><el-option label="数字" value="number"/><el-option label="布尔" value="boolean"/><el-option label="空值" value="null"/><el-option label="业务日期" value="date"/></el-select>
@@ -80,7 +82,7 @@ async function save() {
       </div>
       <el-button v-if="!readonly && !prefillFailed && (editing ? can('workflow.task.update') : can('workflow.task.create'))" type="primary" native-type="submit" :loading="busy">{{ editing ? '保存新版本' : '保存任务' }}</el-button>
     </el-form>
-    <el-button @click="emit('update:open', false)">{{ readonly ? '关闭' : '取消' }}</el-button>
+    <el-button :disabled="busy" @click="emit('update:open', false)">{{ readonly ? '关闭' : '取消' }}</el-button>
   </el-dialog>
 </template>
 <style scoped>.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.row{display:flex;gap:12px;align-items:center;margin:14px 0}.parameter-editor p{color:#687e7b;font-size:13px}.parameter-row .el-select,.parameter-row .el-input{max-width:200px}@media(max-width:700px){.grid{grid-template-columns:1fr}.row{flex-wrap:wrap}}</style>
