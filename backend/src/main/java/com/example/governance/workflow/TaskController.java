@@ -76,6 +76,12 @@ public class TaskController {
     ResponseEntity<Map<String, Long>> run(@PathVariable long id, @RequestBody RunRequest request, Authentication auth) {
         try { return ResponseEntity.accepted().body(Map.of("id", runs.start(id, request.version(), request.businessDate(), auth))); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid task run"); }
+        catch (IllegalStateException ex) { throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage()); }
+    }
+    @PostMapping("/api/tasks/{id}/stop")
+    ResponseEntity<Map<String, Integer>> stop(@PathVariable long id, Authentication auth) {
+        try { return ResponseEntity.ok(Map.of("stopped", runs.stop(id, auth))); }
+        catch (IllegalStateException ex) { throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage()); }
     }
     @GetMapping("/api/tasks/{id}/runs")
     List<TaskRunService.View> runs(@PathVariable long id) { return runs.list(id); }

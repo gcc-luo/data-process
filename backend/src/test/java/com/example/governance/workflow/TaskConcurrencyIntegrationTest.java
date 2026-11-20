@@ -23,7 +23,11 @@ class TaskConcurrencyIntegrationTest {
         var defs=new WorkflowDefinitionStore(jdbc,tx); long flow=defs.create("flow",List.of(new WorkflowDefinitionStore.Node("a",task,1)),List.of());
         var runs=new WorkflowRunStore(jdbc,tx,defs); long run=runs.create(flow,1,LocalDate.now());
         var started=new CountDownLatch(1); var release=new CountDownLatch(1); var active=new AtomicInteger();
-        var runner=mock(CamelTaskRunner.class); doAnswer(inv -> { active.incrementAndGet(); started.countDown(); if(!release.await(3,TimeUnit.SECONDS)) throw new IllegalStateException(); return null; }).when(runner).execute(any(),any());
+        var runner=mock(CamelTaskRunner.class);
+        // 任务路径经 TaskRunService 调三参重载，工作流路径仍调两参；mock 不走真实委托，两个重载都需打桩
+        org.mockito.stubbing.Answer<Object> gate = inv -> { active.incrementAndGet(); started.countDown(); if(!release.await(3,TimeUnit.SECONDS)) throw new IllegalStateException(); return null; };
+        doAnswer(gate).when(runner).execute(any(),any());
+        doAnswer(gate).when(runner).execute(any(),any(),any());
         var limiter=new TaskExecutionLimiter(1); var executor=new ThreadPoolTaskExecutor(); executor.setCorePoolSize(1); executor.initialize();
         var tasksService=new TaskRunService(jdbc,tasks,runner,executor,mock(AuditLog.class),limiter);
         var workflow=new WorkflowWorker(runs,defs,tasks,runner,limiter); var worker=Executors.newSingleThreadExecutor();

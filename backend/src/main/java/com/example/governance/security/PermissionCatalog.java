@@ -219,6 +219,7 @@ public final class PermissionCatalog {
         route(routes, "POST", "/api/tasks/*/runs", "workflow.task.execute");
         route(routes, "GET", "/api/tasks/*/runs", "workflow.task.read");
         route(routes, "POST", "/api/tasks/*/runs/*/retry", "workflow.task.retry");
+        route(routes, "POST", "/api/tasks/*/stop", "workflow.task.execute");
         route(routes, "GET", "/api/workflows", "workflow.workflow.read");
         route(routes, "POST", "/api/workflows", "workflow.workflow.create");
         route(routes, "POST", "/api/workflows/*/versions", "workflow.workflow.update");

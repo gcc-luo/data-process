@@ -16,7 +16,7 @@ import org.apache.camel.impl.DefaultCamelContext;
 
 /** Application-level batches; all target writes use one local transaction. Driver buffering varies. */
 public final class DatabaseSyncExecutor implements AutoCloseable {
-    private record Request(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, List<String> keys, int batchSize) {}
+    private record Request(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, List<String> keys, int batchSize, RunCancelContext cancel) {}
     private final DefaultCamelContext context = new DefaultCamelContext();
     private final ProducerTemplate producer;
     public DatabaseSyncExecutor() throws Exception {
@@ -37,7 +37,7 @@ public final class DatabaseSyncExecutor implements AutoCloseable {
                                 int count;
                                 try (var rows = read.executeQuery()) {
                                     if (rows.getMetaData().getColumnCount() != request.columns().size()) throw new IllegalArgumentException("Column count mismatch");
-                                    count = request.keys().isEmpty() ? appendRows(rows, write, request.columns().size(), request.batchSize()) : upsertRows(rows, write, target, request);
+                                    count = request.keys().isEmpty() ? appendRows(rows, write, request.columns().size(), request.batchSize(), request.cancel()) : upsertRows(rows, write, target, request);
                                 }
                                 target.commit(); exchange.getMessage().setBody(count);
                             }
@@ -51,9 +51,10 @@ public final class DatabaseSyncExecutor implements AutoCloseable {
         });
         context.start(); producer = context.createProducerTemplate();
     }
-    private static int appendRows(ResultSet rows, PreparedStatement write, int width, int batchSize) throws Exception {
+    private static int appendRows(ResultSet rows, PreparedStatement write, int width, int batchSize, RunCancelContext cancel) throws Exception {
         int count = 0, pending = 0;
         while (rows.next()) {
+            if (cancel.isCancelled()) throw new InterruptedException("手动停止");
             for (int i = 0; i < width; i++) write.setObject(i + 1, rows.getObject(i + 1));
             write.addBatch(); count++; pending++;
             if (pending == batchSize) { checkBatch(write.executeBatch()); pending = 0; }
@@ -71,6 +72,7 @@ public final class DatabaseSyncExecutor implements AutoCloseable {
         try (var update = target.prepareStatement("UPDATE " + request.table() + " SET " + assignments + " WHERE " + where)) {
             update.setQueryTimeout(30); int count = 0;
             while (rows.next()) {
+                if (request.cancel().isCancelled()) throw new InterruptedException("手动停止");
                 Object[] values = new Object[request.columns().size()];
                 for (int i = 0; i < values.length; i++) values[i] = rows.getObject(i + 1);
                 int position = 1;
@@ -140,14 +142,16 @@ public final class DatabaseSyncExecutor implements AutoCloseable {
         if (primary.isEmpty() || !primary.equals(configured)) throw new IllegalArgumentException("Configured keys must match target primary key");
     }
     public int append(DataSource source, DataSource target, String query, String table, List<String> columns, int batchSize) { return append(source, target, query, List.of(), table, columns, batchSize); }
-    public int append(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, int batchSize) { return execute(source, target, query, parameters, table, columns, List.of(), batchSize); }
-    public int upsert(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, List<String> keys, int batchSize) {
+    public int append(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, int batchSize) { return append(source, target, query, parameters, table, columns, batchSize, new RunCancelContext()); }
+    public int append(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, int batchSize, RunCancelContext cancel) { return execute(source, target, query, parameters, table, columns, List.of(), batchSize, cancel); }
+    public int upsert(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, List<String> keys, int batchSize) { return upsert(source, target, query, parameters, table, columns, keys, batchSize, new RunCancelContext()); }
+    public int upsert(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, List<String> keys, int batchSize, RunCancelContext cancel) {
         if (keys == null || keys.isEmpty() || keys.stream().anyMatch(key -> !validIdentifier(key)) || keys.stream().map(key -> key.toLowerCase(Locale.ROOT)).distinct().count() != keys.size() || columns == null || keys.stream().anyMatch(key -> columns.stream().noneMatch(column -> column != null && column.equalsIgnoreCase(key)))) throw new IllegalArgumentException("Invalid primary keys");
-        return execute(source, target, query, parameters, table, columns, List.copyOf(keys), batchSize);
+        return execute(source, target, query, parameters, table, columns, List.copyOf(keys), batchSize, cancel);
     }
-    private int execute(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, List<String> keys, int batchSize) {
+    private int execute(DataSource source, DataSource target, String query, List<?> parameters, String table, List<String> columns, List<String> keys, int batchSize, RunCancelContext cancel) {
         if (source == null || target == null || query == null || query.isBlank() || parameters == null || parameters.size() > 1000 || !validQualifiedIdentifier(table) || columns == null || columns.isEmpty() || columns.size() > 1000 || columns.stream().anyMatch(c -> !validIdentifier(c)) || columns.stream().map(c -> c.toLowerCase(Locale.ROOT)).distinct().count() != columns.size() || batchSize < 1 || batchSize > 10000) throw new IllegalArgumentException("Invalid synchronization configuration");
-        return producer.requestBody("direct:sync-data", new Request(source, target, query, Collections.unmodifiableList(new ArrayList<>(parameters)), table, List.copyOf(columns), keys, batchSize), Integer.class);
+        return producer.requestBody("direct:sync-data", new Request(source, target, query, Collections.unmodifiableList(new ArrayList<>(parameters)), table, List.copyOf(columns), keys, batchSize, cancel), Integer.class);
     }
     public static boolean validIdentifier(String value) { return value != null && value.matches("[A-Za-z_][A-Za-z0-9_$]*"); }
     public static boolean validQualifiedIdentifier(String value) { if (value == null) return false; String[] parts = value.split("\\.", -1); return parts.length <= 2 && java.util.Arrays.stream(parts).allMatch(DatabaseSyncExecutor::validIdentifier); }

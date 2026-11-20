@@ -27,6 +27,8 @@ public class TaskRunService {
     private final AuditLog audit;
     private final TransactionTemplate tx;
     private final TaskExecutionLimiter limiter;
+    private final java.util.concurrent.ConcurrentHashMap<Long, RunCancelContext> active = new java.util.concurrent.ConcurrentHashMap<>();
+    private record ActiveRun(long id, String state, int attempt) {}
     public TaskRunService(JdbcTemplate jdbc, TaskVersionStore tasks, CamelTaskRunner runner, ThreadPoolTaskExecutor executor, AuditLog audit) {
         this(jdbc, tasks, runner, executor, audit, new TaskExecutionLimiter(8));
     }
@@ -38,6 +40,7 @@ public class TaskRunService {
     @Transactional
     public long start(long taskId, int version, LocalDate date, Authentication auth) {
         if (date == null || tasks.findVersion(taskId, version).isEmpty()) throw new IllegalArgumentException("Invalid task version or business date");
+        if (hasActiveRun(taskId)) throw new IllegalStateException("任务已在运行");
         var key = new GeneratedKeyHolder();
         jdbc.update(c -> { var st = c.prepareStatement("INSERT INTO task_runs(task_id,task_version,business_date,state,created_at) VALUES (?,?,?,'PENDING',CURRENT_TIMESTAMP)", new String[]{"id"}); st.setLong(1, taskId); st.setInt(2, version); st.setDate(3, java.sql.Date.valueOf(date)); return st; }, key);
         if (key.getKey() == null) throw new IllegalStateException("Task run ID unavailable");
@@ -73,9 +76,13 @@ public class TaskRunService {
             }));
             if (!claimed) return;
         } catch (Exception ex) { finish(id,attempt,"INTERRUPTED",null); return; }
-        try (var permit = limiter.acquire()) { runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date); }
-        catch (InterruptedException ex) { Thread.currentThread().interrupt(); finish(id,attempt,"INTERRUPTED",null); return; }
-        catch (Exception ex) { finish(id,attempt,"FAILED","任务执行失败"); return; }
+        var cancel = new RunCancelContext();
+        cancel.worker(Thread.currentThread());
+        active.put(id, cancel);
+        try (var permit = limiter.acquire()) { runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel); }
+        catch (InterruptedException ex) { Thread.currentThread().interrupt(); finish(id, attempt, "INTERRUPTED", cancel.isCancelled() ? "手动停止" : null); return; }
+        catch (Exception ex) { finish(id, attempt, cancel.isCancelled() ? "INTERRUPTED" : "FAILED", cancel.isCancelled() ? "手动停止" : "任务执行失败"); return; }
+        finally { active.remove(id); }
         // Failure recording a successful business write is ambiguous and must not be classified as a task failure.
         try { finish(id,attempt,"SUCCEEDED",null); }
         catch (RuntimeException ex) { finish(id,attempt,"INTERRUPTED",null); }
@@ -86,6 +93,19 @@ public class TaskRunService {
             if (updated == 0) return;
             if (jdbc.update("UPDATE task_run_attempts SET state=?,finished_at=CURRENT_TIMESTAMP,error_message=? WHERE run_id=? AND attempt_no=? AND state IN ('PENDING','RUNNING')",state,error,id,attempt) != 1) throw new IllegalStateException("Attempt state mismatch");
         });
+    }
+    @Transactional
+    public int stop(long taskId, Authentication auth) {
+        var rows = jdbc.query("SELECT id,state,attempt_no FROM task_runs WHERE task_id=? AND state IN ('PENDING','RUNNING') FOR UPDATE",
+                (rs, row) -> new ActiveRun(rs.getLong(1), rs.getString(2), rs.getInt(3)), taskId);
+        if (rows.isEmpty()) throw new IllegalStateException("任务未在运行");
+        for (ActiveRun run : rows) {
+            RunCancelContext cancel = active.get(run.id());
+            if ("PENDING".equals(run.state()) || cancel == null) finish(run.id(), run.attempt(), "INTERRUPTED", "手动停止");
+            else cancel.cancel();
+        }
+        audit.success(auth, "task.stop", "task", taskId);
+        return rows.size();
     }
     public int recover() {
         return tx.execute(status -> {

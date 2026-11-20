@@ -10,7 +10,7 @@ import org.apache.camel.impl.DefaultCamelContext;
 
 /** Executes one parameterized database statement through a Camel route. */
 public final class SqlTaskExecutor implements AutoCloseable {
-    private record Request(DataSource source, String sql, List<?> parameters) {}
+    private record Request(DataSource source, String sql, List<?> parameters, RunCancelContext cancel) {}
     private final DefaultCamelContext context = new DefaultCamelContext();
     private final ProducerTemplate producer;
 
@@ -23,6 +23,8 @@ public final class SqlTaskExecutor implements AutoCloseable {
                     try (var connection = request.source().getConnection();
                          var statement = connection.prepareStatement(request.sql())) {
                         statement.setQueryTimeout(30);
+                        request.cancel().register(statement);
+                        if (request.cancel().isCancelled()) throw new InterruptedException("手动停止");
                         for (int i = 0; i < request.parameters().size(); i++) statement.setObject(i + 1, request.parameters().get(i));
                         exchange.getMessage().setBody(statement.executeUpdate());
                     }
@@ -32,9 +34,10 @@ public final class SqlTaskExecutor implements AutoCloseable {
         context.start();
         producer = context.createProducerTemplate();
     }
-    public int execute(DataSource source, String sql, List<?> parameters) {
+    public int execute(DataSource source, String sql, List<?> parameters) { return execute(source, sql, parameters, new RunCancelContext()); }
+    public int execute(DataSource source, String sql, List<?> parameters, RunCancelContext cancel) {
         if (source == null || sql == null || sql.isBlank() || parameters == null) throw new IllegalArgumentException("SQL task is incomplete");
-        return producer.requestBody("direct:execute-sql", new Request(source, sql, Collections.unmodifiableList(new ArrayList<>(parameters))), Integer.class);
+        return producer.requestBody("direct:execute-sql", new Request(source, sql, Collections.unmodifiableList(new ArrayList<>(parameters)), cancel), Integer.class);
     }
     @Override public void close() { producer.stop(); context.stop(); }
 }
