@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Navigation exposes the Data Assets directory for datasource grants, plus System Management and its pages. */
+/** Navigation exposes the Data Assets directory for datasource grants, the Processing directory (数据处理/处理任务) for workflow.task grants, plus System Management and its pages. */
 class OrganizationNavigationTest {
     private record Fixture(JdbcTemplate jdbc, OrganizationService org) {}
 
