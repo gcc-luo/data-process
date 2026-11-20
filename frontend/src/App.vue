@@ -4,6 +4,7 @@ import { ElMessageBox } from 'element-plus'
 import { login, authorizedRequest } from './auth.js'
 import DataSources from './DataSources.vue'
 import TaskStudio from './TaskStudio.vue'
+import ProcessingTasks from './ProcessingTasks.vue'
 import Organization from './Organization.vue'
 import DataExplorer from './DataExplorer.vue'
 import Reports from './Reports.vue'
@@ -233,6 +234,7 @@ onMounted(async () => {
         </div>
       </header>
       <div v-if="section === 'assets'" class="content"><DataSources :view="groupPages.assets || 'sources'" /></div>
+      <div v-else-if="section === 'processing'" class="content"><ProcessingTasks :view="groupPages.processing || 'tasks'" /></div>
       <div v-else-if="section === 'tasks'" class="content"><TaskStudio ref="taskStudio" /></div>
       <div v-else-if="section === 'system'" class="content"><Organization :view="groupPages.system || 'departments'" @navigation-updated="loadSession" /></div>
       <div v-else-if="section === 'query'" class="content"><DataExplorer /></div>
