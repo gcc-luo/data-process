@@ -79,7 +79,8 @@ public final class TaskDirectoryStore {
     }
 
     private static String validName(String name) {
-        if (name == null || name.isBlank() || name.length() > 120) throw new IllegalArgumentException("Invalid directory name");
-        return name.trim();
+        String clean = name == null ? "" : name.trim();
+        if (clean.isEmpty() || clean.length() > 120) throw new IllegalArgumentException("Invalid directory name");
+        return clean;
     }
 }

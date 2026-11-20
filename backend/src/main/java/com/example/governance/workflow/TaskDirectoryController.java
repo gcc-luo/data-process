@@ -49,6 +49,7 @@ public class TaskDirectoryController {
 
     @PostMapping("/api/task-directories/sort")
     ResponseEntity<Void> sort(@RequestBody SortRequest request, Authentication auth) {
+        if (request.items() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "排序数据无效");
         try { directories.sort(request.items().stream().map(item -> new TaskDirectoryStore.Directory(item.id(), item.parentId(), null, item.sortOrder())).toList()); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "排序数据无效"); }
         catch (IllegalStateException ex) { throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage()); }

@@ -65,6 +65,14 @@ class TaskDirectoryApiTest {
         mvc.perform(delete("/api/task-directories/" + child).session(session).with(csrf())).andExpect(status().isNoContent());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM task_directories", Integer.class));
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='directory.create' AND actor_id=601", Integer.class));
+        // 空 payload（items 缺失）应返回 400 而非 500
+        mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest());
+        // 名称先 trim 再校验长度：120 字符加尾部空格不应误拒
+        String longName = "n".repeat(120);
+        mvc.perform(post("/api/task-directories").session(session).with(csrf()).contentType("application/json").content("{\"name\":\"" + longName + "  \"}"))
+                .andExpect(status().isCreated());
+        assertEquals(longName, jdbc.queryForObject("SELECT name FROM task_directories WHERE name=?", String.class, longName));
     }
 
     @Test void directoryEndpointsRequirePermission() throws Exception {
