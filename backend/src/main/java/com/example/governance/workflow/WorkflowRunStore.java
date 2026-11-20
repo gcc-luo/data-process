@@ -149,6 +149,14 @@ public final class WorkflowRunStore {
         });
     }
     public String status(long runId) { return jdbc.queryForObject("SELECT state FROM workflow_runs WHERE id=?", String.class, runId); }
+    public int currentAttempt(long runId, String node) {
+        return jdbc.queryForObject("SELECT COALESCE(MAX(attempt_no),1) FROM workflow_node_attempts WHERE run_id=? AND node_key=?", Integer.class, runId, node);
+    }
+    public RunLogSink nodeLogSink(long runId, String node) { return new DbRunLogSink(jdbc, "WORKFLOW_NODE", runId, node, currentAttempt(runId, node)); }
+    public java.util.function.Consumer<String> nodeStatsSink(long runId, String node) {
+        int attempt = currentAttempt(runId, node);
+        return json -> jdbc.update("UPDATE workflow_node_attempts SET stats=? WHERE run_id=? AND node_key=? AND attempt_no=?", json, runId, node, attempt);
+    }
     private record Run(long workflowId, int version, String state) {}
     private record NodeState(String key, String state) {}
     private Run lock(long runId) {

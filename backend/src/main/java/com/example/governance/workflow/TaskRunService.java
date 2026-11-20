@@ -87,7 +87,9 @@ public class TaskRunService {
         } catch (Exception ex) { cancel.detach(); active.remove(id); finish(id,attempt,"INTERRUPTED",null); return; }
         if (!claimed) { cancel.detach(); active.remove(id); return; }
         try (var permit = limiter.acquire()) {
-            runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel);
+            var sinks = new ExecutionSinks(new DbRunLogSink(jdbc, "TASK_RUN", id, null, attempt),
+                    json -> jdbc.update("UPDATE task_run_attempts SET stats=? WHERE run_id=? AND attempt_no=?", json, id, attempt));
+            runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel, sinks);
             // 成功路径在摘除上下文前落终态，闭合 remove→finish 窗口；stop 与业务完成竞态判 INTERRUPTED
             if (cancel.isCancelled()) Thread.interrupted(); // 清除 cancel 留下的中断标志，避免带标志取连接失败
             // Failure recording a successful business write is ambiguous and must not be classified as a task failure.

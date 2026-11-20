@@ -189,13 +189,13 @@ class DataSourceApiTest {
         for (int i = 0; i < 100 && !"SUCCEEDED".equals(jdbc.queryForObject("SELECT state FROM workflow_runs WHERE id=?", String.class, run)); i++) Thread.sleep(20);
         mvc.perform(get("/api/runs/" + run).session(session)).andExpect(status().isOk())
             .andExpect(jsonPath("$.state").value("SUCCEEDED")).andExpect(jsonPath("$.nodes[0].state").value("SUCCEEDED"));
-        verify(runner, times(1)).execute(any(), eq(java.time.LocalDate.of(2026, 11, 16)));
+        verify(runner, times(1)).execute(any(), eq(java.time.LocalDate.of(2026, 11, 16)), any(), any());
     }
     @Test void failedRunCanBeRetriedWithAnotherAttempt() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
         jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','SQL',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (10,1,'{}')");
-        doThrow(new IllegalStateException()).doNothing().when(runner).execute(any(), any());
+        doThrow(new IllegalStateException()).doNothing().when(runner).execute(any(), any(), any(), any());
         var session = login();
         var created = mvc.perform(post("/api/workflows").session(session).with(csrf()).contentType("application/json").content("""
             {"name":"daily","nodes":[{"key":"a","taskId":10,"taskVersion":1}],"edges":[]}

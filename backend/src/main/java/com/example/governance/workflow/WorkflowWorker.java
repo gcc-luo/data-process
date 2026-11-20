@@ -6,7 +6,10 @@ import java.util.stream.Collectors;
 
 /** Explicitly invoked worker; scheduler and external execution adapters are configured separately. */
 public final class WorkflowWorker {
-    @FunctionalInterface public interface TaskRunner { void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception; }
+    @FunctionalInterface public interface TaskRunner {
+        void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception;
+        default void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks) throws Exception { execute(task, businessDate); }
+    }
     private final TaskExecutionLimiter limiter;
     private final WorkflowRunStore runs;
     private final WorkflowDefinitionStore definitions;
@@ -52,7 +55,7 @@ public final class WorkflowWorker {
         boolean success; TaskVersionStore.Version task = null;
         try {
             task = tasks.findVersion(node.taskId(), node.taskVersion()).orElseThrow();
-            runner.execute(task, businessDate);
+            runner.execute(task, businessDate, new RunCancelContext(), new ExecutionSinks(runs.nodeLogSink(runId, key), runs.nodeStatsSink(runId, key)));
             success = true;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
