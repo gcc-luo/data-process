@@ -89,6 +89,9 @@ public final class TaskVersionStore {
         transaction.executeWithoutResult(status -> {
             if (jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, id).isEmpty()) throw new IllegalArgumentException("Unknown task");
             if (jdbc.queryForObject("SELECT COUNT(*) FROM workflow_nodes WHERE task_id=?", Integer.class, id) > 0) throw new IllegalStateException("任务被工作流引用，不能删除");
+            // 锁内复查活跃 run，闭合控制器守卫与 start/retry 的并发窗口；锁序任务行→runs 行，与 start 一致
+            var states = jdbc.queryForList("SELECT state FROM task_runs WHERE task_id=? FOR UPDATE", String.class, id);
+            if (states.stream().anyMatch(s -> s.equals("PENDING") || s.equals("RUNNING"))) throw new IllegalStateException("任务运行中，不能删除");
             // task_run_attempts 对 task_runs ON DELETE CASCADE（V22），删 runs 即级联 attempts
             jdbc.update("DELETE FROM task_runs WHERE task_id=?", id);
             jdbc.update("DELETE FROM processing_task_versions WHERE task_id=?", id);

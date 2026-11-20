@@ -126,7 +126,7 @@ public class TaskRunService {
     }
     public record LastRun(String state, LocalDateTime startedAt, LocalDateTime finishedAt) {}
     public record TaskRunSummary(boolean running, LastRun lastRun) {}
-    /** 活跃 run 判定：start 在任务行锁内调用，与并发 start/stop 原子串行化；基本信息 PUT 守卫为非原子 best-effort 调用，基本信息不影响执行语义。 */
+    /** 活跃 run 判定：start 在任务行锁内调用，与并发 start/stop 原子串行化；DELETE 的权威守卫在 store.delete 锁内锁定读复查，控制器前置检查仅快速失败；基本信息 PUT 守卫为非原子 best-effort 调用，基本信息不影响执行语义。 */
     public boolean hasActiveRun(long taskId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=? AND state IN ('PENDING','RUNNING')", Integer.class, taskId) > 0;
     }
