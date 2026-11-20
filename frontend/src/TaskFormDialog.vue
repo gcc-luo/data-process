@@ -17,8 +17,8 @@ watch(() => props.open, open => {
     description.value = props.task.description ?? ''
   } else { form.value = emptyTask(); directoryId.value = null; description.value = '' }
 }, { immediate: true })
-// 复制/新增态切换类型时丢弃异类原始配置，避免 SQL↔SYNC 残留字段
-watch(() => form.value.type, () => { if (!editing.value) form.value.originalConfiguration = {} })
+// 复制态手动切换类型（与源任务不同）时丢弃异类原始配置，避免 SQL↔SYNC 残留字段
+watch(() => form.value.type, () => { if (!editing.value && props.task && form.value.type !== props.task.type) form.value.originalConfiguration = {} })
 async function save() {
   if (busy.value || prefillFailed.value) return
   error.value = ''; busy.value = true
@@ -29,7 +29,7 @@ async function save() {
       const put = await authorizedRequest(`/api/tasks/${props.task.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) })
       if (!put.ok) throw new Error(put.status === 403 ? '当前账号没有任务修改权限' : put.status === 409 ? '任务运行中，不能修改' : '基本信息保存失败')
       const response = await authorizedRequest(`/api/tasks/${props.task.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ configuration }) })
-      if (!response.ok) throw new Error(response.status === 409 ? '任务运行中，配置未保存（基本信息已保存）' : response.status === 403 ? '当前账号没有任务修改权限' : '配置保存失败，请检查表单（基本信息已保存）')
+      if (!response.ok) throw new Error(response.status === 409 ? '任务运行中，配置未保存（基本信息已保存）' : response.status === 403 ? '当前账号没有任务修改权限（基本信息已保存）' : '配置保存失败，请检查表单（基本信息已保存）')
     } else {
       const response = await authorizedRequest('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...metadata, type: form.value.type, configuration }) })
       if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务创建权限' : '任务保存失败，请检查表单')
