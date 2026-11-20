@@ -8,17 +8,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Restricted expression language for FIELD_FILTER / FIELD_CALC. No arbitrary code execution. */
+/**
+ * Restricted expression language for FIELD_FILTER / FIELD_CALC. No arbitrary code execution.
+ *
+ * <p>限制说明：
+ * <ul>
+ *   <li>保留字 and/or/not/true/false/null（大小写不敏感）不能用作列名。</li>
+ *   <li>字符串字面量以单引号包围，不支持转义单引号。</li>
+ *   <li>源长度上限 4096 字符，递归嵌套深度上限 200；函数元数与数字字面量在解析期校验。</li>
+ *   <li>AND/OR 将 null 视为 false 并短路求值；算术/比较/NOT 遇 null 传播 null；除零得 null。</li>
+ * </ul>
+ */
 public final class FlowExpression {
     public interface Expr { Object eval(Map<String, Object> row); }
     private static final Set<String> FUNCTIONS = Set.of("UPPER", "LOWER", "TRIM", "SUBSTR", "CONCAT", "ABS", "ROUND");
+    private static final int MAX_SOURCE_LENGTH = 4096;
+    private static final int MAX_DEPTH = 200;
     private record Token(String kind, String text) {}
     private final List<Token> tokens;
     private int pos;
+    private int depth;
     private FlowExpression(List<Token> tokens) { this.tokens = tokens; }
 
     public static Expr parse(String source) {
         if (source == null || source.isBlank()) throw new IllegalArgumentException("表达式不能为空");
+        if (source.length() > MAX_SOURCE_LENGTH) throw new IllegalArgumentException("表达式过长");
         var parser = new FlowExpression(tokenize(source));
         Expr expr = parser.or();
         if (parser.pos != parser.tokens.size()) throw new IllegalArgumentException("表达式语法错误: 多余内容 " + parser.tokens.get(parser.pos).text());
@@ -67,17 +81,20 @@ public final class FlowExpression {
 
     private Expr or() {
         Expr left = and();
-        while (matchIdent("OR")) { Expr right = and(); Expr l = left; left = row -> { Object a = l.eval(row); Object b = right.eval(row); return boolOrFalse(a) || boolOrFalse(b); }; }
+        while (matchIdent("OR")) { Expr right = and(); Expr l = left; left = row -> boolOrFalse(l.eval(row)) || boolOrFalse(right.eval(row)); }
         return left;
     }
     private Expr and() {
         Expr left = not();
-        while (matchIdent("AND")) { Expr right = not(); Expr l = left; left = row -> { Object a = l.eval(row); Object b = right.eval(row); return boolOrFalse(a) && boolOrFalse(b); }; }
+        while (matchIdent("AND")) { Expr right = not(); Expr l = left; left = row -> boolOrFalse(l.eval(row)) && boolOrFalse(right.eval(row)); }
         return left;
     }
     private Expr not() {
-        if (matchIdent("NOT")) { Expr inner = not(); return row -> { Object v = inner.eval(row); return v == null ? null : !bool(v); }; }
-        return comparison();
+        enter();
+        try {
+            if (matchIdent("NOT")) { Expr inner = not(); return row -> { Object v = inner.eval(row); return v == null ? null : !bool(v); }; }
+            return comparison();
+        } finally { depth--; }
     }
     private Expr comparison() {
         Expr left = additive();
@@ -116,61 +133,80 @@ public final class FlowExpression {
         }
     }
     private Expr unary() {
-        if (matchOp("-")) { Expr inner = unary(); return row -> { Object v = inner.eval(row); return v == null ? null : num(v).negate(); }; }
-        if (matchOp("+")) return unary();
-        return primary();
+        enter();
+        try {
+            if (matchOp("-")) { Expr inner = unary(); return row -> { Object v = inner.eval(row); return v == null ? null : num(v).negate(); }; }
+            if (matchOp("+")) return unary();
+            return primary();
+        } finally { depth--; }
     }
     private Expr primary() {
-        Token t = take();
-        if (t.kind().equals("NUMBER")) return row -> new BigDecimal(t.text());
-        if (t.kind().equals("STRING")) return row -> t.text();
-        if (t.kind().equals("(")) { Expr inner = or(); expect(")"); return inner; }
-        if (t.kind().equals("IDENT")) {
-            String word = t.text();
-            if (word.equalsIgnoreCase("true")) return row -> Boolean.TRUE;
-            if (word.equalsIgnoreCase("false")) return row -> Boolean.FALSE;
-            if (word.equalsIgnoreCase("null")) return row -> null;
-            Token next = peek();
-            if (next != null && next.kind().equals("(")) {
-                if (!FUNCTIONS.contains(word.toUpperCase(java.util.Locale.ROOT))) throw new IllegalArgumentException("表达式语法错误: 未知函数 " + word);
-                pos++;
-                var args = new ArrayList<Expr>();
-                if (!matchKind(")")) {
-                    args.add(or());
-                    while (matchKind(",")) args.add(or());
-                    expect(")");
+        enter();
+        try {
+            Token t = take();
+            if (t.kind().equals("NUMBER")) { BigDecimal constant = new BigDecimal(t.text()); return row -> constant; }
+            if (t.kind().equals("STRING")) return row -> t.text();
+            if (t.kind().equals("(")) { Expr inner = or(); expect(")"); return inner; }
+            if (t.kind().equals("IDENT")) {
+                String word = t.text();
+                if (word.equalsIgnoreCase("true")) return row -> Boolean.TRUE;
+                if (word.equalsIgnoreCase("false")) return row -> Boolean.FALSE;
+                if (word.equalsIgnoreCase("null")) return row -> null;
+                Token next = peek();
+                if (next != null && next.kind().equals("(")) {
+                    if (!FUNCTIONS.contains(word.toUpperCase(java.util.Locale.ROOT))) throw new IllegalArgumentException("表达式语法错误: 未知函数 " + word);
+                    pos++;
+                    var args = new ArrayList<Expr>();
+                    if (!matchKind(")")) {
+                        args.add(or());
+                        while (matchKind(",")) args.add(or());
+                        expect(")");
+                    }
+                    return call(word.toUpperCase(java.util.Locale.ROOT), args);
                 }
-                return call(word.toUpperCase(java.util.Locale.ROOT), args);
+                String field = word.toLowerCase(java.util.Locale.ROOT);
+                return row -> row.get(field);
             }
-            String field = word.toLowerCase(java.util.Locale.ROOT);
-            return row -> row.get(field);
-        }
-        throw new IllegalArgumentException("表达式语法错误: 意外符号 " + t.text());
+            throw new IllegalArgumentException("表达式语法错误: 意外符号 " + t.text());
+        } finally { depth--; }
     }
+    /** 递归深度守卫：not/unary/primary 覆盖括号嵌套、长链一元与 NOT 链，防止 StackOverflowError。 */
+    private void enter() { if (++depth > MAX_DEPTH) throw new IllegalArgumentException("表达式嵌套过深"); }
     private void expect(String kind) { Token t = take(); if (!t.kind().equals(kind)) throw new IllegalArgumentException("表达式语法错误: 期望 " + kind); }
 
     private static Expr call(String fn, List<Expr> args) {
+        int n = args.size();
+        switch (fn) {
+            case "UPPER": case "LOWER": case "TRIM": case "ABS": requireArity(fn, n, 1); break;
+            case "SUBSTR": if (n < 2 || n > 3) throw new IllegalArgumentException("表达式参数错误: SUBSTR 需 2-3 参"); break;
+            case "ROUND": if (n < 1 || n > 2) throw new IllegalArgumentException("表达式参数错误: ROUND 需 1-2 参"); break;
+            case "CONCAT": if (n < 1) throw new IllegalArgumentException("表达式参数错误: CONCAT 需至少 1 参"); break;
+            default: throw new IllegalArgumentException("表达式语法错误: 未知函数 " + fn);
+        }
         return row -> {
             var values = new ArrayList<Object>();
             for (Expr arg : args) values.add(arg.eval(row));
             switch (fn) {
                 case "UPPER": case "LOWER": case "TRIM": {
-                    requireArity(fn, values, 1);
                     Object v = values.get(0);
                     if (v == null) return null;
                     String s = str(v);
                     return fn.equals("UPPER") ? s.toUpperCase(java.util.Locale.ROOT) : fn.equals("LOWER") ? s.toLowerCase(java.util.Locale.ROOT) : s.trim();
                 }
                 case "SUBSTR": {
-                    if (values.size() < 2 || values.size() > 3) throw new IllegalArgumentException("表达式参数错误: SUBSTR 需 2-3 参");
                     Object v = values.get(0);
                     if (v == null) return null;
                     String s = str(v);
-                    int start = num(values.get(1)).intValue();
+                    int start = exactInt(num(values.get(1)), "SUBSTR 起始");
                     if (start < 1) throw new IllegalArgumentException("表达式参数错误: SUBSTR 起始需 >=1");
                     int from = Math.min(start - 1, s.length());
-                    int to = values.size() == 3 ? Math.min(from + num(values.get(2)).intValue(), s.length()) : s.length();
-                    return s.substring(from, Math.max(from, to));
+                    int to = s.length();
+                    if (values.size() == 3) {
+                        int len = exactInt(num(values.get(2)), "SUBSTR 长度");
+                        if (len < 0) throw new IllegalArgumentException("表达式参数错误: SUBSTR 长度不能为负");
+                        to = (int) Math.min((long) from + len, s.length());
+                    }
+                    return s.substring(from, to);
                 }
                 case "CONCAT": {
                     var sb = new StringBuilder();
@@ -178,23 +214,26 @@ public final class FlowExpression {
                     return sb.toString();
                 }
                 case "ABS": {
-                    requireArity(fn, values, 1);
                     Object v = values.get(0);
                     return v == null ? null : num(v).abs();
                 }
                 case "ROUND": {
-                    if (values.isEmpty() || values.size() > 2) throw new IllegalArgumentException("表达式参数错误: ROUND 需 1-2 参");
                     Object v = values.get(0);
                     if (v == null) return null;
-                    int digits = values.size() == 2 ? num(values.get(1)).intValue() : 0;
+                    int digits = values.size() == 2 ? exactInt(num(values.get(1)), "ROUND 位数") : 0;
+                    if (digits < -18 || digits > 18) throw new IllegalArgumentException("ROUND 位数超出范围");
                     return num(v).setScale(digits, RoundingMode.HALF_UP);
                 }
                 default: throw new IllegalArgumentException("表达式语法错误: 未知函数 " + fn);
             }
         };
     }
-    private static void requireArity(String fn, List<Object> values, int n) {
-        if (values.size() != n) throw new IllegalArgumentException("表达式参数错误: " + fn + " 需 " + n + " 参");
+    private static void requireArity(String fn, int actual, int expected) {
+        if (actual != expected) throw new IllegalArgumentException("表达式参数错误: " + fn + " 需 " + expected + " 参");
+    }
+    private static int exactInt(BigDecimal v, String what) {
+        try { return v.intValueExact(); }
+        catch (ArithmeticException e) { throw new IllegalArgumentException("表达式参数错误: " + what + "超出整数范围", e); }
     }
     private static Object arith(Object a, Object b, String op) {
         if (a == null || b == null) return null;

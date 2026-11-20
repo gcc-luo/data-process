@@ -59,4 +59,64 @@ class FlowExpressionTest {
         assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse(""));
         assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("1; DROP TABLE x"));
     }
+
+    @Test void divisionByZeroIsNull() {
+        assertNull(eval("1 / 0", Map.of()));
+    }
+
+    @Test void arityCheckedAtParseTime() {
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("UPPER('a', 'b')"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("ROUND()"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("CONCAT()"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("SUBSTR('a')"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("SUBSTR('a', 1, 2, 3)"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("ABS(1, 2)"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("ROUND(1, 2, 3)"));
+    }
+
+    @Test void malformedNumberRejectedAtParseTime() {
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("1.2.3"));
+    }
+
+    @Test void substrBounds() {
+        assertThrows(IllegalArgumentException.class, () -> eval("SUBSTR('abc', 0)", Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> eval("SUBSTR('abc', 1, -1)", Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> eval("SUBSTR('abc', 1, 3000000000)", Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> eval("SUBSTR('abc', 3000000000)", Map.of()));
+    }
+
+    @Test void roundDigitsRange() {
+        assertEquals(new BigDecimal("2"), eval("ROUND(1.5)", Map.of()));
+        assertEquals(new BigDecimal("1.50"), eval("ROUND(1.5, 2)", Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> eval("ROUND(1.5, 19)", Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> eval("ROUND(1.5, -19)", Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> eval("ROUND(1.5, 1000000000)", Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> eval("ROUND(1.5, 3000000000)", Map.of()));
+    }
+
+    @Test void functionNamesCaseInsensitiveAndNested() {
+        assertEquals("ABC", eval("upper(name)", Map.of("name", "abc")));
+        assertEquals("ABC", eval("UPPER(TRIM(name))", Map.of("name", " abc ")));
+    }
+
+    @Test void logicNullSemanticsAndBooleanEquality() {
+        assertEquals(Boolean.FALSE, eval("missing > 1 OR false", Map.of()));
+        assertNull(eval("NOT null", Map.of()));
+        assertEquals(Boolean.TRUE, eval("true = true", Map.of()));
+        assertEquals(Boolean.TRUE, eval("true != false", Map.of()));
+        assertEquals(Boolean.FALSE, eval("false = true", Map.of()));
+    }
+
+    @Test void shortCircuitGuards() {
+        assertEquals(Boolean.FALSE, eval("false AND 'a' + 1", Map.of()));
+        assertEquals(Boolean.TRUE, eval("true OR 'a' + 1", Map.of()));
+    }
+
+    @Test void inputLimits() {
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("(".repeat(5000) + "1" + ")".repeat(5000)));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("(".repeat(300) + "1" + ")".repeat(300)));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("-".repeat(3000) + "1"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("NOT ".repeat(1000) + "true"));
+        assertThrows(IllegalArgumentException.class, () -> FlowExpression.parse("1 + ".repeat(2000) + "1"));
+    }
 }
