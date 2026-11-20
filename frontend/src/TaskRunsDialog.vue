@@ -8,15 +8,19 @@ const emit = defineEmits(['update:open'])
 const can = inject('canPermission', () => false)
 const runs = ref([]), error = ref(''), message = ref('')
 const paging = usePagination(runs)
+let loadSequence = 0
 async function load() {
   if (!props.task) return
+  const request = ++loadSequence
   try {
     const response = await fetch(`/api/tasks/${props.task.id}/runs`, { credentials: 'same-origin' })
     if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务读取权限' : '读取运行记录失败')
-    runs.value = await response.json(); error.value = ''
-  } catch (e) { error.value = e.message }
+    const result = await response.json()
+    if (request !== loadSequence) return
+    runs.value = result; error.value = ''
+  } catch (e) { if (request === loadSequence) error.value = e.message }
 }
-watch(() => props.open, open => { if (open) { message.value = ''; load() } })
+watch(() => props.open, open => { if (open) { message.value = ''; error.value = ''; load() } })
 async function retry(run) {
   try {
     const response = await authorizedRequest(`/api/tasks/${props.task.id}/runs/${run.id}/retry`, { method: 'POST' })

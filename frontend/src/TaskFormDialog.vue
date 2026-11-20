@@ -7,18 +7,18 @@ const emit = defineEmits(['update:open', 'saved'])
 const can = inject('canPermission', () => false)
 // 复制预填时 task.id 为 null，按新增处理
 const editing = computed(() => !!props.task?.id)
-const form = ref(emptyTask()), directoryId = ref(null), description = ref(''), error = ref(''), busy = ref(false)
+const form = ref(emptyTask()), directoryId = ref(null), description = ref(''), error = ref(''), busy = ref(false), prefillFailed = ref(false)
 watch(() => props.open, open => {
   if (!open) return
-  error.value = ''
+  error.value = ''; prefillFailed.value = false
   if (props.task) {
-    try { form.value = formFromTask(props.task) } catch (e) { error.value = e.message; form.value = emptyTask() }
+    try { form.value = formFromTask(props.task) } catch (e) { error.value = e.message; form.value = emptyTask(); prefillFailed.value = true }
     directoryId.value = props.task.directoryId ?? null
     description.value = props.task.description ?? ''
   } else { form.value = emptyTask(); directoryId.value = null; description.value = '' }
 })
 async function save() {
-  if (busy.value) return
+  if (busy.value || prefillFailed.value) return
   error.value = ''; busy.value = true
   try {
     const configuration = configurationFromForm(form.value)
@@ -27,7 +27,7 @@ async function save() {
       const put = await authorizedRequest(`/api/tasks/${props.task.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) })
       if (!put.ok) throw new Error(put.status === 409 ? '任务运行中，不能修改' : '基本信息保存失败')
       const response = await authorizedRequest(`/api/tasks/${props.task.id}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ configuration }) })
-      if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务修改权限' : '配置保存失败，请检查表单')
+      if (!response.ok) throw new Error(response.status === 409 ? '任务运行中，不能修改' : response.status === 403 ? '当前账号没有任务修改权限' : '配置保存失败，请检查表单')
     } else {
       const response = await authorizedRequest('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...metadata, type: form.value.type, configuration }) })
       if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务创建权限' : '任务保存失败，请检查表单')
@@ -78,9 +78,9 @@ async function save() {
       <div><el-checkbox v-model="form.retrySafe">我已确认任务在工作流中自动重试不会造成重复或错误数据</el-checkbox>
         <div v-if="form.retrySafe" class="row"><span>最多重试</span><el-input-number v-model="form.maxRetries" :min="1" :max="3"/><span>次，间隔（秒）</span><el-input-number v-model="form.retryDelay" :min="1" :max="3600"/></div>
       </div>
-      <el-button v-if="!readonly && (editing ? can('workflow.task.update') : can('workflow.task.create'))" type="primary" native-type="submit" :loading="busy">{{ editing ? '保存新版本' : '保存任务' }}</el-button>
-      <el-button @click="emit('update:open', false)">{{ readonly ? '关闭' : '取消' }}</el-button>
+      <el-button v-if="!readonly && !prefillFailed && (editing ? can('workflow.task.update') : can('workflow.task.create'))" type="primary" native-type="submit" :loading="busy">{{ editing ? '保存新版本' : '保存任务' }}</el-button>
     </el-form>
+    <el-button @click="emit('update:open', false)">{{ readonly ? '关闭' : '取消' }}</el-button>
   </el-dialog>
 </template>
 <style scoped>.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.row{display:flex;gap:12px;align-items:center;margin:14px 0}.parameter-editor p{color:#687e7b;font-size:13px}.parameter-row .el-select,.parameter-row .el-input{max-width:200px}@media(max-width:700px){.grid{grid-template-columns:1fr}.row{flex-wrap:wrap}}</style>
