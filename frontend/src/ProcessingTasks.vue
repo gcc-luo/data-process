@@ -18,6 +18,11 @@ const startOpen = ref(false), startTargets = ref([]), startDate = ref(new Date()
 const filtered = computed(() => filterTasks(tasks.value, { directories: directories.value, directoryId: currentDirectory.value === 0 ? null : currentDirectory.value, name: nameFilter.value, runState: stateFilter.value }))
 const paging = usePagination(filtered)
 const currentDirectoryName = computed(() => currentDirectory.value === 0 ? '全部任务' : directories.value.find(d => d.id === currentDirectory.value)?.name ?? '全部任务')
+// 窄屏顶部目录下拉：先序展开 + 全角空格缩进层级
+const directoryOptions = computed(() => {
+  const walk = (parentId, depth) => directories.value.filter(d => d.parentId === parentId).sort((a,b)=>a.sortOrder-b.sortOrder).flatMap(d => [{ id: d.id, label: '　'.repeat(depth) + d.name }, ...walk(d.id, depth+1)])
+  return [{ id: 0, label: '全部任务' }, ...walk(null, 0)]
+})
 const treeData = computed(() => {
   const build = parentId => directories.value.filter(d => d.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder).map(d => ({ id: d.id, name: d.name, children: build(d.id) }))
   return [{ id: 0, name: '全部任务', children: build(null) }]
@@ -161,6 +166,8 @@ watch(tasks, rows => {
 watch(directories, rows => {
   if (currentDirectory.value !== 0 && !rows.some(d => d.id === currentDirectory.value)) currentDirectory.value = 0
 })
+// 树点选与窄屏下拉统一在此重置页码
+watch(currentDirectory, () => { paging.page.value = 1 })
 onMounted(loadAll)
 onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 </script>
@@ -168,6 +175,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
   <section class="processing">
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
     <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon/>
+    <el-select v-model="currentDirectory" class="directory-select" aria-label="任务目录"><el-option v-for="o in directoryOptions" :key="o.id" :label="o.label" :value="o.id"/></el-select>
     <div class="processing-layout">
       <aside class="directory-pane">
         <div class="directory-head"><strong>任务目录</strong><el-button v-if="can('workflow.task.create')" text type="primary" @click="addDirectory(null)">新增</el-button></div>
@@ -241,5 +249,6 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 @media(hover:none){.tree-actions{display:inline-flex}}
 .status-text{color:#728582;font-size:12px}
 .pagination{margin-top:14px;display:flex;justify-content:flex-end}
-@media(max-width:700px){.processing-layout{flex-direction:column}.directory-pane{flex:none;width:100%}}
+.directory-select{display:none}
+@media(max-width:700px){.directory-pane{display:none}.directory-select{display:block;width:100%;margin-bottom:10px}}
 </style>

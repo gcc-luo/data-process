@@ -41,4 +41,22 @@ class StandaloneTaskRetryApiTest {
         mvc.perform(post("/api/tasks/501/runs/501/retry").session(session).with(csrf())).andExpect(status().isConflict());
         assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='task.retry' AND actor_id=501",Integer.class));
     }
+    @Test void retryRejectedWhileAnotherRunIsActive() throws Exception {
+        jdbc.update("INSERT INTO departments(id,name) VALUES (601,'retry-active-dept')");
+        jdbc.update("INSERT INTO roles(id,name) VALUES (601,'retry-active-role')");
+        jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (601,'retry-active-user',?,601,TRUE,'v')",encoder.encode("password"));
+        jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (601,601)");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (601,'workflow.task.retry')");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (601,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (601,1,'{}')");
+        jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no) VALUES (601,601,1,DATE '2026-11-16','FAILED',CURRENT_TIMESTAMP,1)");
+        jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,finished_at,error_message) VALUES (601,1,'FAILED',CURRENT_TIMESTAMP,'任务执行失败')");
+        // 同任务另有一条 RUNNING 实例：重试旧 FAILED 实例必须被单活跃守卫拒绝
+        jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no,started_at) VALUES (602,601,1,DATE '2026-11-17','RUNNING',CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,started_at) VALUES (602,1,'RUNNING',CURRENT_TIMESTAMP)");
+        var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username","retry-active-user").param("password","password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
+        mvc.perform(post("/api/tasks/601/runs/601/retry").session(session).with(csrf())).andExpect(status().isConflict());
+        assertEquals("FAILED",jdbc.queryForObject("SELECT state FROM task_runs WHERE id=601",String.class));
+        assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='task.retry' AND actor_id=601",Integer.class));
+    }
 }

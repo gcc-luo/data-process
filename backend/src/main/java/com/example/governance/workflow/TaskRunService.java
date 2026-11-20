@@ -54,6 +54,9 @@ public class TaskRunService {
     }
     @Transactional
     public void retry(long taskId, long runId, Authentication auth) {
+        // 先锁任务行再复查活跃 run，与 start/delete 锁序一致（任务行→runs 行）无锁环；防止并发 RUNNING 时重试旧实例产生双活跃
+        jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, taskId);
+        if (hasActiveRun(taskId)) throw new IllegalStateException("任务已在运行，不能重试");
         var rows = jdbc.query("SELECT task_id,task_version,business_date,state,attempt_no FROM task_runs WHERE id=? FOR UPDATE", (rs, row) -> new Run(rs.getLong(1),rs.getInt(2),rs.getDate(3).toLocalDate(),rs.getString(4),rs.getInt(5)),runId);
         if (rows.isEmpty() || rows.getFirst().taskId() != taskId) throw new IllegalArgumentException("Unknown task run");
         var run = rows.getFirst();
