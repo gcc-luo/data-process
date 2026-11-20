@@ -50,11 +50,13 @@ class TaskDeleteApiTest {
         // 有运行历史但无引用 → 级联删除
         jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no) VALUES (641,642,1,DATE '2026-11-20','SUCCEEDED',CURRENT_TIMESTAMP,1)");
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,finished_at) VALUES (641,1,'SUCCEEDED',CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO execution_logs(owner_type,owner_id,attempt_no,line_no,level,message) VALUES ('TASK_RUN',641,1,1,'INFO','x')");
         mvc.perform(delete("/api/tasks/642").session(session).with(csrf())).andExpect(status().isNoContent());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM processing_tasks WHERE id=642", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM processing_task_versions WHERE task_id=642", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=642", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM task_run_attempts WHERE run_id=641", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM execution_logs WHERE owner_type='TASK_RUN' AND owner_id=641", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='task.delete' AND actor_id=641 AND object_type='task' AND object_id='642'", Integer.class));
         // 不存在 → 404
         mvc.perform(delete("/api/tasks/999").session(session).with(csrf())).andExpect(status().isNotFound());

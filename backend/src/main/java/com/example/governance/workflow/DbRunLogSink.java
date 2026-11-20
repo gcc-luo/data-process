@@ -19,8 +19,15 @@ public final class DbRunLogSink implements RunLogSink {
         if (line > 2001) return;
         boolean marker = line == 2001;
         String text = marker ? "日志超过 2000 行，已截断" : message;
-        if (text.length() > 2000) text = text.substring(0, 2000);
-        jdbc.update("INSERT INTO execution_logs(owner_type,owner_id,node_key,attempt_no,line_no,level,message) VALUES (?,?,?,?,?,?,?)",
-                ownerType, ownerId, nodeKey, attempt, line, marker ? "WARN" : level, text);
+        if (text.length() > 2000) {
+            int end = 2000;
+            if (Character.isHighSurrogate(text.charAt(end - 1))) end--;
+            text = text.substring(0, end);
+        }
+        String lv = marker ? "WARN" : (level == null ? "INFO" : level.length() > 10 ? level.substring(0, 10) : level);
+        try {
+            jdbc.update("INSERT INTO execution_logs(owner_type,owner_id,node_key,attempt_no,line_no,level,message) VALUES (?,?,?,?,?,?,?)",
+                    ownerType, ownerId, nodeKey, attempt, line, lv, text);
+        } catch (org.springframework.dao.DataAccessException ex) { /* 日志 best-effort：记日志失败不击穿业务执行 */ }
     }
 }

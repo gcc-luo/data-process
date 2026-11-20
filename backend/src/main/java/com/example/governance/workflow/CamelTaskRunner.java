@@ -21,6 +21,7 @@ public final class CamelTaskRunner implements WorkflowWorker.TaskRunner, AutoClo
         try { sync = new DatabaseSyncExecutor(); } catch (Exception e) { sql.close(); throw e; }
     }
     @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception { execute(task, businessDate, new RunCancelContext()); }
+    // sinks 由二期任务 4 接线（FLOW）；此处仅保 cancel 透传。
     @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks) throws Exception { execute(task, businessDate, cancel); }
     public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel) throws Exception {
         JsonNode config = mapper.readTree(task.configuration());

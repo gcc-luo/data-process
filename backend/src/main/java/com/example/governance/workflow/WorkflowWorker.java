@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 public final class WorkflowWorker {
     @FunctionalInterface public interface TaskRunner {
         void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception;
+        /** 支持取消/日志的实现必须 override 四参；default 委托两参会丢弃 cancel 与 sinks（见 RealRunnerCancelPropagationTest）。 */
         default void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks) throws Exception { execute(task, businessDate); }
     }
     private final TaskExecutionLimiter limiter;

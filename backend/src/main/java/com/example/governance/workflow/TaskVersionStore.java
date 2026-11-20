@@ -92,7 +92,8 @@ public final class TaskVersionStore {
             // 锁内复查活跃 run，闭合控制器守卫与 start/retry 的并发窗口；锁序任务行→runs 行，与 start 一致
             var states = jdbc.queryForList("SELECT state FROM task_runs WHERE task_id=? FOR UPDATE", String.class, id);
             if (states.stream().anyMatch(s -> s.equals("PENDING") || s.equals("RUNNING"))) throw new IllegalStateException("任务运行中，不能删除");
-            // task_run_attempts 对 task_runs ON DELETE CASCADE（V22），删 runs 即级联 attempts
+            // execution_logs 无外键，先按 run 归属清理孤儿日志；task_run_attempts 对 task_runs ON DELETE CASCADE（V22），删 runs 即级联 attempts
+            jdbc.update("DELETE FROM execution_logs WHERE owner_type='TASK_RUN' AND owner_id IN (SELECT id FROM task_runs WHERE task_id=?)", id);
             jdbc.update("DELETE FROM task_runs WHERE task_id=?", id);
             jdbc.update("DELETE FROM processing_task_versions WHERE task_id=?", id);
             jdbc.update("DELETE FROM processing_tasks WHERE id=?", id);

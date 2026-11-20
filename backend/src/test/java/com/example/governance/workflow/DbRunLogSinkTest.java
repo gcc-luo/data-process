@@ -33,4 +33,21 @@ class DbRunLogSinkTest {
         assertEquals("n1", jdbc.queryForObject("SELECT node_key FROM execution_logs WHERE owner_id=9", String.class));
         assertEquals(2, jdbc.queryForObject("SELECT attempt_no FROM execution_logs WHERE owner_id=9", Integer.class));
     }
+
+    @Test void truncationNeverSplitsSurrogatePairs() {
+        var jdbc = fixture();
+        var sink = new DbRunLogSink(jdbc, "TASK_RUN", 11, null, 1);
+        // 前置单字符使 2000 字符截断点落在代理对中间，覆盖孤立高代理缺陷
+        sink.log("INFO", "a" + "\uD83D\uDE00".repeat(1200));
+        String stored = jdbc.queryForObject("SELECT message FROM execution_logs WHERE owner_id=11", String.class);
+        assertTrue(stored.length() <= 2000);
+        assertFalse(Character.isHighSurrogate(stored.charAt(stored.length() - 1)));
+    }
+
+    @Test void nullLevelFallsBackToInfo() {
+        var jdbc = fixture();
+        var sink = new DbRunLogSink(jdbc, "TASK_RUN", 12, null, 1);
+        assertDoesNotThrow(() -> sink.log(null, "hello"));
+        assertEquals("INFO", jdbc.queryForObject("SELECT level FROM execution_logs WHERE owner_id=12", String.class));
+    }
 }
