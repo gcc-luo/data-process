@@ -17,7 +17,7 @@ public final class TaskVersionStore {
     public TaskVersionStore(JdbcTemplate jdbc, PlatformTransactionManager manager) { this.jdbc = jdbc; this.transaction = new TransactionTemplate(manager); }
     public long create(String name, String type, String configuration) { return create(name, type, configuration, null, null); }
     public long create(String name, String type, String configuration, Long directoryId, String description) {
-        if (name == null || name.isBlank() || name.length() > 160 || type == null || !Set.of("SQL", "SYNC").contains(type)) throw new IllegalArgumentException("Invalid task");
+        if (name == null || name.isBlank() || name.length() > 160 || type == null || !Set.of("SQL", "SYNC", "FLOW").contains(type)) throw new IllegalArgumentException("Invalid task");
         if (description != null && description.length() > 500) throw new IllegalArgumentException("Invalid description");
         validate(configuration);
         return transaction.execute(status -> {

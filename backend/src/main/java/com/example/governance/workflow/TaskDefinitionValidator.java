@@ -15,11 +15,12 @@ public final class TaskDefinitionValidator {
                 var retry = root.path("retry"); var max = retry.path("maxRetries"); var delay = retry.path("delaySeconds");
                 if (!retry.isObject() || !retry.path("safe").isBoolean() || !retry.path("safe").booleanValue() || !max.isInt() || max.intValue() < 1 || max.intValue() > 3 || !delay.isInt() || delay.intValue() < 1 || delay.intValue() > 3600) throw new IllegalArgumentException("Invalid retry policy");
             }
-            id(root, "sourceId");
             if ("SQL".equals(type)) {
+                id(root, "sourceId");
                 text(root, "sql");
                 parameters(root.path("parameters"));
             } else if ("SYNC".equals(type)) {
+                id(root, "sourceId");
                 id(root, "targetId"); text(root, "sourceQuery");
                 if (root.has("sourceParameters")) parameters(root.path("sourceParameters"));
                 String table = text(root, "targetTable");
@@ -39,6 +40,8 @@ public final class TaskDefinitionValidator {
                 }
                 JsonNode batch = root.get("batchSize");
                 if (batch != null && (!batch.isIntegralNumber() || !batch.canConvertToInt() || batch.intValue() < 1 || batch.intValue() > 10000)) throw new IllegalArgumentException("Invalid batch size");
+            } else if ("FLOW".equals(type)) {
+                FlowGraph.validate(FlowGraph.parse(root));
             } else throw new IllegalArgumentException("Invalid task type");
         } catch (java.io.IOException ex) { throw new IllegalArgumentException("Invalid task configuration"); }
     }
