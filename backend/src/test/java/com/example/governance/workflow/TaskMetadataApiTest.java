@@ -64,7 +64,15 @@ class TaskMetadataApiTest {
         mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("加工任务"))
                 .andExpect(jsonPath("$[0].description").value("新描述"))
+                .andExpect(jsonPath("$[0].directoryId").value(directory))
                 .andExpect(jsonPath("$[0].runState").value("STOPPED"));
+        // 停止状态下非法类型仍拒绝：name 不可为 null/数字，description 不可为数字
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"name\":null}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"name\":123}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"description\":123}"))
+                .andExpect(status().isBadRequest());
         // 清空目录（显式 null）
         mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":null}"))
                 .andExpect(status().isNoContent());

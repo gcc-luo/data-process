@@ -57,11 +57,21 @@ public final class TaskVersionStore {
                     (rs, row) -> new Object[]{rs.getString(1), rs.getObject(2, Long.class), rs.getString(3)}, id);
             if (rows.isEmpty()) throw new IllegalArgumentException("Unknown task");
             Object[] current = rows.getFirst();
-            String name = changes.has("name") ? changes.get("name").asText() : (String) current[0];
+            String name = (String) current[0];
+            if (changes.has("name")) {
+                com.fasterxml.jackson.databind.JsonNode node = changes.get("name");
+                name = node.isTextual() ? node.asText() : null;
+            }
             if (name == null || name.isBlank() || name.length() > 160) throw new IllegalArgumentException("Invalid task name");
             Long directoryId = changes.has("directoryId") ? (changes.get("directoryId").isNull() ? null : changes.get("directoryId").asLong()) : (Long) current[1];
             if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=?", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
-            String description = changes.has("description") ? (changes.get("description").isNull() ? null : changes.get("description").asText()) : (String) current[2];
+            String description = (String) current[2];
+            if (changes.has("description")) {
+                com.fasterxml.jackson.databind.JsonNode node = changes.get("description");
+                if (node.isNull()) description = null;
+                else if (node.isTextual()) description = node.asText();
+                else throw new IllegalArgumentException("Invalid description");
+            }
             if (description != null && description.length() > 500) throw new IllegalArgumentException("Invalid description");
             jdbc.update("UPDATE processing_tasks SET name=?,directory_id=?,description=? WHERE id=?", name, directoryId, description, id);
         });
