@@ -24,6 +24,7 @@
 |---|---|
 | 创建 `backend/src/main/resources/db/migration/V32__processing_menu_and_directories.sql` | H2：菜单 3/31、目录表、任务表扩展 |
 | 创建 `backend/src/main/resources/db/mysql/V32__processing_menu_and_directories.sql` | MySQL 同内容 |
+| 创建 `backend/src/main/resources/db/migration/V33__task_delete_permission.sql` + `db/mysql/` 同名 | 注册 workflow.task.delete 权限码并授予 role 1（V30 模式） |
 | 修改 `backend/src/main/java/com/example/governance/security/PermissionCatalog.java` | 组件→模块映射、新端点路由守卫 |
 | 创建 `backend/src/main/java/com/example/governance/workflow/TaskDirectoryStore.java` | 目录树 CRUD + 排序（环校验、保守删除） |
 | 创建 `backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java` | 目录 REST 端点 + 审计 |
@@ -59,7 +60,7 @@
 - 修改：`frontend/src/menu-icons.js`
 - 测试：`backend/src/test/java/com/example/governance/organization/OrganizationNavigationTest.java`
 
-- [ ] **步骤 1：更新导航测试（先写失败测试）**
+- [x] **步骤 1：更新导航测试（先写失败测试）**
 
 在 `OrganizationNavigationTest.java` 中做三处修改：
 
@@ -89,12 +90,12 @@
     }
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=OrganizationNavigationTest -DfailIfNoTests=false`
 预期：FAIL（roots 缺少 processing、组件数不符）。
 
-- [ ] **步骤 3：编写迁移与映射**
+- [x] **步骤 3：编写迁移与映射**
 
 `db/migration/V32__processing_menu_and_directories.sql`：
 ```sql
@@ -132,12 +133,12 @@ ALTER TABLE processing_tasks ADD COLUMN description VARCHAR(500);
   processing: '数据处理',
 ```
 
-- [ ] **步骤 4：运行测试验证通过**
+- [x] **步骤 4：运行测试验证通过**
 
 运行：同步骤 2 命令。
 预期：`Tests run: 7, Failures: 0`（原 6 个 + 新增 1 个），BUILD SUCCESS。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add backend/src/main/resources/db/migration/V32__processing_menu_and_directories.sql backend/src/main/resources/db/mysql/V32__processing_menu_and_directories.sql backend/src/main/java/com/example/governance/security/PermissionCatalog.java backend/src/test/java/com/example/governance/organization/OrganizationNavigationTest.java frontend/src/menu-icons.js
@@ -158,7 +159,7 @@ git commit -m "feat(processing): 数据处理菜单与任务目录表迁移
 - 修改：`backend/src/main/java/com/example/governance/security/PermissionCatalog.java`（routes 段，约 208 行附近）
 - 测试：`backend/src/test/java/com/example/governance/workflow/TaskDirectoryApiTest.java`
 
-- [ ] **步骤 1：编写失败的 API 测试**
+- [x] **步骤 1：编写失败的 API 测试**
 
 创建 `TaskDirectoryApiTest.java`：
 ```java
@@ -211,9 +212,9 @@ class TaskDirectoryApiTest {
         jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version,directory_id) VALUES (601,'t','SQL',1,?)", child);
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (601,1,'{}')");
         mvc.perform(delete("/api/task-directories/" + child).session(session).with(csrf())).andExpect(status().isConflict());
-        // 移入自身子孙禁止
+        // 移入自身子孙禁止（root→child→root 真环）
         mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json")
-                .content("{\"items\":[{\"id\":" + root + ",\"parentId\":" + child + ",\"sortOrder\":0},{\"id\":" + child + ",\"parentId\":null,\"sortOrder\":1}]}"))
+                .content("{\"items\":[{\"id\":" + root + ",\"parentId\":" + child + ",\"sortOrder\":0},{\"id\":" + child + ",\"parentId\":" + root + ",\"sortOrder\":1}]}"))
                 .andExpect(status().isConflict());
         // 合法排序：child 提为顶级，root 挂到 child 下
         mvc.perform(post("/api/task-directories/sort").session(session).with(csrf()).contentType("application/json")
@@ -240,12 +241,12 @@ class TaskDirectoryApiTest {
 }
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=TaskDirectoryApiTest -DfailIfNoTests=false`
 预期：FAIL（404，端点不存在）。
 
-- [ ] **步骤 3：实现存储**
+- [x] **步骤 3：实现存储**
 
 创建 `TaskDirectoryStore.java`：
 ```java
@@ -336,7 +337,7 @@ public final class TaskDirectoryStore {
 }
 ```
 
-- [ ] **步骤 4：实现控制器与装配**
+- [x] **步骤 4：实现控制器与装配**
 
 创建 `TaskDirectoryController.java`：
 ```java
@@ -405,7 +406,21 @@ public class TaskDirectoryController {
     @Bean TaskDirectoryStore taskDirectoryStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new TaskDirectoryStore(jdbc, tx); }
 ```
 
-`PermissionCatalog.java` routes 段（`/api/tasks` 路由附近）增加：
+`PermissionCatalog.java` 还需注册删除权限码（原 catalog 的 workflow.task 模块无 delete 动作，route() 会强校验未注册权限）：`buildEntries` 中增加
+```java
+        add(values, "workflow.task", "任务管理", "删除", "删除任务");
+```
+并创建双份迁移 `V33__task_delete_permission.sql`（H2 与 MySQL 内容一致，参照 V30 模式）：
+```sql
+INSERT INTO permission_catalog (permission_code,module_code,module_name,action_code,action_name,description,sort_order)
+SELECT 'workflow.task.delete','workflow.task','任务管理','delete','删除','删除任务与任务目录',COALESCE(MAX(sort_order),0)+1 FROM permission_catalog;
+INSERT INTO role_permissions (role_id, permission)
+SELECT 1, 'workflow.task.delete' FROM permission_catalog
+WHERE EXISTS (SELECT 1 FROM roles WHERE id=1)
+  AND NOT EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.role_id=1 AND rp.permission='workflow.task.delete');
+```
+
+routes 段（`/api/tasks` 路由附近）增加：
 ```java
         route(routes, "GET", "/api/task-directories", "workflow.task.read");
         route(routes, "POST", "/api/task-directories", "workflow.task.create");
@@ -414,19 +429,19 @@ public class TaskDirectoryController {
         route(routes, "DELETE", "/api/task-directories/*", "workflow.task.delete");
 ```
 
-- [ ] **步骤 5：运行测试验证通过**
+- [x] **步骤 5：运行测试验证通过**
 
 运行：同步骤 2 命令。
 预期：`Tests run: 2, Failures: 0`，BUILD SUCCESS。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
-git add backend/src/main/java/com/example/governance/workflow/TaskDirectoryStore.java backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java backend/src/main/java/com/example/governance/workflow/WorkflowConfiguration.java backend/src/main/java/com/example/governance/security/PermissionCatalog.java backend/src/test/java/com/example/governance/workflow/TaskDirectoryApiTest.java
+git add backend/src/main/java/com/example/governance/workflow/TaskDirectoryStore.java backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java backend/src/main/java/com/example/governance/workflow/WorkflowConfiguration.java backend/src/main/java/com/example/governance/security/PermissionCatalog.java backend/src/main/resources/db/migration/V33__task_delete_permission.sql backend/src/main/resources/db/mysql/V33__task_delete_permission.sql backend/src/test/java/com/example/governance/workflow/TaskDirectoryApiTest.java
 git commit -m "feat(processing): 任务目录树 CRUD 与拖拽排序接口
 
 目录非空保守删除、排序全量提交并校验环；权限复用 workflow.task，
-增删改移记审计。"
+增删改移记审计；注册 workflow.task.delete 权限码（V33）。"
 ```
 
 ---
@@ -440,7 +455,7 @@ git commit -m "feat(processing): 任务目录树 CRUD 与拖拽排序接口
 - 修改：`backend/src/main/java/com/example/governance/security/PermissionCatalog.java`（PUT /api/tasks/* 路由）
 - 测试：`backend/src/test/java/com/example/governance/workflow/TaskMetadataApiTest.java`
 
-- [ ] **步骤 1：编写失败的 API 测试**
+- [x] **步骤 1：编写失败的 API 测试**
 
 创建 `TaskMetadataApiTest.java`（login 辅助与任务 2 相同模式，此处完整给出）：
 ```java
@@ -474,15 +489,18 @@ class TaskMetadataApiTest {
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (621,621)");
         for (String permission : new String[]{"workflow.task.read", "workflow.task.create", "workflow.task.update", "workflow.task.execute", "datasource.source.read"})
             jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (621,?)", permission);
+        jdbc.update("INSERT INTO task_directories(id,parent_id,name,sort_order) VALUES (621,NULL,'订单域',0)");
+        // 创建任务时 verify() 会锁定 sourceId 对应的数据源，测试库需先存在 id=1 的数据源
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         return (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username", "meta-user").param("password", "password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
     }
 
     @Test void listCreateAndMetadataUpdate() throws Exception {
         var session = login();
-        long directory = jdbc.queryForObject("SELECT id FROM task_directories WHERE name='订单域'", Long.class);
+        long directory = 621;
         // 创建带目录与描述
         mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
-                .content("{\"name\":\"加工任务\",\"type\":\"SQL\",\"configuration\":{\"sourceId\":1,\"sql\":\"SELECT 1\"},\"directoryId\":" + directory + ",\"description\":\"每日加工\"}"))
+                .content("{\"name\":\"加工任务\",\"type\":\"SQL\",\"configuration\":{\"sourceId\":1,\"sql\":\"SELECT 1\",\"parameters\":[]},\"directoryId\":" + directory + ",\"description\":\"每日加工\"}"))
                 .andExpect(status().isCreated());
         long taskId = jdbc.queryForObject("SELECT id FROM processing_tasks WHERE name='加工任务'", Long.class);
         // 列表富化：无运行时 STOPPED、lastRun 为空（本测试库仅此一任务，用 $[0]）
@@ -506,8 +524,14 @@ class TaskMetadataApiTest {
                 .andExpect(status().isNoContent());
         mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("加工任务"))
+                .andExpect(jsonPath("$[0].directoryId").value(directory))
                 .andExpect(jsonPath("$[0].description").value("新描述"))
                 .andExpect(jsonPath("$[0].runState").value("STOPPED"));
+        // 名称 null/非文本 → 400（不得落库字面 "null"）
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"name\":null}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"name\":123}"))
+                .andExpect(status().isBadRequest());
         // 清空目录（显式 null）
         mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":null}"))
                 .andExpect(status().isNoContent());
@@ -516,18 +540,12 @@ class TaskMetadataApiTest {
 }
 ```
 
-注意：该测试依赖任务 2 已创建的“订单域”目录？**不依赖**——本测试库独立。在 `login()` 末尾追加创建目录：
-```java
-        jdbc.update("INSERT INTO task_directories(id,parent_id,name,sort_order) VALUES (621,NULL,'订单域',0)");
-```
-并把测试中 `long directory = ...` 改为 `long directory = 621;`。
-
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=TaskMetadataApiTest -DfailIfNoTests=false`
 预期：FAIL（创建请求多余字段被忽略、列表无 runState、PUT 404）。
 
-- [ ] **步骤 3：扩展 TaskVersionStore**
+- [x] **步骤 3：扩展 TaskVersionStore**
 
 `Task` 记录与 `list()` 替换为：
 ```java
@@ -543,10 +561,11 @@ class TaskMetadataApiTest {
     public long create(String name, String type, String configuration) { return create(name, type, configuration, null, null); }
     public long create(String name, String type, String configuration, Long directoryId, String description) {
         if (name == null || name.isBlank() || name.length() > 160 || type == null || !Set.of("SQL", "SYNC").contains(type)) throw new IllegalArgumentException("Invalid task");
-        if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=?", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
         if (description != null && description.length() > 500) throw new IllegalArgumentException("Invalid description");
         validate(configuration);
         return transaction.execute(status -> {
+            // 目录存在性检查在事务内并锁目录行，与目录删除串行化
+            if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=? FOR UPDATE", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
             var key = new GeneratedKeyHolder();
             jdbc.update(connection -> {
                 var statement = connection.prepareStatement("INSERT INTO processing_tasks(name,task_type,current_version,directory_id,description) VALUES (?,?,1,?,?)", new String[]{"id"});
@@ -569,20 +588,36 @@ class TaskMetadataApiTest {
         transaction.executeWithoutResult(status -> {
             var rows = jdbc.query("SELECT name,directory_id,description FROM processing_tasks WHERE id=? FOR UPDATE",
                     (rs, row) -> new Object[]{rs.getString(1), rs.getObject(2, Long.class), rs.getString(3)}, id);
-            if (rows.isEmpty()) throw new IllegalArgumentException("Unknown task");
+            if (rows.isEmpty()) throw new java.util.NoSuchElementException("Unknown task");
             Object[] current = rows.getFirst();
-            String name = changes.has("name") ? changes.get("name").asText() : (String) current[0];
+            String name = (String) current[0];
+            if (changes.has("name")) {
+                com.fasterxml.jackson.databind.JsonNode node = changes.get("name");
+                name = node.isTextual() ? node.asText() : null;   // null/非文本 → 后续校验拒为 400
+            }
             if (name == null || name.isBlank() || name.length() > 160) throw new IllegalArgumentException("Invalid task name");
-            Long directoryId = changes.has("directoryId") ? (changes.get("directoryId").isNull() ? null : changes.get("directoryId").asLong()) : (Long) current[1];
-            if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=?", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
-            String description = changes.has("description") ? (changes.get("description").isNull() ? null : changes.get("description").asText()) : (String) current[2];
+            Long directoryId = (Long) current[1];
+            if (changes.has("directoryId")) {
+                com.fasterxml.jackson.databind.JsonNode node = changes.get("directoryId");
+                if (node.isNull()) directoryId = null;
+                else if (node.isIntegralNumber() && node.canConvertToLong()) directoryId = node.asLong();
+                else throw new IllegalArgumentException("Invalid directory");
+            }
+            if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=? FOR UPDATE", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
+            String description = (String) current[2];
+            if (changes.has("description")) {
+                com.fasterxml.jackson.databind.JsonNode node = changes.get("description");
+                if (node.isNull()) description = null;
+                else if (node.isTextual()) description = node.asText();
+                else throw new IllegalArgumentException("Invalid description");
+            }
             if (description != null && description.length() > 500) throw new IllegalArgumentException("Invalid description");
             jdbc.update("UPDATE processing_tasks SET name=?,directory_id=?,description=? WHERE id=?", name, directoryId, description, id);
         });
     }
 ```
 
-- [ ] **步骤 4：TaskRunService 增加状态查询**
+- [x] **步骤 4：TaskRunService 增加状态查询**
 
 在 `TaskRunService` 中新增：
 ```java
@@ -591,23 +626,19 @@ class TaskMetadataApiTest {
     public boolean hasActiveRun(long taskId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=? AND state IN ('PENDING','RUNNING')", Integer.class, taskId) > 0;
     }
-    /** Latest run plus active flag per task, derived in one pass over task_runs. */
+    private record RunRow(long taskId, String state, LocalDateTime startedAt, LocalDateTime finishedAt) {}
+    /** Latest run per task (MAX(id) join) plus active flag (DISTINCT active task_id); O(tasks+active), not O(history). */
     public java.util.Map<Long, TaskRunSummary> summary() {
-        var rows = jdbc.query("SELECT task_id,state,started_at,finished_at FROM task_runs ORDER BY id",
-                (rs, row) -> new Object[]{rs.getLong(1), rs.getString(2), rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toLocalDateTime(), rs.getTimestamp(4) == null ? null : rs.getTimestamp(4).toLocalDateTime()});
+        var latest = jdbc.query("SELECT r.task_id,r.state,r.started_at,r.finished_at FROM task_runs r JOIN (SELECT task_id,MAX(id) AS max_id FROM task_runs GROUP BY task_id) m ON m.max_id=r.id",
+                (rs, row) -> { var s = rs.getTimestamp(3); var f = rs.getTimestamp(4); return new RunRow(rs.getLong(1), rs.getString(2), s == null ? null : s.toLocalDateTime(), f == null ? null : f.toLocalDateTime()); });
+        var active = new java.util.HashSet<>(jdbc.queryForList("SELECT DISTINCT task_id FROM task_runs WHERE state IN ('PENDING','RUNNING')", Long.class));
         var result = new java.util.HashMap<Long, TaskRunSummary>();
-        for (Object[] row : rows) {
-            long taskId = (Long) row[0];
-            boolean active = "PENDING".equals(row[1]) || "RUNNING".equals(row[1]);
-            var previous = result.get(taskId);
-            boolean running = active || (previous != null && previous.running());
-            result.put(taskId, new TaskRunSummary(running, new LastRun((String) row[1], (LocalDateTime) row[2], (LocalDateTime) row[3])));
-        }
+        for (RunRow row : latest) result.put(row.taskId(), new TaskRunSummary(active.contains(row.taskId()), new LastRun(row.state(), row.startedAt(), row.finishedAt())));
         return result;
     }
 ```
 
-- [ ] **步骤 5：TaskController 列表富化 + 创建扩展 + PUT**
+- [x] **步骤 5：TaskController 列表富化 + 创建扩展 + PUT**
 
 `TaskController` 中：
 
@@ -643,6 +674,7 @@ class TaskMetadataApiTest {
     ResponseEntity<Void> metadata(@PathVariable long id, @RequestBody JsonNode changes, Authentication auth) {
         if (runs.hasActiveRun(id)) throw new ResponseStatusException(HttpStatus.CONFLICT, "任务运行中，不能修改");
         try { tasks.updateMetadata(id, changes); }
+        catch (java.util.NoSuchElementException ex) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在"); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "基本信息无效"); }
         audit.success(auth, "task.update", "task", id);
         return ResponseEntity.noContent().build();
@@ -655,12 +687,12 @@ class TaskMetadataApiTest {
         route(routes, "PUT", "/api/tasks/*", "workflow.task.update");
 ```
 
-- [ ] **步骤 6：运行测试验证通过**
+- [x] **步骤 6：运行测试验证通过**
 
 运行：同步骤 2 命令；再跑 `mvn test -Dtest=TaskVersionStoreTest,StandaloneTaskRetryApiTest -DfailIfNoTests=false` 确认旧测试不回归。
 预期：全部 PASS。
 
-- [ ] **步骤 7：Commit**
+- [x] **步骤 7：Commit**
 
 ```bash
 git add backend/src/main/java/com/example/governance/workflow/TaskVersionStore.java backend/src/main/java/com/example/governance/workflow/TaskRunService.java backend/src/main/java/com/example/governance/workflow/TaskController.java backend/src/main/java/com/example/governance/security/PermissionCatalog.java backend/src/test/java/com/example/governance/workflow/TaskMetadataApiTest.java
@@ -684,7 +716,7 @@ PUT 维护基本信息，运行中禁止修改。"
 - 修改：`backend/src/main/java/com/example/governance/security/PermissionCatalog.java`
 - 测试：`backend/src/test/java/com/example/governance/workflow/TaskStopApiTest.java`
 
-- [ ] **步骤 1：编写失败的 API 测试**
+- [x] **步骤 1：编写失败的 API 测试**
 
 创建 `TaskStopApiTest.java`：
 ```java
@@ -798,12 +830,12 @@ class TaskStopApiTest {
 }
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=TaskStopApiTest -DfailIfNoTests=false`
 预期：FAIL（编译错误：RunCancelContext 不存在 / stop 404）。
 
-- [ ] **步骤 3：实现 RunCancelContext**
+- [x] **步骤 3：实现 RunCancelContext**
 
 创建 `RunCancelContext.java`：
 ```java
@@ -821,6 +853,8 @@ public final class RunCancelContext {
     public boolean isCancelled() { return cancelled.get(); }
     public void worker(Thread thread) { this.worker = thread; }
     public void register(Statement active) { this.statement = active; }
+    /** 终态后调用：迟到 cancel 只置标志，不再 interrupt 复用池线程或 cancel 已关闭语句。 */
+    public void detach() { this.worker = null; this.statement = null; }
     public void cancel() {
         cancelled.set(true);
         Statement active = statement;
@@ -831,7 +865,7 @@ public final class RunCancelContext {
 }
 ```
 
-- [ ] **步骤 4：TaskRunService 接线停止与守卫**
+- [x] **步骤 4：TaskRunService 接线停止与守卫**
 
 新增字段与记录：
 ```java
@@ -839,23 +873,28 @@ public final class RunCancelContext {
     private record ActiveRun(long id, String state, int attempt) {}
 ```
 
-`start` 方法在版本校验后追加：
+`start` 方法在版本校验后追加（行锁内守卫，与并发 start/stop 串行化）：
 ```java
+        jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, taskId);
         if (hasActiveRun(taskId)) throw new IllegalStateException("任务已在运行");
 ```
 
-`execute` 方法中，`if (!claimed) return;` 之后到方法结束替换为：
+`execute` 方法重构：ctx 注册提前到 claim 之前（闭合 claim→put 窗口）；终态 finish 完成后才 detach+remove（闭合 remove→finish 窗口）；InterruptedException 先 finish 再恢复中断标志（避免带标志取连接失败）；成功路径 finish 前查取消标志：
 ```java
         var cancel = new RunCancelContext();
         cancel.worker(Thread.currentThread());
         active.put(id, cancel);
-        try (var permit = limiter.acquire()) { runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel); }
-        catch (InterruptedException ex) { Thread.currentThread().interrupt(); finish(id, attempt, "INTERRUPTED", cancel.isCancelled() ? "手动停止" : null); return; }
-        catch (Exception ex) { finish(id, attempt, cancel.isCancelled() ? "INTERRUPTED" : "FAILED", cancel.isCancelled() ? "手动停止" : "任务执行失败"); return; }
-        finally { active.remove(id); }
-        // Failure recording a successful business write is ambiguous and must not be classified as a task failure.
-        try { finish(id, attempt, "SUCCEEDED", null); }
-        catch (RuntimeException ex) { finish(id, attempt, "INTERRUPTED", null); }
+        try {
+            boolean claimed = ...原有 claim 事务...;
+            if (!claimed) return;   // finally 会 detach+remove
+            try (var permit = limiter.acquire()) { runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel); }
+            catch (InterruptedException ex) { finish(id, attempt, "INTERRUPTED", cancel.isCancelled() ? "手动停止" : null); Thread.currentThread().interrupt(); return; }
+            catch (Exception ex) { finish(id, attempt, cancel.isCancelled() ? "INTERRUPTED" : "FAILED", cancel.isCancelled() ? "手动停止" : "任务执行失败"); return; }
+            if (cancel.isCancelled()) { finish(id, attempt, "INTERRUPTED", "手动停止"); return; }
+            // Failure recording a successful business write is ambiguous and must not be classified as a task failure.
+            try { finish(id, attempt, "SUCCEEDED", null); }
+            catch (RuntimeException ex) { finish(id, attempt, "INTERRUPTED", null); }
+        } finally { cancel.detach(); active.remove(id); }
 ```
 
 新增 stop：
@@ -875,7 +914,7 @@ public final class RunCancelContext {
     }
 ```
 
-- [ ] **步骤 5：执行器传递取消上下文**
+- [x] **步骤 5：执行器传递取消上下文**
 
 `CamelTaskRunner.java`：原 `execute(Version, LocalDate)` 方法体首行改为委托，并新增三参重载：
 ```java
@@ -903,6 +942,7 @@ public final class RunCancelContext {
 `DatabaseSyncExecutor.java`：
 - `Request` 记录末尾追加 `RunCancelContext cancel` 分量。
 - 路由内 `appendRows(rows, write, request.columns().size(), request.batchSize())` 改为 `appendRows(rows, write, request.columns().size(), request.batchSize(), request.cancel())`；`upsertRows(rows, write, target, request)` 不变（request 已含 cancel）。
+- 路由内 read/write prepareStatement 后 `request.cancel().register(write)`（接线 Statement.cancel，停止即时化）；`target.commit()` 之前补 `if (request.cancel().isCancelled()) throw new InterruptedException("手动停止");`（末批/commit 窗口走 rollback）。
 - `appendRows` 签名追加 `RunCancelContext cancel`，`while (rows.next()) {` 后首行追加：
 ```java
             if (cancel.isCancelled()) throw new InterruptedException("手动停止");
@@ -916,7 +956,7 @@ public final class RunCancelContext {
     }
 ```
 
-- [ ] **步骤 6：控制器 stop 端点与路由**
+- [x] **步骤 6：控制器 stop 端点与路由**
 
 `TaskController.java` 新增：
 ```java
@@ -936,12 +976,12 @@ public final class RunCancelContext {
         route(routes, "POST", "/api/tasks/*/stop", "workflow.task.execute");
 ```
 
-- [ ] **步骤 7：运行测试验证通过**
+- [x] **步骤 7：运行测试验证通过**
 
 运行：`cd backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=TaskStopApiTest,TaskConcurrencyIntegrationTest,SqlTaskExecutorTest,DatabaseSyncExecutorTest,CamelTaskRunnerTest,WorkflowWorkerTest -DfailIfNoTests=false`
 预期：全部 PASS（旧执行器测试经旧签名委托不受影响）。
 
-- [ ] **步骤 8：Commit**
+- [x] **步骤 8：Commit**
 
 ```bash
 git add backend/src/main/java/com/example/governance/workflow/RunCancelContext.java backend/src/main/java/com/example/governance/workflow/TaskRunService.java backend/src/main/java/com/example/governance/workflow/CamelTaskRunner.java backend/src/main/java/com/example/governance/workflow/SqlTaskExecutor.java backend/src/main/java/com/example/governance/workflow/DatabaseSyncExecutor.java backend/src/main/java/com/example/governance/workflow/TaskController.java backend/src/main/java/com/example/governance/security/PermissionCatalog.java backend/src/test/java/com/example/governance/workflow/TaskStopApiTest.java
@@ -961,7 +1001,7 @@ git commit -m "feat(processing): 任务停止与重复启动守卫
 - 修改：`backend/src/main/java/com/example/governance/security/PermissionCatalog.java`
 - 测试：`backend/src/test/java/com/example/governance/workflow/TaskDeleteApiTest.java`
 
-- [ ] **步骤 1：编写失败的 API 测试**
+- [x] **步骤 1：编写失败的 API 测试**
 
 创建 `TaskDeleteApiTest.java`：
 ```java
@@ -1005,8 +1045,11 @@ class TaskDeleteApiTest {
         jdbc.update("INSERT INTO workflow_definitions(id,name,current_version) VALUES (641,'wf',1)");
         jdbc.update("INSERT INTO workflow_versions(workflow_id,version) VALUES (641,1)");
         jdbc.update("INSERT INTO workflow_nodes(workflow_id,workflow_version,node_key,ordinal_no,task_id,task_version) VALUES (641,1,'n1',0,641,1)");
-        // 被工作流引用 → 409
-        mvc.perform(delete("/api/tasks/641").session(session).with(csrf())).andExpect(status().isConflict());
+        // 被工作流引用 → 409（reason 区分双 409 源），且被拒任务完好
+        mvc.perform(delete("/api/tasks/641").session(session).with(csrf())).andExpect(status().isConflict())
+                .andExpect(result -> assertEquals("任务被工作流引用，不能删除", ((org.springframework.web.server.ResponseStatusException) result.getResolvedException()).getReason()));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM processing_tasks WHERE id=641", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM processing_task_versions WHERE task_id=641", Integer.class));
         // 有运行历史但无引用 → 级联删除
         jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no) VALUES (641,642,1,DATE '2026-11-20','SUCCEEDED',CURRENT_TIMESTAMP,1)");
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,finished_at) VALUES (641,1,'SUCCEEDED',CURRENT_TIMESTAMP)");
@@ -1022,12 +1065,12 @@ class TaskDeleteApiTest {
 }
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=TaskDeleteApiTest -DfailIfNoTests=false`
 预期：FAIL（DELETE 404/405）。
 
-- [ ] **步骤 3：实现删除**
+- [x] **步骤 3：实现删除**
 
 `TaskVersionStore.java` 新增：
 ```java
@@ -1036,6 +1079,9 @@ class TaskDeleteApiTest {
         transaction.executeWithoutResult(status -> {
             if (jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, id).isEmpty()) throw new IllegalArgumentException("Unknown task");
             if (jdbc.queryForObject("SELECT COUNT(*) FROM workflow_nodes WHERE task_id=?", Integer.class, id) > 0) throw new IllegalStateException("任务被工作流引用，不能删除");
+            // 锁内复查活跃 run，闭合控制器守卫与 start/retry 的并发窗口（权威守卫；控制器前置检查仅快速失败）
+            var states = jdbc.queryForList("SELECT state FROM task_runs WHERE task_id=? FOR UPDATE", String.class, id);
+            if (states.stream().anyMatch(s -> s.equals("PENDING") || s.equals("RUNNING"))) throw new IllegalStateException("任务运行中，不能删除");
             jdbc.update("DELETE FROM task_runs WHERE task_id=?", id);
             jdbc.update("DELETE FROM processing_task_versions WHERE task_id=?", id);
             jdbc.update("DELETE FROM processing_tasks WHERE id=?", id);
@@ -1062,12 +1108,12 @@ class TaskDeleteApiTest {
         route(routes, "DELETE", "/api/tasks/*", "workflow.task.delete");
 ```
 
-- [ ] **步骤 4：运行测试验证通过**
+- [x] **步骤 4：运行测试验证通过**
 
 运行：同步骤 2 命令。
 预期：`Tests run: 1, Failures: 0`。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add backend/src/main/java/com/example/governance/workflow/TaskVersionStore.java backend/src/main/java/com/example/governance/workflow/TaskController.java backend/src/main/java/com/example/governance/security/PermissionCatalog.java backend/src/test/java/com/example/governance/workflow/TaskDeleteApiTest.java
@@ -1085,7 +1131,7 @@ git commit -m "feat(processing): 任务删除接口与引用守卫
 - 创建：`frontend/src/processing-tasks.js`
 - 测试：`frontend/tests/processing-tasks.test.js`
 
-- [ ] **步骤 1：编写失败的测试**
+- [x] **步骤 1：编写失败的测试**
 
 创建 `frontend/tests/processing-tasks.test.js`：
 ```js
@@ -1147,12 +1193,12 @@ test('flatten tree produces parent links and sibling order', () => {
 })
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd frontend && node --test "tests/processing-tasks.test.js"`
 预期：FAIL（模块不存在）。
 
-- [ ] **步骤 3：实现模块**
+- [x] **步骤 3：实现模块**
 
 创建 `frontend/src/processing-tasks.js`：
 ```js
@@ -1171,10 +1217,10 @@ export function subtreeIds(directories, rootId) {
 
 export function filterTasks(tasks, { directories = [], directoryId = null, name = '', runState = '' } = {}) {
   const ids = subtreeIds(directories, directoryId)
-  const keyword = name.trim().toLowerCase()
+  const keyword = String(name ?? '').trim().toLowerCase()
   return tasks.filter(task =>
     (ids === null || (task.directoryId != null && ids.has(task.directoryId))) &&
-    (!keyword || task.name.toLowerCase().includes(keyword)) &&
+    (!keyword || String(task.name ?? '').toLowerCase().includes(keyword)) &&
     (!runState || task.runState === runState))
 }
 
@@ -1183,7 +1229,7 @@ export function batchSummary(results) {
   const failed = results.filter(result => !result.ok)
   const parts = []
   if (succeeded.length) parts.push(`成功：${succeeded.join('、')}`)
-  if (failed.length) parts.push(`失败：${failed.map(result => `${result.name}（${result.error}）`).join('、')}`)
+  if (failed.length) parts.push(`失败：${failed.map(result => `${result.name}（${result.error || '未知错误'}）`).join('、')}`)
   return parts.join('；') || '没有可操作的任务'
 }
 
@@ -1197,12 +1243,12 @@ export function flattenTree(nodes, parentId = null) {
 }
 ```
 
-- [ ] **步骤 4：运行测试验证通过**
+- [x] **步骤 4：运行测试验证通过**
 
 运行：同步骤 2 命令。
 预期：`pass 5, fail 0`。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add frontend/src/processing-tasks.js frontend/tests/processing-tasks.test.js
@@ -1222,7 +1268,7 @@ git commit -m "feat(processing): 任务目录过滤与批量启停汇总纯逻�
 
 复用 `task-edit.js`（emptyTask/formFromTask/configurationFromForm/newParameter）与 `auth.js` 的 authorizedRequest，字段语义与 TaskStudio 完全一致。
 
-- [ ] **步骤 1：实现 TaskFormDialog.vue**
+- [x] **步骤 1：实现 TaskFormDialog.vue**
 
 创建 `frontend/src/TaskFormDialog.vue`：
 ```vue
@@ -1314,7 +1360,7 @@ async function save() {
 <style scoped>.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.row{display:flex;gap:12px;align-items:center;margin:14px 0}.parameter-editor p{color:#687e7b;font-size:13px}.parameter-row .el-select,.parameter-row .el-input{max-width:200px}@media(max-width:700px){.grid{grid-template-columns:1fr}.row{flex-wrap:wrap}}</style>
 ```
 
-- [ ] **步骤 2：实现 TaskRunsDialog.vue**
+- [x] **步骤 2：实现 TaskRunsDialog.vue**
 
 创建 `frontend/src/TaskRunsDialog.vue`：
 ```vue
@@ -1361,12 +1407,12 @@ async function retry(run) {
 <style scoped>.el-pagination{margin-top:18px;justify-content:flex-end}</style>
 ```
 
-- [ ] **步骤 3：构建验证**
+- [x] **步骤 3：构建验证**
 
 运行：`cd frontend && npm run build`
 预期：构建成功（组件尚未被引用，但语法与导入必须通过）。
 
-- [ ] **步骤 4：Commit**
+- [x] **步骤 4：Commit**
 
 ```bash
 git add frontend/src/TaskFormDialog.vue frontend/src/TaskRunsDialog.vue
@@ -1384,7 +1430,7 @@ git commit -m "feat(processing): 任务表单与运行记录对话框组件
 - 创建：`frontend/src/ProcessingTasks.vue`
 - 修改：`frontend/src/App.vue`（import 与 section 分支，约 6 行与 236 行附近）
 
-- [ ] **步骤 1：实现 ProcessingTasks.vue**
+- [x] **步骤 1：实现 ProcessingTasks.vue**
 
 创建 `frontend/src/ProcessingTasks.vue`：
 ```vue
@@ -1591,7 +1637,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 </style>
 ```
 
-- [ ] **步骤 2：App.vue 接线**
+- [x] **步骤 2：App.vue 接线**
 
 `App.vue` script 段 import 区（TaskStudio import 附近）增加：
 ```js
@@ -1602,7 +1648,7 @@ template 中 assets 分支后增加：
       <div v-else-if="section === 'processing'" class="content"><ProcessingTasks :view="groupPages.processing || 'tasks'" /></div>
 ```
 
-- [ ] **步骤 3：构建与全量测试**
+- [x] **步骤 3：构建与全量测试**
 
 运行：
 ```bash
@@ -1611,7 +1657,7 @@ cd ../backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-ho
 ```
 预期：前端构建成功、48+5 个测试通过；后端全量测试 BUILD SUCCESS。
 
-- [ ] **步骤 4：手工验证清单**
+- [x] **步骤 4：手工验证清单**
 
 启动后端（`mvn spring-boot:run`，环境变量已配置）与前端（`npm run dev`），以具备 `workflow.task.*` 权限的账号登录：
 1. 侧边栏出现“数据处理 / 处理任务”，面包屑正确。
@@ -1624,7 +1670,7 @@ cd ../backend && JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-ho
 8. 窄屏（≤700px）目录 pane 置顶、工具栏换行查询区在前。
 9. 仅有 `datasource.*` 权限的账号看不到“数据处理”菜单。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add frontend/src/ProcessingTasks.vue frontend/src/App.vue
