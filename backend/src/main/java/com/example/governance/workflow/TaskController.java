@@ -9,6 +9,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import java.util.List;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,15 +25,33 @@ public class TaskController {
     private final DataSourceStore sources;
     private final AuditLog audit;
     public TaskController(TaskVersionStore tasks, TaskDefinitionValidator validator, DataSourceStore sources, AuditLog audit, TaskRunService runs) { this.runs = runs; this.tasks = tasks; this.validator = validator; this.sources = sources; this.audit = audit; }
-    record CreateRequest(String name, String type, JsonNode configuration) {}
+    record CreateRequest(String name, String type, JsonNode configuration, Long directoryId, String description) {}
+    public record LastRunView(String state, java.time.LocalDateTime startedAt, java.time.LocalDateTime finishedAt) {}
+    public record TaskView(long id, String name, String type, int version, String configuration, Long directoryId, String description, String runState, LastRunView lastRun) {}
     @GetMapping("/api/tasks")
-    List<TaskVersionStore.Task> list() { return tasks.list(); }
+    List<TaskView> list() {
+        var summaries = runs.summary();
+        return tasks.list().stream().map(task -> {
+            var summary = summaries.get(task.id());
+            boolean running = summary != null && summary.running();
+            LastRunView last = summary == null || summary.lastRun() == null ? null : new LastRunView(summary.lastRun().state(), summary.lastRun().startedAt(), summary.lastRun().finishedAt());
+            return new TaskView(task.id(), task.name(), task.type(), task.version(), task.configuration(), task.directoryId(), task.description(), running ? "RUNNING" : "STOPPED", last);
+        }).toList();
+    }
+    @PutMapping("/api/tasks/{id}")
+    ResponseEntity<Void> metadata(@PathVariable long id, @RequestBody JsonNode changes, Authentication auth) {
+        if (runs.hasActiveRun(id)) throw new ResponseStatusException(HttpStatus.CONFLICT, "任务运行中，不能修改");
+        try { tasks.updateMetadata(id, changes); }
+        catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "基本信息无效"); }
+        audit.success(auth, "task.update", "task", id);
+        return ResponseEntity.noContent().build();
+    }
     @PostMapping("/api/tasks")
     @Transactional
     ResponseEntity<Map<String, Object>> create(@RequestBody CreateRequest request, Authentication authentication) {
         try {
             String config = verify(request.type(), request.configuration());
-            long id = tasks.create(request.name(), request.type(), config);
+            long id = tasks.create(request.name(), request.type(), config, request.directoryId(), request.description());
             audit.success(authentication, "task.create", "task", id);
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id, "version", 1));
         } catch (IllegalArgumentException ex) {

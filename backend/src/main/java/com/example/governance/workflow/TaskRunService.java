@@ -93,6 +93,25 @@ public class TaskRunService {
             return jdbc.update("UPDATE task_runs SET state='INTERRUPTED',finished_at=CURRENT_TIMESTAMP WHERE state IN ('PENDING','RUNNING')");
         });
     }
+    public record LastRun(String state, LocalDateTime startedAt, LocalDateTime finishedAt) {}
+    public record TaskRunSummary(boolean running, LastRun lastRun) {}
+    public boolean hasActiveRun(long taskId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=? AND state IN ('PENDING','RUNNING')", Integer.class, taskId) > 0;
+    }
+    /** Latest run plus active flag per task, derived in one pass over task_runs. */
+    public java.util.Map<Long, TaskRunSummary> summary() {
+        var rows = jdbc.query("SELECT task_id,state,started_at,finished_at FROM task_runs ORDER BY id",
+                (rs, row) -> new Object[]{rs.getLong(1), rs.getString(2), rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toLocalDateTime(), rs.getTimestamp(4) == null ? null : rs.getTimestamp(4).toLocalDateTime()});
+        var result = new java.util.HashMap<Long, TaskRunSummary>();
+        for (Object[] row : rows) {
+            long taskId = (Long) row[0];
+            boolean active = "PENDING".equals(row[1]) || "RUNNING".equals(row[1]);
+            var previous = result.get(taskId);
+            boolean running = active || (previous != null && previous.running());
+            result.put(taskId, new TaskRunSummary(running, new LastRun((String) row[1], (LocalDateTime) row[2], (LocalDateTime) row[3])));
+        }
+        return result;
+    }
     public List<View> list(long taskId) {
         var runs = jdbc.query("SELECT id,task_id,task_version,business_date,state,created_at,started_at,finished_at,error_message FROM task_runs WHERE task_id=? ORDER BY id DESC LIMIT 100", (rs, row) -> new View(rs.getLong(1), rs.getLong(2), rs.getInt(3), rs.getDate(4).toLocalDate(), rs.getString(5), rs.getTimestamp(6).toLocalDateTime(), rs.getTimestamp(7) == null ? null : rs.getTimestamp(7).toLocalDateTime(), rs.getTimestamp(8) == null ? null : rs.getTimestamp(8).toLocalDateTime(), rs.getString(9), List.of()), taskId);
         if (runs.isEmpty()) return List.of();
