@@ -42,8 +42,9 @@ class OrganizationNavigationTest {
         var roots = rows.stream().filter(menu -> menu.parentId() == null).map(OrganizationService.Menu::component).toList();
         assertEquals(List.of("assets", "system"), roots);
         var components = components(f, "admin");
-        assertEquals(11, components.size());
-        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/datasets", "assets/drivers", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
+        assertEquals(10, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/drivers", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
+        assertFalse(components.contains("assets/datasets"));
     }
 
     @Test void singleSystemGrantOnlyOpensItsOwnPage() {
@@ -62,12 +63,10 @@ class OrganizationNavigationTest {
         assertTrue(components.containsAll(List.of("assets", "assets/sources")));
     }
 
-    @Test void datasetGrantOpensDatasetPageOnly() {
+    @Test void datasetGrantDoesNotShowHiddenDatasetPage() {
         var f = fixture();
         grantUser(f, 10, "dataset", 10, true, Set.of("datasource.dataset.read"));
-        var components = components(f, "dataset");
-        assertEquals(2, components.size());
-        assertTrue(components.containsAll(List.of("assets", "assets/datasets")));
+        assertEquals(List.of(), components(f, "dataset"));
     }
 
     @Test void noGrantsOrDisabledRoleMeansEmptyNavigation() {
