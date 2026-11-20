@@ -1,6 +1,7 @@
 <script setup>
 import { inject, onMounted, ref, computed } from 'vue'
 import { authorizedRequest } from './auth.js'
+import RefreshIcon from './RefreshIcon.vue'
 import { analysisQuery, changeFilterOperation, changeFilterType } from './analysis-filters.js'
 import { createValidationGuard } from './workflow.js'
 import { usePagination } from './pagination.js'
@@ -10,11 +11,12 @@ const sortField = ref(''), sortDirection = ref('DESC')
 const rowLimit = ref(200)
 const reportName = ref(''), chartType = ref('TABLE'), lastQuery = ref(null), message = ref('')
 const queryGuard = createValidationGuard()
-const queryOpen = ref(false), search = ref('')
-const filteredDatasets = computed(() => datasets.value.filter(item => item.name.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())))
+const queryOpen = ref(false), search = ref(''), appliedSearch = ref('')
+const filteredDatasets = computed(() => datasets.value.filter(item => item.name.toLocaleLowerCase().includes(appliedSearch.value.toLocaleLowerCase())))
 const { page, pageSize, total, visible } = usePagination(filteredDatasets)
 const dataset = computed(() => datasets.value.find(d => d.id === datasetId.value))
 async function load() { try { const response = await fetch('/api/accessible-datasets', { credentials: 'same-origin' }); if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有数据集读取权限' : '无法读取数据集'); datasets.value = await response.json() } catch (e) { error.value = e.message } }
+function applyDatasetQuery() { appliedSearch.value = search.value.trim(); page.value = 1 }
 function openDataset(item) { datasetId.value = item.id; selectDataset(); queryOpen.value = true }
 function closeQuery() { queryGuard.changed(); busy.value = false; datasetId.value = null; lastQuery.value = null; rows.value = []; error.value = '' }
 function selectDataset() { queryGuard.changed(); busy.value = false; fields.value = []; groups.value = []; metricField.value = ''; filters.value = []; sortField.value = ''; rows.value = []; lastQuery.value = null; error.value = ''; message.value = '' }
@@ -45,9 +47,8 @@ onMounted(load)
 </script>
 <template>
 <section>
-  <div class="page-actions"><el-button @click="load">刷新数据集</el-button></div>
   <el-alert v-if="error && !queryOpen" :title="error" type="error" :closable="false" show-icon />
-  <div class="toolbar"><el-input v-model="search" placeholder="搜索数据集" clearable aria-label="搜索数据集" /><span>已加载 {{ datasets.length }} 个数据集 · 本页分页</span></div>
+  <div class="toolbar list-query-toolbar"><div class="list-query-controls"><el-input v-model="search" placeholder="搜索数据集" clearable aria-label="搜索数据集" @keyup.enter="applyDatasetQuery"/><el-button type="primary" @click="applyDatasetQuery">查询</el-button><span>已加载 {{ datasets.length }} 个数据集 · 本页分页</span></div><div class="list-query-actions"><el-button class="refresh-button" title="刷新数据集" aria-label="刷新数据集" @click="load"><RefreshIcon /></el-button></div></div>
   <div class="list-panel">
     <el-table :data="visible" empty-text="暂无已授权数据集"><el-table-column prop="name" label="数据集" min-width="180"/><el-table-column label="可用字段" min-width="260"><template #default="scope">{{ scope.row.fields.join('、') }}</template></el-table-column><el-table-column label="操作" width="130"><template #default="scope"><el-button text type="primary" @click="openDataset(scope.row)">查询分析</el-button></template></el-table-column></el-table>
     <el-pagination v-model:current-page="page" v-model:page-size="pageSize" :total="total" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" class="pagination" />

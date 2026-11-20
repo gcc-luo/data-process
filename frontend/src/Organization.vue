@@ -4,6 +4,7 @@ import { ElMessageBox } from 'element-plus'
 import { authorizedRequest, sessionExpired } from './auth.js'
 import { allowedDepartmentParents, departmentName } from './organization.js'
 import { menuIconOptions, menuIconPath } from './menu-icons.js'
+import RefreshIcon from './RefreshIcon.vue'
 
 const props = defineProps({ view: { type: String, default: 'departments' } })
 const emit = defineEmits(['navigation-updated'])
@@ -15,10 +16,13 @@ const message = ref('')
 const search = ref('')
 const enabledFilter = ref('')
 const departmentFilter = ref('')
+const appliedSearch = ref('')
+const appliedEnabledFilter = ref('')
+const appliedDepartmentFilter = ref('')
 const deptTree = ref(null)
 const departmentTreeRows = computed(() => nested(data.value.departmentOptions))
 const departmentDescendants = computed(() => {
-  const selected = departmentFilter.value
+  const selected = appliedDepartmentFilter.value
   if (selected === '' || selected == null) return null
   const ids = new Set([Number(selected)])
   let changed = true
@@ -30,6 +34,11 @@ const departmentDescendants = computed(() => {
 })
 function selectDepartment(node) { departmentFilter.value = node.id }
 function clearDepartmentFilter() { departmentFilter.value = ''; deptTree.value?.setCurrentKey(null) }
+function applyListQuery() {
+  appliedSearch.value = search.value.trim()
+  appliedEnabledFilter.value = enabledFilter.value
+  appliedDepartmentFilter.value = departmentFilter.value
+}
 const pageSizeOptions = [10, 20, 50, 100]
 const pageSizes = ref({ roles: 10, users: 10, permissions: 10, audit: 10 })
 const pages = ref({ roles: 1, users: 1, permissions: 1, audit: 1 })
@@ -163,8 +172,8 @@ const menuComponentOptions = computed(() => menuForm.value.menuType === 'D' ? co
 
 function matches(value, query) { return String(value ?? '').toLocaleLowerCase().includes(query) }
 const filtered = computed(() => {
-  const query = search.value.trim().toLocaleLowerCase()
-  const enabled = enabledFilter.value || ''
+  const query = appliedSearch.value.toLocaleLowerCase()
+  const enabled = appliedEnabledFilter.value || ''
   const matchState = item => enabled === '' || String(item.enabled) === enabled
   return {
     departments: data.value.departments.filter(item => matchState(item) && (!query || [item.name, item.id, item.leader, item.phone].some(value => matches(value, query)))),
@@ -180,13 +189,13 @@ function page(items, name) {
   if (pages.value[name] !== index) pages.value[name] = index
   return items.slice((index - 1) * size, index * size)
 }
-watch([search, enabledFilter, departmentFilter], () => { pages.value = { roles: 1, users: 1, permissions: 1, audit: 1 } })
+watch([appliedSearch, appliedEnabledFilter, appliedDepartmentFilter], () => { pages.value = { roles: 1, users: 1, permissions: 1, audit: 1 } })
 
 function nested(items, parentId = null) {
   return items.filter(item => item.parentId === parentId).map(item => ({ ...item, children: nested(items, item.id) }))
 }
-const departmentRows = computed(() => search.value.trim() || (enabledFilter.value || '') !== '' ? filtered.value.departments : nested(data.value.departments))
-const menuRows = computed(() => search.value.trim() || (enabledFilter.value || '') !== '' ? filtered.value.menus : nested(data.value.menus))
+const departmentRows = computed(() => appliedSearch.value || (appliedEnabledFilter.value || '') !== '' ? filtered.value.departments : nested(data.value.departments))
+const menuRows = computed(() => appliedSearch.value || (appliedEnabledFilter.value || '') !== '' ? filtered.value.menus : nested(data.value.menus))
 const menuOptions = computed(() => nested(data.value.menus.filter(item => item.menuType !== 'F' && item.id !== menuForm.value.id)))
 
 async function load() {
@@ -309,7 +318,7 @@ const permissionTreeRows = computed(() => {
 const allPermissionCount = computed(() => data.value.permissionCatalog.length)
 const allPermissionsSelected = computed(() => allPermissionCount.value > 0 && permissionSelectedCount.value === allPermissionCount.value)
 const permissionRows = computed(() => {
-  const query = search.value.trim().toLocaleLowerCase()
+  const query = appliedSearch.value.toLocaleLowerCase()
   return data.value.permissionCatalog.filter(item => !query || [item.moduleName, item.moduleCode, item.actionName, item.code, item.description].some(value => matches(value, query)))
 })
 watch([filtered, permissionRows, pageSizes], () => {
@@ -358,7 +367,7 @@ async function loadAudit(reset = false) {
   } catch (e) { error.value = e.message } finally { auditBusy.value = false }
 }
 function changeAuditSize() { pages.value.audit = 1; void loadAudit() }
-watch(() => props.view, view => { search.value = ''; enabledFilter.value = ''; departmentFilter.value = ''; if (view === 'audit') { void loadAuditCatalog(); loadAudit(true) } }, { immediate: true })
+watch(() => props.view, view => { search.value = ''; enabledFilter.value = ''; departmentFilter.value = ''; appliedSearch.value = ''; appliedEnabledFilter.value = ''; appliedDepartmentFilter.value = ''; if (view === 'audit') { void loadAuditCatalog(); loadAudit(true) } }, { immediate: true })
 onMounted(load)
 </script>
 
@@ -368,10 +377,9 @@ onMounted(load)
     <el-alert v-if="message" class="notice" :title="message" type="success" :closable="true" show-icon @close="message = ''" />
 
     <template v-if="props.view === 'departments'">
-      <div class="toolbar">
-        <el-input v-model="search" clearable placeholder="搜索部门名称、负责人或编号" />
-        <el-select v-model="enabledFilter" clearable placeholder="部门状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button @click="load">刷新</el-button><el-button v-if="can('system.department.create')" class="toolbar-add" type="primary" @click="openDepartment()">新增</el-button>
+      <div class="toolbar list-query-toolbar">
+        <div class="list-query-controls"><el-input v-model="search" clearable placeholder="搜索部门名称、负责人或编号" @keyup.enter="applyListQuery" /><el-select v-model="enabledFilter" clearable placeholder="部门状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select><el-button type="primary" @click="applyListQuery">查询</el-button></div>
+        <div class="list-query-actions"><el-button v-if="can('system.department.create')" class="toolbar-add" type="primary" @click="openDepartment()">新增</el-button><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="load"><RefreshIcon /></el-button></div>
       </div>
       <el-table :data="departmentRows" row-key="id" :tree-props="{ children: 'children' }" default-expand-all v-loading="loading">
         <el-table-column prop="name" label="部门名称" min-width="190" />
@@ -386,10 +394,9 @@ onMounted(load)
     </template>
 
     <template v-else-if="props.view === 'roles'">
-      <div class="toolbar">
-        <el-input v-model="search" clearable placeholder="搜索角色名称、权限字符或编号" />
-        <el-select v-model="enabledFilter" clearable placeholder="角色状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button @click="load">刷新</el-button><el-button v-if="can('system.role.create')" class="toolbar-add" type="primary" @click="openRole()">新增</el-button>
+      <div class="toolbar list-query-toolbar">
+        <div class="list-query-controls"><el-input v-model="search" clearable placeholder="搜索角色名称、权限字符或编号" @keyup.enter="applyListQuery" /><el-select v-model="enabledFilter" clearable placeholder="角色状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select><el-button type="primary" @click="applyListQuery">查询</el-button></div>
+        <div class="list-query-actions"><el-button v-if="can('system.role.create')" class="toolbar-add" type="primary" @click="openRole()">新增</el-button><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="load"><RefreshIcon /></el-button></div>
       </div>
       <el-table :data="page(filtered.roles, 'roles')" row-key="id" v-loading="loading">
         <el-table-column prop="name" label="角色名称" min-width="150" />
@@ -413,10 +420,9 @@ onMounted(load)
           </div>
         </div>
         <div class="users-main">
-      <div class="toolbar">
-        <el-input v-model="search" clearable placeholder="搜索账号、姓名、部门或手机号" />
-        <el-select v-if="can('system.user.read')" v-model="enabledFilter" clearable placeholder="用户状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button v-if="can('system.user.read')" @click="exportUsers">导出</el-button><el-button v-if="can('system.user.create')" @click="openImport">导入</el-button><el-button v-if="can('system.user.read')" @click="openOnline">在线用户</el-button><el-button @click="load">刷新</el-button><el-button v-if="can('system.user.create')" class="toolbar-add" type="primary" @click="openUser()">新增</el-button>
+      <div class="toolbar list-query-toolbar">
+        <div class="list-query-controls"><el-input v-model="search" clearable placeholder="搜索账号、姓名、部门或手机号" @keyup.enter="applyListQuery" /><el-select v-if="can('system.user.read')" v-model="enabledFilter" clearable placeholder="用户状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select><el-button type="primary" @click="applyListQuery">查询</el-button></div>
+        <div class="list-query-actions"><el-button v-if="can('system.user.create')" class="toolbar-add" type="primary" @click="openUser()">新增</el-button><el-button v-if="can('system.user.read')" @click="exportUsers">导出</el-button><el-button v-if="can('system.user.create')" @click="openImport">导入</el-button><el-button v-if="can('system.user.read')" @click="openOnline">在线用户</el-button><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="load"><RefreshIcon /></el-button></div>
       </div>
       <el-table :data="page(filtered.users, 'users')" row-key="id" v-loading="loading">
         <el-table-column prop="username" label="用户账号" min-width="140" />
@@ -435,10 +441,9 @@ onMounted(load)
     </template>
 
     <template v-else-if="props.view === 'menus'">
-      <div class="toolbar">
-        <el-input v-model="search" clearable placeholder="搜索菜单名称或路由" />
-        <el-select v-model="enabledFilter" clearable placeholder="菜单状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select>
-        <el-button @click="load">刷新</el-button><el-button v-if="can('system.menu.create')" class="toolbar-add" type="primary" @click="openMenu()">新增</el-button>
+      <div class="toolbar list-query-toolbar">
+        <div class="list-query-controls"><el-input v-model="search" clearable placeholder="搜索菜单名称或路由" @keyup.enter="applyListQuery" /><el-select v-model="enabledFilter" clearable placeholder="菜单状态"><el-option label="启用" value="true" /><el-option label="停用" value="false" /></el-select><el-button type="primary" @click="applyListQuery">查询</el-button></div>
+        <div class="list-query-actions"><el-button v-if="can('system.menu.create')" class="toolbar-add" type="primary" @click="openMenu()">新增</el-button><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="load"><RefreshIcon /></el-button></div>
       </div>
       <el-table :data="menuRows" row-key="id" :tree-props="{ children: 'children' }" default-expand-all v-loading="loading">
         <el-table-column prop="name" label="菜单名称" min-width="180" />
@@ -453,9 +458,9 @@ onMounted(load)
     </template>
 
     <template v-else-if="props.view === 'permissions'">
-      <div class="toolbar">
-        <el-input v-model="search" clearable placeholder="搜索模块、操作或权限码" />
-        <el-button @click="load">刷新</el-button>
+      <div class="toolbar list-query-toolbar">
+        <div class="list-query-controls"><el-input v-model="search" clearable placeholder="搜索模块、操作或权限码" @keyup.enter="applyListQuery" /><el-button type="primary" @click="applyListQuery">查询</el-button></div>
+        <div class="list-query-actions"><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="load"><RefreshIcon /></el-button></div>
       </div>
       <el-alert title="权限点由平台后端登记并逐接口校验。此目录用于查看与授权，新增操作需先在后端实现对应校验，避免配置出无效权限。" type="info" :closable="false" show-icon />
       <el-table :data="page(permissionRows, 'permissions')" row-key="code" v-loading="loading">
@@ -470,7 +475,7 @@ onMounted(load)
 
     <template v-else-if="props.view === 'audit'">
       <div class="pane">
-        <div class="toolbar audit-toolbar"><el-select v-model="auditAction" clearable filterable placeholder="操作类型（可留空）" @change="loadAudit(true)"><el-option v-for="item in auditCatalog.actions" :key="item.code" :label="item.label" :value="item.code" /></el-select><el-select v-model="auditResult" clearable placeholder="结果" @change="loadAudit(true)"><el-option label="成功" value="SUCCESS" /><el-option label="失败" value="FAILURE" /></el-select><el-input v-model="auditActor" clearable placeholder="操作者账号" class="audit-actor" @keyup.enter="loadAudit(true)" /><el-input v-model="auditFrom" type="datetime-local" class="audit-time" aria-label="开始时间" /><el-input v-model="auditTo" type="datetime-local" class="audit-time" aria-label="结束时间" /><el-button type="primary" @click="loadAudit(true)">查询</el-button><el-button @click="loadAudit(true)">刷新</el-button><el-button v-if="can('system.audit.read')" @click="exportAudit">导出</el-button></div>
+        <div class="toolbar audit-toolbar list-query-toolbar"><div class="list-query-controls"><el-select v-model="auditAction" clearable filterable placeholder="操作类型（可留空）"><el-option v-for="item in auditCatalog.actions" :key="item.code" :label="item.label" :value="item.code" /></el-select><el-select v-model="auditResult" clearable placeholder="结果"><el-option label="成功" value="SUCCESS" /><el-option label="失败" value="FAILURE" /></el-select><el-input v-model="auditActor" clearable placeholder="操作者账号" class="audit-actor" @keyup.enter="loadAudit(true)" /><el-input v-model="auditFrom" type="datetime-local" class="audit-time" aria-label="开始时间" /><el-input v-model="auditTo" type="datetime-local" class="audit-time" aria-label="结束时间" /><el-button type="primary" @click="loadAudit(true)">查询</el-button></div><div class="list-query-actions"><el-button v-if="can('system.audit.read')" @click="exportAudit">导出</el-button><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="loadAudit(true)"><RefreshIcon /></el-button></div></div>
         <el-alert title="登录失败等没有关联账号的记录显示为系统或未知账号。" type="info" :closable="false" show-icon />
         <el-table :data="auditEvents" class="audit-table" v-loading="auditBusy">
           <el-table-column label="时间" min-width="180"><template #default="scope">{{ scope.row.occurredAtText || String(scope.row.occurredAt || '').replace('T', ' ') }}</template></el-table-column>
@@ -615,7 +620,7 @@ onMounted(load)
         <el-table-column prop="userAgent" label="终端" min-width="200" show-overflow-tooltip />
         <el-table-column label="操作" width="100"><template #default="scope"><el-button v-if="can('system.user.set_status')" link type="primary" @click="kickSession(scope.row)">踢下线</el-button></template></el-table-column>
       </el-table>
-      <template #footer><el-button @click="openOnline">刷新</el-button><el-button @click="onlineDialog = false">关闭</el-button></template>
+      <template #footer><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="openOnline"><RefreshIcon /></el-button><el-button @click="onlineDialog = false">关闭</el-button></template>
     </el-dialog>
 
     <el-dialog v-model="roleUsersDialog" :title="`角色用户 · ${roleUsersRole?.name || ''}`" width="min(560px, 95vw)">

@@ -302,6 +302,11 @@ onMounted(async () => {
 .page-actions{display:flex;justify-content:flex-end;align-items:center;margin:0 0 10px}
 .shell .content .el-tab-pane,.shell .content section > div:has(> .toolbar + .el-table),.shell .content .list-panel,.shell .content section .pane{min-height:min(620px,calc(100vh - 200px));padding:14px;background:#fff;border:1px solid var(--el-border-color-lighter);border-radius:4px;box-shadow:var(--el-box-shadow-lighter)}
 .shell .content section .toolbar{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin:0 0 8px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.shell .content section .toolbar.list-query-toolbar{justify-content:space-between;flex-wrap:wrap}
+.shell .content section .toolbar.list-query-toolbar .list-query-controls,.shell .content section .toolbar.list-query-toolbar .list-query-actions{display:flex;align-items:center;gap:10px;min-width:0}
+.shell .content section .toolbar.list-query-toolbar .list-query-controls{flex:1;flex-wrap:wrap}
+.shell .content section .toolbar.list-query-toolbar .list-query-actions{margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.shell .content section .toolbar.list-query-toolbar .list-query-controls .el-input{flex:0 1 260px;width:min(260px,100%)}
 .shell .content section .toolbar:has(.el-input),.shell .content section .pane > .row{min-height:52px;padding:10px 12px;margin:0 0 10px;border:1px solid var(--el-border-color-lighter);border-radius:4px;background:#fff}
 .shell .content section .toolbar .el-input{width:min(260px,100%)}
 .shell .content .el-table{width:100%;--el-table-header-bg-color:var(--el-fill-color-light);--el-table-row-hover-bg-color:#eaf3ff;border:0;border-radius:0;overflow:visible}
@@ -315,6 +320,7 @@ onMounted(async () => {
 .shell .content .el-tabs__header{margin-bottom:12px}
 .shell .content .el-tabs__nav-wrap::after{background-color:var(--el-border-color-light)}
 @media(max-width:700px){.shell .content section .toolbar{flex-wrap:wrap}.shell .content .el-tab-pane,.shell .content section > div:has(> .toolbar + .el-table),.shell .content .list-panel,.shell .content section .pane{min-height:0;padding:10px}.shell .content .el-pagination,.shell .content section .pagination{justify-content:flex-start;overflow-x:auto}}
+@media(max-width:700px){.shell .content section .toolbar.list-query-toolbar .list-query-controls{flex:1 1 100%}.shell .content section .toolbar.list-query-toolbar .list-query-actions{margin-left:auto}}
 .shell .workspace > .content{width:100%;max-width:none;margin:0;padding:10px 12px}
 @media(max-width:650px){.shell .workspace > .content{padding:8px}}
 :root{--ui-text-primary:#24344b;--ui-text-body:#40536a;--ui-text-secondary:#66778c;--ui-text-muted:#8b98a8;--el-text-color-primary:var(--ui-text-primary);--el-text-color-regular:var(--ui-text-body);--el-text-color-secondary:var(--ui-text-secondary);--el-text-color-placeholder:var(--ui-text-muted);--el-text-color-disabled:#b4bec9}
@@ -332,6 +338,8 @@ body{color:var(--ui-text-primary)}
 .shell .content .toolbar{--ui-toolbar-height:calc(var(--ui-navigation-size) + 19px)}
 .shell .content .toolbar .el-button,.shell .content .toolbar .el-input__inner,.shell .content .toolbar .el-select__wrapper,.shell .content .toolbar .el-select__placeholder,.shell .content .toolbar .el-select__selected-item{font-size:var(--ui-navigation-size)}
 .shell .content .toolbar .el-button{height:var(--ui-toolbar-height);min-height:0;padding:0 calc(var(--ui-navigation-size) * .9)}
+.el-button.refresh-button{width:clamp(32px,1.9vw,42px);height:clamp(32px,1.9vw,42px);min-height:0;padding:0;border-radius:50%;flex:none}
+.shell .content .toolbar .el-button.refresh-button{width:var(--ui-toolbar-height);height:var(--ui-toolbar-height);padding:0}
 .shell .content .toolbar .el-input{--el-input-height:var(--ui-toolbar-height)}
 .shell .content .toolbar .el-select__wrapper{min-height:var(--ui-toolbar-height)}
 .shell{height:100vh;height:100dvh;min-height:0;overflow:hidden}
