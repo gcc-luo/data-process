@@ -49,6 +49,28 @@ class FlowGraphTest {
         assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("t", "SINK_TABLE", "{\"sourceId\":2,\"table\":\"t\",\"writeMode\":\"UPSERT\"}"), "{\"from\":\"s\",\"to\":\"t\"}"))));
     }
 
+    @Test void unreachableChainRejectedByReverseBfs() throws Exception {
+        // 合法对 s1→t 加孤立链 s2→f：所有度数检查通过，仅反向 BFS 能拒 f/s2
+        var g = parse(graph(node("s1", "SOURCE_TABLE", SRC) + "," + node("s2", "SOURCE_TABLE", SRC) + "," + node("f", "FIELD_FILTER", "{\"expression\":\"true\"}") + "," + node("t", "SINK_TABLE", SINK),
+                "{\"from\":\"s1\",\"to\":\"t\"},{\"from\":\"s2\",\"to\":\"f\"}"));
+        var ex = assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(g));
+        assertTrue(ex.getMessage().contains("未连接到目标"), ex.getMessage());
+    }
+
+    @Test void edgeWithMissingEndpointRejected() throws Exception {
+        var g = parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("t", "SINK_TABLE", SINK), "{\"from\":\"s\",\"to\":\"nope\"}"));
+        var ex = assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(g));
+        assertTrue(ex.getMessage().contains("Invalid edge"), ex.getMessage());
+    }
+
+    @Test void topoOrderRejectsCycleDirectly() throws Exception {
+        // a↔b 环图直调 topoOrder，不经 validate 的度数守卫
+        var g = parse(graph(node("a", "FIELD_FILTER", "{\"expression\":\"true\"}") + "," + node("b", "FIELD_FILTER", "{\"expression\":\"true\"}"),
+                "{\"from\":\"a\",\"to\":\"b\"},{\"from\":\"b\",\"to\":\"a\"}"));
+        var ex = assertThrows(IllegalArgumentException.class, () -> FlowGraph.topoOrder(g));
+        assertTrue(ex.getMessage().contains("流程存在环"), ex.getMessage());
+    }
+
     @Test void duplicateKeysAndUnknownComponentsRejected() throws Exception {
         assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(parse(graph(node("s", "SOURCE_TABLE", SRC) + "," + node("s", "SINK_TABLE", SINK), "{\"from\":\"s\",\"to\":\"s\"}"))));
         assertThrows(IllegalArgumentException.class, () -> FlowGraph.validate(parse(graph(node("s", "KAFKA", SRC) + "," + node("t", "SINK_TABLE", SINK), "{\"from\":\"s\",\"to\":\"t\"}"))));
