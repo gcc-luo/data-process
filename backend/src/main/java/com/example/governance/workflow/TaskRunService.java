@@ -95,21 +95,18 @@ public class TaskRunService {
     }
     public record LastRun(String state, LocalDateTime startedAt, LocalDateTime finishedAt) {}
     public record TaskRunSummary(boolean running, LastRun lastRun) {}
+    /** 非原子 best-effort 守卫：检查与后续写入不在同一事务，基本信息不影响执行语义。 */
     public boolean hasActiveRun(long taskId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=? AND state IN ('PENDING','RUNNING')", Integer.class, taskId) > 0;
     }
-    /** Latest run plus active flag per task, derived in one pass over task_runs. */
+    private record RunRow(long taskId, String state, LocalDateTime startedAt, LocalDateTime finishedAt) {}
+    /** Latest run plus active flag per task; aggregated in SQL, no full-table materialization. */
     public java.util.Map<Long, TaskRunSummary> summary() {
-        var rows = jdbc.query("SELECT task_id,state,started_at,finished_at FROM task_runs ORDER BY id",
-                (rs, row) -> new Object[]{rs.getLong(1), rs.getString(2), rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toLocalDateTime(), rs.getTimestamp(4) == null ? null : rs.getTimestamp(4).toLocalDateTime()});
+        var latest = jdbc.query("SELECT r.task_id,r.state,r.started_at,r.finished_at FROM task_runs r JOIN (SELECT task_id,MAX(id) AS max_id FROM task_runs GROUP BY task_id) m ON m.max_id=r.id",
+                (rs, row) -> { var s = rs.getTimestamp(3); var f = rs.getTimestamp(4); return new RunRow(rs.getLong(1), rs.getString(2), s == null ? null : s.toLocalDateTime(), f == null ? null : f.toLocalDateTime()); });
+        var active = new java.util.HashSet<>(jdbc.queryForList("SELECT DISTINCT task_id FROM task_runs WHERE state IN ('PENDING','RUNNING')", Long.class));
         var result = new java.util.HashMap<Long, TaskRunSummary>();
-        for (Object[] row : rows) {
-            long taskId = (Long) row[0];
-            boolean active = "PENDING".equals(row[1]) || "RUNNING".equals(row[1]);
-            var previous = result.get(taskId);
-            boolean running = active || (previous != null && previous.running());
-            result.put(taskId, new TaskRunSummary(running, new LastRun((String) row[1], (LocalDateTime) row[2], (LocalDateTime) row[3])));
-        }
+        for (RunRow row : latest) result.put(row.taskId(), new TaskRunSummary(active.contains(row.taskId()), new LastRun(row.state(), row.startedAt(), row.finishedAt())));
         return result;
     }
     public List<View> list(long taskId) {

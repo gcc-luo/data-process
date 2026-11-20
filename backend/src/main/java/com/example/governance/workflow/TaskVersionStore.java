@@ -18,10 +18,11 @@ public final class TaskVersionStore {
     public long create(String name, String type, String configuration) { return create(name, type, configuration, null, null); }
     public long create(String name, String type, String configuration, Long directoryId, String description) {
         if (name == null || name.isBlank() || name.length() > 160 || type == null || !Set.of("SQL", "SYNC").contains(type)) throw new IllegalArgumentException("Invalid task");
-        if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=?", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
         if (description != null && description.length() > 500) throw new IllegalArgumentException("Invalid description");
         validate(configuration);
         return transaction.execute(status -> {
+            // 目录存在性检查在事务内 FOR UPDATE，与目录删除串行化
+            if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=? FOR UPDATE", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
             var key = new GeneratedKeyHolder();
             jdbc.update(connection -> {
                 var statement = connection.prepareStatement("INSERT INTO processing_tasks(name,task_type,current_version,directory_id,description) VALUES (?,?,1,?,?)", new String[]{"id"});
@@ -55,7 +56,7 @@ public final class TaskVersionStore {
         transaction.executeWithoutResult(status -> {
             var rows = jdbc.query("SELECT name,directory_id,description FROM processing_tasks WHERE id=? FOR UPDATE",
                     (rs, row) -> new Object[]{rs.getString(1), rs.getObject(2, Long.class), rs.getString(3)}, id);
-            if (rows.isEmpty()) throw new IllegalArgumentException("Unknown task");
+            if (rows.isEmpty()) throw new java.util.NoSuchElementException("Unknown task");
             Object[] current = rows.getFirst();
             String name = (String) current[0];
             if (changes.has("name")) {
@@ -63,8 +64,15 @@ public final class TaskVersionStore {
                 name = node.isTextual() ? node.asText() : null;
             }
             if (name == null || name.isBlank() || name.length() > 160) throw new IllegalArgumentException("Invalid task name");
-            Long directoryId = changes.has("directoryId") ? (changes.get("directoryId").isNull() ? null : changes.get("directoryId").asLong()) : (Long) current[1];
-            if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=?", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
+            Long directoryId = (Long) current[1];
+            if (changes.has("directoryId")) {
+                com.fasterxml.jackson.databind.JsonNode node = changes.get("directoryId");
+                if (node.isNull()) directoryId = null;
+                else if (node.isIntegralNumber() && node.canConvertToLong()) directoryId = node.asLong();
+                else throw new IllegalArgumentException("Invalid directory");
+            }
+            // 目录存在性检查 FOR UPDATE，与目录删除串行化
+            if (directoryId != null && jdbc.queryForList("SELECT id FROM task_directories WHERE id=? FOR UPDATE", Long.class, directoryId).isEmpty()) throw new IllegalArgumentException("Unknown directory");
             String description = (String) current[2];
             if (changes.has("description")) {
                 com.fasterxml.jackson.databind.JsonNode node = changes.get("description");

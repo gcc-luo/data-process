@@ -40,8 +40,10 @@ public class TaskController {
     }
     @PutMapping("/api/tasks/{id}")
     ResponseEntity<Void> metadata(@PathVariable long id, @RequestBody JsonNode changes, Authentication auth) {
+        // 非原子 best-effort 守卫：检查与写入不在同一事务，基本信息不影响执行语义
         if (runs.hasActiveRun(id)) throw new ResponseStatusException(HttpStatus.CONFLICT, "任务运行中，不能修改");
         try { tasks.updateMetadata(id, changes); }
+        catch (java.util.NoSuchElementException ex) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在"); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "基本信息无效"); }
         audit.success(auth, "task.update", "task", id);
         return ResponseEntity.noContent().build();
@@ -55,7 +57,8 @@ public class TaskController {
             audit.success(authentication, "task.create", "task", id);
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id, "version", 1));
         } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid task configuration"));
+            // 以异常退出而非直接返回，确保内层事务标记 rollback-only 后外层 @Transactional 正常回滚
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid task configuration");
         }
     }
     record VersionRequest(JsonNode configuration) {}

@@ -46,7 +46,8 @@ class TaskMetadataApiTest {
         mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].runState").value("STOPPED"))
                 .andExpect(jsonPath("$[0].directoryId").value(directory))
-                .andExpect(jsonPath("$[0].description").value("每日加工"));
+                .andExpect(jsonPath("$[0].description").value("每日加工"))
+                .andExpect(jsonPath("$[0].lastRun").value(org.hamcrest.Matchers.nullValue()));
         // 插入运行中实例 → RUNNING + lastRun
         jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,started_at,attempt_no) VALUES (621,?,1,DATE '2026-11-20','RUNNING',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1)", taskId);
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,started_at) VALUES (621,1,'RUNNING',CURRENT_TIMESTAMP)");
@@ -56,9 +57,19 @@ class TaskMetadataApiTest {
         // 运行中禁止改基本信息
         mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"name\":\"改名\"}"))
                 .andExpect(status().isConflict());
-        // 结束运行后可编辑：仅改描述，名称与目录保持
+        // 多实例：后插入的已结束实例 B 覆盖 lastRun，但活跃实例 A 仍使 runState=RUNNING
+        jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,started_at,finished_at,attempt_no) VALUES (622,?,1,DATE '2026-11-21','SUCCEEDED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1)", taskId);
+        jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,started_at,finished_at) VALUES (622,1,'SUCCEEDED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+        mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].runState").value("RUNNING"))
+                .andExpect(jsonPath("$[0].lastRun.state").value("SUCCEEDED"));
+        // A 也结束 → STOPPED，lastRun 仍为最新实例 B
         jdbc.update("UPDATE task_runs SET state='SUCCEEDED',finished_at=CURRENT_TIMESTAMP WHERE id=621");
         jdbc.update("UPDATE task_run_attempts SET state='SUCCEEDED',finished_at=CURRENT_TIMESTAMP WHERE run_id=621");
+        mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].runState").value("STOPPED"))
+                .andExpect(jsonPath("$[0].lastRun.state").value("SUCCEEDED"));
+        // 结束运行后可编辑：仅改描述，名称与目录保持
         mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"description\":\"新描述\"}"))
                 .andExpect(status().isNoContent());
         mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk())
@@ -73,6 +84,30 @@ class TaskMetadataApiTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"description\":123}"))
                 .andExpect(status().isBadRequest());
+        // directoryId 仅接受整数或显式 null：布尔/小数/字符串均 400
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":true}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":1.9}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":\"621\"}"))
+                .andExpect(status().isBadRequest());
+        // 不存在的目录：创建与 PUT 均 400
+        mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
+                .content("{\"name\":\"坏目录\",\"type\":\"SQL\",\"configuration\":{\"sourceId\":1,\"sql\":\"SELECT 1\",\"parameters\":[]},\"directoryId\":999999}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":999999}"))
+                .andExpect(status().isBadRequest());
+        // 不存在的任务 → 404
+        mvc.perform(put("/api/tasks/999999").session(session).with(csrf()).contentType("application/json").content("{\"description\":\"x\"}"))
+                .andExpect(status().isNotFound());
+        // 无 workflow.task.update 权限的会话 → 403
+        jdbc.update("INSERT INTO roles(id,name) VALUES (622,'no-perm-role')");
+        jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (622,'meta-noperm',?,621,TRUE,'v')", encoder.encode("password"));
+        jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (622,622)");
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (622,'workflow.task.read')");
+        var noPerm = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username", "meta-noperm").param("password", "password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
+        mvc.perform(put("/api/tasks/" + taskId).session(noPerm).with(csrf()).contentType("application/json").content("{\"description\":\"x\"}"))
+                .andExpect(status().isForbidden());
         // 清空目录（显式 null）
         mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":null}"))
                 .andExpect(status().isNoContent());
