@@ -20,6 +20,39 @@ class DatabaseSyncExecutorTest {
             assertTrue(rows.next()); assertEquals(2, rows.getInt(1));
         }
     }
+    @Test void rollsBackWhenCancelledDuringFinalBatch() throws Exception {
+        String srcUrl = "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1";
+        String dstUrl = "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1";
+        var source = new DriverManagerDataSource(srcUrl, "sa", "");
+        try (var c = source.getConnection(); var s = c.createStatement()) { s.execute("CREATE TABLE src(id INT)"); s.execute("INSERT INTO src VALUES (1)"); }
+        try (var c = new DriverManagerDataSource(dstUrl, "sa", "").getConnection(); var s = c.createStatement()) { s.execute("CREATE TABLE dst(id INT PRIMARY KEY)"); }
+        var cancel = new RunCancelContext();
+        // 目标连接的 executeBatch 真实执行后置取消标志，模拟“末批写完”与 stop 的竞态
+        var target = new DriverManagerDataSource(dstUrl, "sa", "") {
+            @Override public java.sql.Connection getConnection() throws java.sql.SQLException {
+                java.sql.Connection real = super.getConnection();
+                return (java.sql.Connection) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{java.sql.Connection.class}, (p, m, a) -> {
+                    try {
+                        Object result = m.invoke(real, a);
+                        if (m.getName().equals("prepareStatement")) {
+                            java.sql.PreparedStatement ps = (java.sql.PreparedStatement) result;
+                            return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{java.sql.PreparedStatement.class}, (p2, m2, a2) -> {
+                                try { Object r2 = m2.invoke(ps, a2); if (m2.getName().equals("executeBatch")) cancel.cancel(); return r2; }
+                                catch (java.lang.reflect.InvocationTargetException ex) { throw ex.getCause(); }
+                            });
+                        }
+                        return result;
+                    } catch (java.lang.reflect.InvocationTargetException ex) { throw ex.getCause(); }
+                });
+            }
+        };
+        try (var executor = new DatabaseSyncExecutor()) {
+            assertThrows(Exception.class, () -> executor.append(source, target, "SELECT id FROM src", List.of(), "dst", List.of("id"), 1, cancel));
+        }
+        try (var c = new DriverManagerDataSource(dstUrl, "sa", "").getConnection(); var s = c.createStatement(); var rows = s.executeQuery("SELECT COUNT(*) FROM dst")) {
+            assertTrue(rows.next()); assertEquals(0, rows.getInt(1));
+        }
+    }
     @Test void refusesUnsafeIdentifiers() throws Exception {
         try (var executor = new DatabaseSyncExecutor()) {
             var db = new DriverManagerDataSource("jdbc:h2:mem:test", "sa", "");

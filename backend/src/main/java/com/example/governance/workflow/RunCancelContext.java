@@ -12,6 +12,8 @@ public final class RunCancelContext {
     public boolean isCancelled() { return cancelled.get(); }
     public void worker(Thread thread) { this.worker = thread; }
     public void register(Statement active) { this.statement = active; }
+    /** worker 结束后摘除引用：迟到的 cancel 只置标志，不再 interrupt/cancel，避免误伤复用的池线程。 */
+    public void detach() { worker = null; statement = null; }
     public void cancel() {
         cancelled.set(true);
         Statement active = statement;

@@ -33,12 +33,16 @@ public final class DatabaseSyncExecutor implements AutoCloseable {
                             if (!request.keys().isEmpty()) verifyUniqueKey(target, request.table(), request.keys());
                             try (var read = source.prepareStatement(request.query()); var write = target.prepareStatement(insert)) {
                                 read.setFetchSize(request.batchSize()); read.setQueryTimeout(30); write.setQueryTimeout(30);
+                                // 取消注册针对 write 语句：写阶段是主要耗时点；读侧由逐行 isCancelled 与 queryTimeout 兜底
+                                request.cancel().register(write);
                                 for (int i = 0; i < request.parameters().size(); i++) read.setObject(i + 1, request.parameters().get(i));
                                 int count;
                                 try (var rows = read.executeQuery()) {
                                     if (rows.getMetaData().getColumnCount() != request.columns().size()) throw new IllegalArgumentException("Column count mismatch");
                                     count = request.keys().isEmpty() ? appendRows(rows, write, request.columns().size(), request.batchSize(), request.cancel()) : upsertRows(rows, write, target, request);
                                 }
+                                // 末批写完与 stop 存在竞态：commit 前再查一次取消，走既有 rollback 路径
+                                if (request.cancel().isCancelled()) throw new InterruptedException("手动停止");
                                 target.commit(); exchange.getMessage().setBody(count);
                             }
                         } catch (Exception failure) {

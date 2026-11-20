@@ -40,6 +40,8 @@ public class TaskRunService {
     @Transactional
     public long start(long taskId, int version, LocalDate date, Authentication auth) {
         if (date == null || tasks.findVersion(taskId, version).isEmpty()) throw new IllegalArgumentException("Invalid task version or business date");
+        // 锁任务行后再查活跃 run，与并发 start/stop 串行化（stop 只锁 runs 行、不取任务锁，无锁环）
+        jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, taskId);
         if (hasActiveRun(taskId)) throw new IllegalStateException("任务已在运行");
         var key = new GeneratedKeyHolder();
         jdbc.update(c -> { var st = c.prepareStatement("INSERT INTO task_runs(task_id,task_version,business_date,state,created_at) VALUES (?,?,?,'PENDING',CURRENT_TIMESTAMP)", new String[]{"id"}); st.setLong(1, taskId); st.setInt(2, version); st.setDate(3, java.sql.Date.valueOf(date)); return st; }, key);
@@ -68,24 +70,33 @@ public class TaskRunService {
         });
     }
     private void execute(long id, long taskId, int version, LocalDate date, int attempt) {
+        // 上下文先于 claim 注册，闭合 claim→put 窗口；claim 失败（如 PENDING 已被 stop 落终态）则摘除后返回
+        var cancel = new RunCancelContext();
+        cancel.worker(Thread.currentThread());
+        active.put(id, cancel);
+        boolean claimed;
         try {
-            boolean claimed = Boolean.TRUE.equals(tx.execute(status -> {
+            claimed = Boolean.TRUE.equals(tx.execute(status -> {
                 if (jdbc.update("UPDATE task_runs SET state='RUNNING',started_at=CURRENT_TIMESTAMP WHERE id=? AND state='PENDING' AND attempt_no=?",id,attempt) != 1) return false;
                 if (jdbc.update("UPDATE task_run_attempts SET state='RUNNING',started_at=CURRENT_TIMESTAMP WHERE run_id=? AND attempt_no=? AND state='PENDING'",id,attempt) != 1) throw new IllegalStateException("Attempt state mismatch");
                 return true;
             }));
-            if (!claimed) return;
-        } catch (Exception ex) { finish(id,attempt,"INTERRUPTED",null); return; }
-        var cancel = new RunCancelContext();
-        cancel.worker(Thread.currentThread());
-        active.put(id, cancel);
-        try (var permit = limiter.acquire()) { runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel); }
-        catch (InterruptedException ex) { Thread.currentThread().interrupt(); finish(id, attempt, "INTERRUPTED", cancel.isCancelled() ? "手动停止" : null); return; }
-        catch (Exception ex) { finish(id, attempt, cancel.isCancelled() ? "INTERRUPTED" : "FAILED", cancel.isCancelled() ? "手动停止" : "任务执行失败"); return; }
-        finally { active.remove(id); }
-        // Failure recording a successful business write is ambiguous and must not be classified as a task failure.
-        try { finish(id,attempt,"SUCCEEDED",null); }
-        catch (RuntimeException ex) { finish(id,attempt,"INTERRUPTED",null); }
+        } catch (Exception ex) { cancel.detach(); active.remove(id); finish(id,attempt,"INTERRUPTED",null); return; }
+        if (!claimed) { cancel.detach(); active.remove(id); return; }
+        try (var permit = limiter.acquire()) {
+            runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel);
+            // 成功路径在摘除上下文前落终态，闭合 remove→finish 窗口；stop 与业务完成竞态判 INTERRUPTED
+            if (cancel.isCancelled()) Thread.interrupted(); // 清除 cancel 留下的中断标志，避免带标志取连接失败
+            // Failure recording a successful business write is ambiguous and must not be classified as a task failure.
+            try { finish(id, attempt, cancel.isCancelled() ? "INTERRUPTED" : "SUCCEEDED", cancel.isCancelled() ? "手动停止" : null); }
+            catch (RuntimeException ex) { finish(id,attempt,"INTERRUPTED",null); }
+        }
+        catch (InterruptedException ex) { finish(id, attempt, "INTERRUPTED", cancel.isCancelled() ? "手动停止" : null); Thread.currentThread().interrupt(); }
+        catch (Exception ex) {
+            if (cancel.isCancelled()) Thread.interrupted(); // 同上：先落库再保留中断语义
+            finish(id, attempt, cancel.isCancelled() ? "INTERRUPTED" : "FAILED", cancel.isCancelled() ? "手动停止" : "任务执行失败");
+        }
+        finally { cancel.detach(); active.remove(id); }
     }
     private void finish(long id, int attempt, String state, String error) {
         tx.executeWithoutResult(status -> {
@@ -115,7 +126,7 @@ public class TaskRunService {
     }
     public record LastRun(String state, LocalDateTime startedAt, LocalDateTime finishedAt) {}
     public record TaskRunSummary(boolean running, LastRun lastRun) {}
-    /** 非原子 best-effort 守卫：检查与后续写入不在同一事务，基本信息不影响执行语义。 */
+    /** 活跃 run 判定：start 在任务行锁内调用，与并发 start/stop 原子串行化；基本信息 PUT 守卫为非原子 best-effort 调用，基本信息不影响执行语义。 */
     public boolean hasActiveRun(long taskId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=? AND state IN ('PENDING','RUNNING')", Integer.class, taskId) > 0;
     }

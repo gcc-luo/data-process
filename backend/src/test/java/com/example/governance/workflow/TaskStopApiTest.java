@@ -102,6 +102,20 @@ class TaskStopApiTest {
         assertEquals("手动停止", jdbc.queryForObject("SELECT error_message FROM task_runs WHERE id=?", String.class, runId));
     }
 
+    @Test void stopRaceAfterBusinessCompletionMarksInterrupted() throws Exception {
+        var session = login();
+        insertTask(634);
+        Mockito.when(limiter.acquire()).thenAnswer(invocation -> new TaskExecutionLimiter(8).acquire());
+        // 模拟 stop 与业务完成竞态：runner 内置取消（含中断 worker）后正常返回，终态应为 INTERRUPTED+手动停止
+        Mockito.doAnswer(invocation -> { RunCancelContext cancel = invocation.getArgument(2); cancel.cancel(); return null; })
+                .when(runner).execute(Mockito.any(), Mockito.any(), Mockito.any());
+        mvc.perform(post("/api/tasks/634/runs").session(session).with(csrf()).contentType("application/json").content("{\"version\":1,\"businessDate\":\"2026-11-20\"}"))
+                .andExpect(status().isAccepted());
+        long runId = jdbc.queryForObject("SELECT id FROM task_runs WHERE task_id=634", Long.class);
+        awaitState(runId, "INTERRUPTED");
+        assertEquals("手动停止", jdbc.queryForObject("SELECT error_message FROM task_runs WHERE id=?", String.class, runId));
+    }
+
     @Test void stopWithoutActiveRunConflicts() throws Exception {
         var session = login();
         insertTask(633);
