@@ -10,22 +10,21 @@ import FlowEditor from './FlowEditor.vue'
 import RefreshIcon from './RefreshIcon.vue'
 const can = inject('canPermission', () => false)
 const directories = ref([]), tasks = ref([]), sources = ref([]), error = ref(''), message = ref('')
-const tree = ref(null), currentDirectory = ref(0)
+const tree = ref(null), currentDirectory = ref(0), directoryMenu = ref(null)
 const view = ref('list'), flowDraft = ref(null)
 const nameSearch = ref(''), nameFilter = ref(''), stateSearch = ref(''), stateFilter = ref('')
 const selected = ref([]), formOpen = ref(false), formTask = ref(null), formReadonly = ref(false), runsOpen = ref(false), runsTask = ref(null)
 const startOpen = ref(false), startTargets = ref([]), startDate = ref(new Date().toLocaleDateString('sv-SE')), batchBusy = ref(false)
 const filtered = computed(() => filterTasks(tasks.value, { directories: directories.value, directoryId: currentDirectory.value === 0 ? null : currentDirectory.value, name: nameFilter.value, runState: stateFilter.value }))
 const paging = usePagination(filtered)
-const currentDirectoryName = computed(() => currentDirectory.value === 0 ? '全部任务' : directories.value.find(d => d.id === currentDirectory.value)?.name ?? '全部任务')
 // 窄屏顶部目录下拉：先序展开 + 全角空格缩进层级
 const directoryOptions = computed(() => {
   const walk = (parentId, depth) => directories.value.filter(d => d.parentId === parentId).sort((a,b)=>a.sortOrder-b.sortOrder).flatMap(d => [{ id: d.id, label: '　'.repeat(depth) + d.name }, ...walk(d.id, depth+1)])
-  return [{ id: 0, label: '全部任务' }, ...walk(null, 0)]
+  return [{ id: 0, label: '任务目录' }, ...walk(null, 0)]
 })
 const treeData = computed(() => {
   const build = parentId => directories.value.filter(d => d.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder).map(d => ({ id: d.id, name: d.name, children: build(d.id) }))
-  return [{ id: 0, name: '全部任务', children: build(null) }]
+  return [{ id: 0, name: '任务目录', children: build(null) }]
 })
 async function get(url) { const response = await fetch(url, { credentials: 'same-origin' }); if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有相应权限' : '读取失败，请检查连接'); return response.json() }
 const runStateLabels = { SUCCEEDED: '成功', FAILED: '失败', INTERRUPTED: '已中断', RUNNING: '运行中', PENDING: '排队', WAITING: '等待' }
@@ -60,7 +59,48 @@ function applyBatchParts(results) {
   if (failText) error.value = failText
 }
 function applyQuery() { nameFilter.value = nameSearch.value.trim(); stateFilter.value = stateSearch.value; paging.page.value = 1 }
-function selectDirectory(node) { currentDirectory.value = node.id; paging.page.value = 1 }
+function closeDirectoryMenu() { directoryMenu.value = null }
+function selectDirectory(node) { currentDirectory.value = node.id; paging.page.value = 1; closeDirectoryMenu() }
+function openDirectoryMenu(event, node) {
+  event.preventDefault()
+  event.stopPropagation()
+  selectDirectory(node)
+  const allowed = node.id === 0
+    ? can('workflow.task.create')
+    : can('workflow.task.create') || can('workflow.task.update') || can('workflow.task.delete')
+  if (!allowed) return
+
+  const itemCount = node.id === 0
+    ? 1
+    : Number(can('workflow.task.create')) + Number(can('workflow.task.update')) + Number(can('workflow.task.delete'))
+  const hasDivider = node.id !== 0 && can('workflow.task.create') && (can('workflow.task.update') || can('workflow.task.delete'))
+  const menuHeight = itemCount * 34 + (hasDivider ? 21 : 10)
+  const menuWidth = 120
+  const fromPointer = event.type === 'contextmenu' && (event.clientX || event.clientY)
+  const rowRect = !fromPointer && event.type === 'contextmenu' && event.target instanceof Element
+    ? event.target.closest('.el-tree-node__content')?.getBoundingClientRect()
+    : null
+  const rect = rowRect ?? event.currentTarget?.getBoundingClientRect?.()
+  const requestedX = fromPointer ? event.clientX : Math.max(8, (rect?.right ?? 200) - menuWidth)
+  const requestedY = fromPointer ? event.clientY : (rect?.bottom ?? 40) + 4
+  const x = Math.max(8, Math.min(requestedX, window.innerWidth - menuWidth - 8))
+  const y = Math.max(8, Math.min(requestedY, window.innerHeight - menuHeight - 8))
+  directoryMenu.value = { x, y, node }
+}
+function runDirectoryMenuAction(action) {
+  const node = directoryMenu.value?.node
+  closeDirectoryMenu()
+  if (action === 'create') addDirectory(null)
+  else if (action === 'create-child' && node) addDirectory(node)
+  else if (action === 'rename' && node) renameDirectory(node)
+  else if (action === 'delete' && node) deleteDirectory(node)
+}
+function handleMenuKeydown(event) { if (event.key === 'Escape') closeDirectoryMenu() }
+function handleOutsidePointerdown(event) {
+  if (event.target instanceof Element && event.target.closest('.directory-context-menu, .directory-menu-trigger')) return
+  closeDirectoryMenu()
+}
+function closeMenuOnViewportChange() { closeDirectoryMenu() }
 async function submitSort() {
   // 拖拽只改 el-tree 内部节点结构，须从 getNode 读取；根哨兵节点的子节点即顶级目录
   const toPlain = node => ({ id: node.data.id, children: node.childNodes.map(toPlain) })
@@ -166,33 +206,41 @@ watch(tasks, rows => {
   if (running && !pollTimer) pollTimer = setInterval(loadTasks, 5000)
   if (!running && pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }, { deep: false })
-// 选中目录被删除/重载后不存在时回退到全部任务
+// 选中目录被删除/重载后不存在时回退到任务目录根节点
 watch(directories, rows => {
   if (currentDirectory.value !== 0 && !rows.some(d => d.id === currentDirectory.value)) currentDirectory.value = 0
 })
 // 树点选与窄屏下拉统一在此重置页码
 watch(currentDirectory, () => { paging.page.value = 1 })
-onMounted(loadAll)
-onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
+onMounted(() => {
+  loadAll()
+  window.addEventListener('pointerdown', handleOutsidePointerdown)
+  window.addEventListener('keydown', handleMenuKeydown)
+  window.addEventListener('resize', closeMenuOnViewportChange)
+  window.addEventListener('scroll', closeMenuOnViewportChange, true)
+})
+onBeforeUnmount(() => {
+  if (pollTimer) clearInterval(pollTimer)
+  window.removeEventListener('pointerdown', handleOutsidePointerdown)
+  window.removeEventListener('keydown', handleMenuKeydown)
+  window.removeEventListener('resize', closeMenuOnViewportChange)
+  window.removeEventListener('scroll', closeMenuOnViewportChange, true)
+})
 </script>
 <template>
-  <section class="processing">
+  <section class="processing" :class="{ 'processing-has-directory': view === 'list' }">
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
     <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon/>
     <template v-if="view === 'list'">
       <el-select v-model="currentDirectory" class="directory-select" aria-label="任务目录"><el-option v-for="o in directoryOptions" :key="o.id" :label="o.label" :value="o.id"/></el-select>
       <div class="processing-layout">
         <aside class="directory-pane">
-          <div class="directory-head"><strong>任务目录</strong><el-button v-if="can('workflow.task.create')" text type="primary" @click="addDirectory(null)">新增</el-button></div>
-          <el-tree ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all :draggable="can('workflow.task.update')" :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-drop="submitSort">
+          <el-tree class="directory-tree" ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all :draggable="can('workflow.task.update')" :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-contextmenu="openDirectoryMenu" @node-drop="submitSort">
             <template #default="{ data }">
               <span class="tree-node">
-                <span>{{ data.name }}</span>
-                <span v-if="data.id !== 0" class="tree-actions">
-                  <el-button v-if="can('workflow.task.create')" text size="small" @click.stop="addDirectory(data)">新增</el-button>
-                  <el-button v-if="can('workflow.task.update')" text size="small" @click.stop="renameDirectory(data)">重命名</el-button>
-                  <el-button v-if="can('workflow.task.delete')" text size="small" type="danger" @click.stop="deleteDirectory(data)">删除</el-button>
-                </span>
+                <svg v-if="data.id !== 0" class="directory-folder-icon" viewBox="0 0 16 14" aria-hidden="true"><path d="M1 2.5c0-.8.7-1.5 1.5-1.5h3l1.6 1.7h6.4c.8 0 1.5.7 1.5 1.5v7.1c0 .9-.7 1.6-1.6 1.6H2.6c-.9 0-1.6-.7-1.6-1.6Z"/><path class="folder-highlight" d="M1.4 4.1h13"/></svg>
+                <span class="tree-label">{{ data.name }}</span>
+                <button v-if="data.id === 0 ? can('workflow.task.create') : can('workflow.task.create') || can('workflow.task.update') || can('workflow.task.delete')" type="button" class="directory-menu-trigger" :aria-label="`${data.name}目录操作`" aria-haspopup="menu" @pointerdown.stop @click.stop="openDirectoryMenu($event, data)" @contextmenu.stop.prevent="openDirectoryMenu($event, data)">⋯</button>
               </span>
             </template>
           </el-tree>
@@ -203,17 +251,13 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
               <el-input v-model="nameSearch" clearable placeholder="搜索任务名称" @keyup.enter="applyQuery"/>
               <el-select v-model="stateSearch" clearable placeholder="运行状态" style="width:130px"><el-option label="运行中" value="RUNNING"/><el-option label="停止" value="STOPPED"/></el-select>
               <el-button type="primary" @click="applyQuery">查询</el-button>
-              <span>当前目录：{{ currentDirectoryName }}</span>
             </div>
             <div class="list-query-actions">
               <el-button v-if="can('workflow.task.create') && can('datasource.source.read')" type="primary" @click="openCreate">新增</el-button>
-              <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="openStart(selected)">批量启动</el-button>
-              <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="stopBatch">批量停止</el-button>
               <el-button class="refresh-button" title="刷新" aria-label="刷新" @click="loadAll"><RefreshIcon /></el-button>
             </div>
           </div>
-          <el-table :data="paging.visible.value" empty-text="暂无任务" row-key="id" @selection-change="selected = $event">
-            <el-table-column v-if="can('workflow.task.execute')" type="selection" width="45"/>
+          <el-table class="task-table" :data="paging.visible.value" empty-text="暂无任务" row-key="id">
             <el-table-column type="index" label="序号" width="60"/>
             <el-table-column prop="name" label="任务名称" min-width="160"/>
             <el-table-column label="类型" width="110"><template #default="scope">{{ scope.row.type === 'SQL' ? 'SQL 加工' : scope.row.type === 'SYNC' ? '数据库同步' : scope.row.type === 'FLOW' ? '流程编排' : scope.row.type }}</template></el-table-column>
@@ -242,20 +286,59 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
       </el-dialog>
     </template>
     <FlowEditor v-else :draft="flowDraft" :sources="sources" :readonly="flowDraft?.runState === 'RUNNING'" @saved="flowSaved" @cancel="flowCancel"/>
+    <Teleport to="body">
+      <div v-if="directoryMenu" class="directory-context-menu" role="menu" aria-label="任务目录操作" :style="{ left: `${directoryMenu.x}px`, top: `${directoryMenu.y}px` }" @pointerdown.stop>
+        <template v-if="directoryMenu.node.id === 0">
+          <button type="button" role="menuitem" class="directory-context-item" @click="runDirectoryMenuAction('create')">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.7 4.2c0-.8.6-1.4 1.4-1.4h2.6l1.4 1.5h5.8c.8 0 1.4.6 1.4 1.4v5.6c0 .8-.6 1.4-1.4 1.4H3.1c-.8 0-1.4-.6-1.4-1.4Z"/><path d="M8 6.2v4.2M5.9 8.3h4.2"/></svg>新增目录
+          </button>
+        </template>
+        <template v-else>
+          <button v-if="can('workflow.task.create')" type="button" role="menuitem" class="directory-context-item" @click="runDirectoryMenuAction('create-child')">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.7 4.2c0-.8.6-1.4 1.4-1.4h2.6l1.4 1.5h5.8c.8 0 1.4.6 1.4 1.4v5.6c0 .8-.6 1.4-1.4 1.4H3.1c-.8 0-1.4-.6-1.4-1.4Z"/><path d="M8 6.2v4.2M5.9 8.3h4.2"/></svg>新增子目录
+          </button>
+          <span v-if="can('workflow.task.create') && (can('workflow.task.update') || can('workflow.task.delete'))" class="directory-context-divider" role="separator"/>
+          <button v-if="can('workflow.task.update')" type="button" role="menuitem" class="directory-context-item" @click="runDirectoryMenuAction('rename')">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 10.9-.7 2.8 2.8-.7 7.3-7.3a1.5 1.5 0 0 0-2.1-2.1Z"/><path d="m9.4 4.5 2.1 2.1"/></svg>重命名
+          </button>
+          <button v-if="can('workflow.task.delete')" type="button" role="menuitem" class="directory-context-item is-danger" @click="runDirectoryMenuAction('delete')">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.2h11M6 4.2V2.7h4v1.5M4.3 4.7l.6 8.1h6.2l.6-8.1M6.4 6.5v4.5M9.6 6.5v4.5"/></svg>删除
+          </button>
+        </template>
+      </div>
+    </Teleport>
   </section>
 </template>
 <style scoped>
-.processing-layout{display:flex;gap:14px;align-items:flex-start}
-.directory-pane{flex:0 0 220px;background:#fff;border:1px solid var(--el-border-color-lighter);border-radius:4px;padding:12px}
+.processing-has-directory{display:flex;flex-direction:column;min-height:100%}
+.processing-layout{display:flex;flex:1;gap:14px;align-items:stretch;min-height:0}
+.directory-pane{display:flex;flex:0 0 clamp(180px,15%,210px);flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:#fff;border:1px solid var(--el-border-color-lighter);border-radius:4px;padding:12px}
+.directory-tree{flex:1;min-height:0;overflow:auto}
 .directory-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.list-pane{flex:1;min-width:0}
-.tree-node{display:flex;justify-content:space-between;align-items:center;gap:6px;flex:1;min-width:0}
-.tree-actions{display:none;white-space:nowrap}
-.el-tree-node__content:hover .tree-actions{display:inline-flex}
-.el-tree-node__content:focus-within .tree-actions{display:inline-flex}
-@media(hover:none){.tree-actions{display:inline-flex}}
+.list-pane{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0}
+.list-pane :deep(.task-table){flex:1;min-height:0;background:#fff}
+.tree-node{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.tree-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.directory-folder-icon{width:15px;height:14px;flex:none;color:#ad8b4d;fill:currentColor}
+.directory-folder-icon .folder-highlight{fill:none;stroke:#fff;stroke-opacity:.72;stroke-width:.85}
+.directory-tree :deep(.el-tree-node__content.is-current) .directory-folder-icon{color:#4282c1}
+.directory-menu-trigger{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;flex:none;margin-left:auto;padding:0;border:0;border-radius:4px;background:transparent;color:#61758e;font-size:19px;line-height:1;opacity:0;cursor:pointer}
+.directory-tree :deep(.el-tree-node__content:hover) .directory-menu-trigger,.directory-tree :deep(.el-tree-node__content:focus-within) .directory-menu-trigger{opacity:1}
+.directory-menu-trigger:hover{background:#eaf1fa;color:#2e6eae}
+.directory-menu-trigger:focus-visible{opacity:1;outline:2px solid rgba(52,120,190,.35);outline-offset:1px}
+.directory-context-menu{position:fixed;z-index:3000;width:120px;min-width:120px;padding:5px;background:#fff;border:1px solid #dce4ed;border-radius:6px;box-shadow:0 8px 22px rgba(29,48,76,.17)}
+.directory-context-item{display:flex;align-items:center;gap:8px;width:100%;height:34px;padding:0 8px;border:0;border-radius:4px;background:transparent;color:#43566e;text-align:left;white-space:nowrap;font:inherit;font-size:12px;cursor:pointer}
+.directory-context-item svg{width:15px;height:15px;flex:none;fill:none;stroke:#7e91a8;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.directory-context-item:hover,.directory-context-item:focus-visible{background:#f0f5fb;color:#2b69ae;outline:none}
+.directory-context-item:hover svg,.directory-context-item:focus-visible svg{stroke:#2b69ae}
+.directory-context-item.is-danger{color:#c75454}
+.directory-context-item.is-danger svg{stroke:#c75454}
+.directory-context-item.is-danger:hover,.directory-context-item.is-danger:focus-visible{background:#fff2f0;color:#b64d4d}
+.directory-context-item.is-danger:hover svg,.directory-context-item.is-danger:focus-visible svg{stroke:#b64d4d}
+.directory-context-divider{display:block;height:1px;margin:5px 4px;background:#edf0f4}
 .status-text{color:#728582;font-size:12px}
-.pagination{margin-top:14px;display:flex;justify-content:flex-end}
+.processing-has-directory .list-pane .pagination{display:flex;flex:none;align-items:center;justify-content:flex-end;min-height:50px;margin-top:auto;padding:0 12px;border-top:1px solid var(--el-border-color-lighter);background:#fff}
 .directory-select{display:none}
-@media(max-width:700px){.directory-pane{display:none}.directory-select{display:block;width:100%;margin-bottom:10px}}
+@media(hover:none){.directory-menu-trigger{opacity:1}}
+@media(max-width:700px){.processing-has-directory{min-height:0}.processing-layout{flex:initial;min-height:0}.processing-has-directory .list-pane .pagination{margin-top:14px}.directory-pane{display:none}.directory-select{display:block;width:100%;margin-bottom:10px}}
 </style>
