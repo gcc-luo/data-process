@@ -209,6 +209,59 @@ class FlowTaskExecutorTest {
         assertEquals("b", f.jdbc().queryForObject("SELECT label FROM orders_map WHERE id=2", String.class));
     }
 
+    @Test void convertHandlesJavaTimeAndBinary() {
+        assertEquals("2026-11-20", FlowTaskExecutor.convert(LocalDate.of(2026, 11, 20)));
+        assertEquals("2026-11-20T09:30:15", FlowTaskExecutor.convert(java.time.LocalDateTime.of(2026, 11, 20, 9, 30, 15)));
+        assertEquals("09:30:15", FlowTaskExecutor.convert(java.time.LocalTime.of(9, 30, 15)));
+        assertEquals("2026-11-20T09:30:15+08:00", FlowTaskExecutor.convert(java.time.OffsetDateTime.of(2026, 11, 20, 9, 30, 15, 0, java.time.ZoneOffset.ofHours(8))));
+        assertEquals("09:30:15+08:00", FlowTaskExecutor.convert(java.time.OffsetTime.of(9, 30, 15, 0, java.time.ZoneOffset.ofHours(8))));
+        assertEquals("2026-11-20T01:30:00Z", FlowTaskExecutor.convert(java.time.Instant.parse("2026-11-20T01:30:00Z")));
+        byte[] bytes = {1, 2, 3};
+        assertSame(bytes, FlowTaskExecutor.convert(bytes));
+        assertThrows(IllegalArgumentException.class, () -> FlowTaskExecutor.convert(new Object()));
+    }
+
+    @Test void qualifiedSinkTableResolvesSchemaOnH2() throws Exception {
+        var f = fixture();
+        f.jdbc().update("CREATE SCHEMA flow_target");
+        f.jdbc().update("CREATE TABLE flow_target.orders_copy(id INT PRIMARY KEY, name VARCHAR(50), amount DECIMAL(10,2), tag VARCHAR(10))");
+        // 小写限定名：H2 非 MySQL 走 schema 位，storesUpperCase 归一后必须命中列
+        String qualified = CHAIN.replace("\"table\":\"orders_copy\"", "\"table\":\"flow_target.orders_copy\"");
+        new FlowTaskExecutor().execute(graph(qualified), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), ExecutionSinks.NOOP, 0);
+        assertEquals(2, f.jdbc().queryForObject("SELECT COUNT(*) FROM flow_target.orders_copy", Integer.class));
+    }
+
+    @Test void sinkRejectsIllegalUpstreamColumnNames() throws Exception {
+        var f = fixture();
+        f.jdbc().update("CREATE TABLE weird(\"bad name\" VARCHAR(10))");
+        f.jdbc().update("INSERT INTO weird VALUES ('x')");
+        f.jdbc().update("CREATE TABLE weird_copy(id INT)");
+        String g = "{\"nodes\":["
+                + "{\"key\":\"s\",\"component\":\"SOURCE_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"weird\"}},"
+                + "{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"weird_copy\",\"writeMode\":\"APPEND\"}}],"
+                + "\"edges\":[{\"from\":\"s\",\"to\":\"t\"}]}";
+        var ex = assertThrows(IllegalArgumentException.class, () -> new FlowTaskExecutor().execute(graph(g), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), ExecutionSinks.NOOP, 0));
+        assertTrue(ex.getMessage().contains("列名非法 bad name"), ex.getMessage());
+    }
+
+    @Test void sinkLogsProgressEveryTenBatches() throws Exception {
+        var f = fixture();
+        f.jdbc().update("CREATE TABLE bulk(id INT)");
+        var values = new StringBuilder();
+        for (int i = 1; i <= 25; i++) values.append(i == 1 ? "" : ",").append("(").append(i).append(")");
+        f.jdbc().update("INSERT INTO bulk VALUES " + values);
+        f.jdbc().update("CREATE TABLE bulk_copy(id INT)");
+        String g = "{\"nodes\":["
+                + "{\"key\":\"s\",\"component\":\"SOURCE_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"bulk\"}},"
+                + "{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"bulk_copy\",\"writeMode\":\"APPEND\",\"batchSize\":1}}],"
+                + "\"edges\":[{\"from\":\"s\",\"to\":\"t\"}]}";
+        var logs = new ArrayList<String>();
+        new FlowTaskExecutor().execute(graph(g), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), new ExecutionSinks((l, m) -> logs.add(m), s -> {}), 0);
+        assertTrue(logs.stream().anyMatch(m -> m.equals("节点 t 已写入 10 行")), String.join("\n", logs));
+        assertTrue(logs.stream().anyMatch(m -> m.equals("节点 t 已写入 20 行")), String.join("\n", logs));
+        assertEquals(25, f.jdbc().queryForObject("SELECT COUNT(*) FROM bulk_copy", Integer.class));
+    }
+
     @Test void sourceSqlBindsBusinessDate() throws Exception {
         var f = fixture();
         f.jdbc().update("CREATE TABLE orders_d(d DATE, id INT)");

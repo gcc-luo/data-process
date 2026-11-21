@@ -11,6 +11,7 @@ import { authorizedRequest } from './auth.js'
 import { COMPONENTS, GROUPS, componentDef, defaultConfig } from './flow-components.js'
 import { validateFlow, toVueNodes, toVueEdges, newNode, canConnect, previewTable } from './flow-graph.js'
 import { configToForm, formToConfig } from './flow-config.js'
+import { newParameter } from './task-edit.js'
 import FlowNode from './FlowNode.vue'
 const props = defineProps({ draft: Object, sources: Array, readonly: Boolean })
 const emit = defineEmits(['saved', 'cancel'])
@@ -80,8 +81,9 @@ function saveConfig() {
   if (props.readonly) return
   const node = graph.value.nodes.find(n => n.key === editingKey.value)
   if (!node) { drawerOpen.value = false; return }
-  const config = formToConfig(node.component, configForm.value)
-  node.config = config
+  try {
+    node.config = formToConfig(node.component, configForm.value)
+  } catch (e) { error.value = e.message; return } // 参数非法时保留抽屉供修改
   drawerOpen.value = false
 }
 const editingDef = computed(() => { const n = graph.value.nodes.find(n => n.key === editingKey.value); if (!n) return null; try { return componentDef(n.component) } catch { return null } })
@@ -158,6 +160,19 @@ const previewTables = computed(() => Object.fromEntries(previewKeys.value.map(k 
           <el-input-number v-else-if="f.type === 'number'" v-model="configForm[f.key]" :min="f.min ?? 1" :max="f.max ?? 10000"/>
           <el-input v-else-if="f.type === 'textarea' || f.type === 'expr'" v-model="configForm[f.key]" type="textarea" :rows="3"/>
           <el-input v-else-if="f.type === 'list'" v-model="configForm[f.key]" placeholder="逗号分隔"/>
+          <div v-else-if="f.type === 'parameters'" class="parameters">
+            <div v-for="(parameter, index) in configForm.parameters" :key="index" class="row parameter-row">
+              <span>第 {{ index + 1 }} 个</span>
+              <el-select :model-value="parameter.kind" aria-label="参数类型" @change="configForm.parameters[index] = newParameter($event)"><el-option label="文本" value="string"/><el-option label="数字" value="number"/><el-option label="布尔" value="boolean"/><el-option label="空值" value="null"/><el-option label="业务日期" value="date"/></el-select>
+              <el-input v-if="parameter.kind === 'string'" v-model="parameter.value" aria-label="文本参数"/>
+              <el-input v-else-if="parameter.kind === 'number'" v-model="parameter.value" inputmode="decimal" placeholder="例如 12.5" aria-label="数字参数"/>
+              <el-select v-else-if="parameter.kind === 'boolean'" v-model="parameter.value" aria-label="布尔参数"><el-option label="是" :value="true"/><el-option label="否" :value="false"/></el-select>
+              <el-button text :disabled="index === 0" @click="[configForm.parameters[index - 1], configForm.parameters[index]] = [configForm.parameters[index], configForm.parameters[index - 1]]">上移</el-button>
+              <el-button text :disabled="index === configForm.parameters.length - 1" @click="[configForm.parameters[index + 1], configForm.parameters[index]] = [configForm.parameters[index], configForm.parameters[index + 1]]">下移</el-button>
+              <el-button text type="danger" @click="configForm.parameters.splice(index, 1)">删除</el-button>
+            </div>
+            <el-button text type="primary" :disabled="(configForm.parameters || []).length >= 1000" @click="configForm.parameters.push(newParameter())">添加参数</el-button>
+          </div>
           <div v-else-if="f.type === 'mappings'" class="mappings">
             <div v-for="(m, i) in configForm.mappings" :key="i" class="row">
               <el-input v-model="m.from" placeholder="上游字段"/>
@@ -202,6 +217,8 @@ const previewTables = computed(() => Object.fromEntries(previewKeys.value.map(k 
 .canvas{flex:1;min-width:0;height:560px;border:1px solid #cbdcda;border-radius:8px;background:#f8fbfa;position:relative}
 .empty{position:absolute;top:45%;left:0;right:0;text-align:center;color:#718581;pointer-events:none}
 .mappings .row{margin:6px 0}
+.parameters .row{margin:6px 0;flex-wrap:wrap}
+.parameter-row .el-select,.parameter-row .el-input{max-width:160px}
 .logs{max-height:360px;overflow:auto;font-family:monospace;font-size:12px}
 .log-line.error{color:#c45656}
 .log-line.warn{color:#b88230}

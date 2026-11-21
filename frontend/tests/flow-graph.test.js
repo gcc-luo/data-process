@@ -141,3 +141,19 @@ test('newNode generates unique keys and default config', () => {
   assert.equal(a.config.expression, '')
   assert.deepEqual(a.position, { x: 10, y: 20 })
 })
+
+test('SOURCE_SQL chain validates without table requirement', () => {
+  const sqlChain = {
+    nodes: [
+      { key: 's', component: 'SOURCE_SQL', config: { sourceId: 1, sql: 'SELECT id FROM orders' } },
+      { key: 'f', component: 'FIELD_FILTER', config: { expression: 'id > 0' } },
+      { key: 't', component: 'SINK_TABLE', config: { sourceId: 2, table: 'copy', writeMode: 'APPEND' } }
+    ],
+    edges: [{ from: 's', to: 'f' }, { from: 'f', to: 't' }]
+  }
+  assert.deepEqual(validateFlow(sqlChain), [])
+  const noSql = { nodes: sqlChain.nodes.map(n => n.key === 's' ? { ...n, config: { sourceId: 1, sql: '' } } : n), edges: sqlChain.edges }
+  assert.ok(validateFlow(noSql).some(m => m.includes('未配置 SQL')))
+  const noTable = { nodes: chain.nodes.map(n => n.key === 's' ? { ...n, config: { sourceId: 1, table: '' } } : n), edges: chain.edges }
+  assert.ok(validateFlow(noTable).some(m => m.includes('表名无效')))
+})

@@ -11,7 +11,8 @@ export const COMPONENTS = [
     component: 'SOURCE_SQL', group: 'source', label: 'SQL 查询',
     fields: [
       { key: 'sourceId', label: '数据源', type: 'source' },
-      { key: 'sql', label: 'SQL 语句', type: 'textarea' }
+      { key: 'sql', label: 'SQL 语句', type: 'textarea' },
+      { key: 'parameters', label: '顺序参数（按 SQL 占位符顺序）', type: 'parameters' }
     ]
   },
   {

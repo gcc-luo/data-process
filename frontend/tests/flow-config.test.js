@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
-import { configToForm, formToConfig } from '../src/flow-config.js'
+import { configToForm, formToConfig, paramsToForm, formToParams } from '../src/flow-config.js'
 
 test('keyColumns round-trips between array and comma text', () => {
   const config = { sourceId: 2, table: 'copy', writeMode: 'UPSERT', keyColumns: ['a', 'b'], batchSize: 500 }
@@ -42,4 +42,25 @@ test('clean configs round-trip unchanged', () => {
   assert.deepEqual(formToConfig('SINK_TABLE', configToForm('SINK_TABLE', sink)), sink)
   const filter = { expression: 'amount > 0' }
   assert.deepEqual(formToConfig('FIELD_FILTER', configToForm('FIELD_FILTER', filter)), filter)
+})
+
+test('SOURCE_SQL parameters round-trip through kinds form', () => {
+  const config = { sourceId: 1, sql: 'SELECT ?', parameters: [
+    { type: 'BUSINESS_DATE' },
+    { type: 'VALUE', value: null },
+    { type: 'VALUE', value: 'x' },
+    { type: 'VALUE', value: 12.5 },
+    { type: 'VALUE', value: true }
+  ] }
+  const form = configToForm('SOURCE_SQL', config)
+  assert.deepEqual(form.parameters.map(p => p.kind), ['date', 'null', 'string', 'number', 'boolean'])
+  assert.deepEqual(formToConfig('SOURCE_SQL', form), config)
+})
+
+test('paramsToForm defaults missing parameters and formToParams validates numbers', () => {
+  assert.deepEqual(configToForm('SOURCE_SQL', { sourceId: 1, sql: 'SELECT 1' }).parameters, [])
+  assert.deepEqual(formToConfig('SOURCE_SQL', { sourceId: 1, sql: 'SELECT 1' }).parameters, [])
+  assert.deepEqual(paramsToForm([{ type: 'VALUE', value: 3 }]), [{ kind: 'number', value: '3' }])
+  assert.throws(() => formToParams([{ kind: 'number', value: 'abc' }]))
+  assert.throws(() => formToParams([{ kind: 'number', value: '9007199254740993' }]))
 })

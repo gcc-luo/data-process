@@ -18,6 +18,7 @@ import javax.sql.DataSource;
 
 /** Streaming pull pipeline for FLOW tasks; preview mode caps sources and never writes targets. */
 public final class FlowTaskExecutor {
+    private static final java.util.regex.Pattern IDENT = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_$]*");
     /** durationMs 口径：非 sink 节点为迭代器构建期耗时（惰性排空计入下游 sink），sink 节点含上游排空与写入。 */
     public record NodeStat(String nodeKey, long rowsIn, long rowsOut, long durationMs) {}
     public record Preview(List<String> columns, List<List<Object>> rows) {}
@@ -87,7 +88,7 @@ public final class FlowTaskExecutor {
                             previews.put(node.key(), new Preview(List.copyOf(cols), collected));
                             it = java.util.Collections.emptyIterator();
                         } else {
-                            counts[1] = writeSink(node, provider, cols, source, cancel, counts);
+                            counts[1] = writeSink(node, provider, cols, source, cancel, counts, sinks);
                             it = java.util.Collections.emptyIterator();
                         }
                     }
@@ -201,7 +202,7 @@ public final class FlowTaskExecutor {
         };
     }
 
-    private long writeSink(FlowGraph.Node node, CamelTaskRunner.DataSourceProvider provider, List<String> cols, Iterator<Map<String, Object>> source, RunCancelContext cancel, long[] counts) throws Exception {
+    private long writeSink(FlowGraph.Node node, CamelTaskRunner.DataSourceProvider provider, List<String> cols, Iterator<Map<String, Object>> source, RunCancelContext cancel, long[] counts, ExecutionSinks sinks) throws Exception {
         DataSource ds = provider.get(node.config().path("sourceId").asLong());
         String table = node.config().path("table").textValue();
         String mode = node.config().path("writeMode").asText("APPEND");
@@ -214,15 +215,24 @@ public final class FlowTaskExecutor {
                 var targetColumns = new java.util.HashSet<String>();
                 var meta = target.getMetaData();
                 String[] parts = table.split("\\.");
-                String schema = parts.length == 2 ? parts[0] : null;
+                // MySQL 限定名首段是 catalog 而非 schema；标识符大小写按库归一（同 verifyUniqueKey）
+                boolean mysql = meta.getDatabaseProductName().toLowerCase(Locale.ROOT).contains("mysql");
+                String catalog = mysql ? (parts.length == 2 ? parts[0] : target.getCatalog()) : null;
+                String schema = mysql ? null : (parts.length == 2 ? parts[0] : target.getSchema());
                 String name = parts[parts.length - 1];
-                try (ResultSet rc = meta.getColumns(null, schema, name, null)) {
+                if (meta.storesUpperCaseIdentifiers()) { name = name.toUpperCase(Locale.ROOT); if (schema != null) schema = schema.toUpperCase(Locale.ROOT); }
+                else if (meta.storesLowerCaseIdentifiers()) { name = name.toLowerCase(Locale.ROOT); if (schema != null) schema = schema.toLowerCase(Locale.ROOT); }
+                try (ResultSet rc = meta.getColumns(catalog, schema, name, null)) {
                     while (rc.next()) targetColumns.add(rc.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
                 }
-                if (targetColumns.isEmpty()) try (ResultSet rc = meta.getColumns(null, schema, name.toUpperCase(Locale.ROOT), null)) {
+                if (targetColumns.isEmpty()) try (ResultSet rc = meta.getColumns(catalog, schema, name.toUpperCase(Locale.ROOT), null)) {
                     while (rc.next()) targetColumns.add(rc.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
                 }
-                for (String col : cols) if (!targetColumns.contains(col)) throw new IllegalArgumentException("节点 " + node.key() + ": 目标表缺少字段 " + col);
+                for (String col : cols) {
+                    // 列名直接拼 SQL：白名单拦截非法上游列名，防注入
+                    if (!IDENT.matcher(col).matches()) throw new IllegalArgumentException("节点 " + node.key() + ": 列名非法 " + col);
+                    if (!targetColumns.contains(col)) throw new IllegalArgumentException("节点 " + node.key() + ": 目标表缺少字段 " + col);
+                }
                 if ("UPSERT".equals(mode)) DatabaseSyncExecutor.verifyUniqueKey(target, table, keys);
                 String placeholders = String.join(",", java.util.Collections.nCopies(cols.size(), "?"));
                 String assignments = null;
@@ -242,6 +252,8 @@ public final class FlowTaskExecutor {
                         cancel.register(update);
                     }
                     int pending = 0;
+                    int batchNo = 0;
+                    long written = 0;
                     while (source.hasNext()) {
                         if (cancel.isCancelled()) throw new InterruptedException("手动停止");
                         var row = source.next();
@@ -262,11 +274,11 @@ public final class FlowTaskExecutor {
                             bind(insert, cols, row);
                             insert.addBatch();
                             pending++;
-                            if (pending == batchSize) { insert.executeBatch(); pending = 0; }
+                            if (pending == batchSize) { insert.executeBatch(); written += pending; pending = 0; if (++batchNo % 10 == 0) sinks.log().log("INFO", "节点 " + node.key() + " 已写入 " + written + " 行"); }
                         }
                         counts[1]++;
                     }
-                    if (pending > 0) insert.executeBatch();
+                    if (pending > 0) { insert.executeBatch(); written += pending; if (++batchNo % 10 == 0) sinks.log().log("INFO", "节点 " + node.key() + " 已写入 " + written + " 行"); }
                     if (cancel.isCancelled()) throw new InterruptedException("手动停止");
                     target.commit();
                 }
@@ -295,11 +307,15 @@ public final class FlowTaskExecutor {
             }
         }
     }
-    private static Object convert(Object value) {
+    static Object convert(Object value) {
         if (value == null) return null;
         if (value instanceof BigDecimal || value instanceof String || value instanceof Boolean) return value;
         if (value instanceof Number n) return new BigDecimal(n.toString());
         if (value instanceof java.sql.Date || value instanceof java.sql.Timestamp || value instanceof java.sql.Time) return value.toString();
+        // MySQL JDBC 可能返回 java.time 类型；二进制透传（sink setObject 支持，预览 Jackson 默认 base64）
+        if (value instanceof java.time.LocalDate || value instanceof java.time.LocalDateTime || value instanceof java.time.LocalTime
+                || value instanceof java.time.OffsetDateTime || value instanceof java.time.OffsetTime || value instanceof java.time.Instant) return value.toString();
+        if (value instanceof byte[]) return value;
         throw new IllegalArgumentException("不支持的字段类型: " + value.getClass().getSimpleName());
     }
     private static RuntimeException wrap(Exception ex) {

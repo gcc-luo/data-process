@@ -6,6 +6,7 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.sql.DataSource;
 
 /** Runs only pre-authorized task definitions. Connections are resolved by a trusted provider. */
@@ -30,7 +31,13 @@ public final class CamelTaskRunner implements WorkflowWorker.TaskRunner, AutoClo
             long sourceId = positiveId(config, "sourceId");
             String statement = text(config, "sql");
             List<Object> values = parameters(config.path("parameters"), businessDate);
-            sql.execute(provider.get(sourceId), statement, values, cancel);
+            // SQL/SYNC 与 FLOW 一致：开始/完成日志与 stats 经 sinks 落库（不改执行器签名）
+            sinks.log().log("INFO", "SQL 任务开始");
+            long started = System.nanoTime();
+            int n = sql.execute(provider.get(sourceId), statement, values, cancel);
+            long elapsed = (System.nanoTime() - started) / 1_000_000;
+            sinks.log().log("INFO", "SQL 任务完成: 写入 " + n + " 行");
+            sinks.stats().accept(mapper.writeValueAsString(List.of(Map.of("nodeKey", "sql", "rowsIn", 0, "rowsOut", n, "durationMs", elapsed))));
         } else if ("SYNC".equals(task.type())) {
             long sourceId = positiveId(config, "sourceId"), targetId = positiveId(config, "targetId");
             JsonNode fields = config.path("targetColumns");
@@ -40,14 +47,20 @@ public final class CamelTaskRunner implements WorkflowWorker.TaskRunner, AutoClo
             int batchSize = config.path("batchSize").asInt(500);
             List<Object> values = config.has("sourceParameters") ? parameters(config.path("sourceParameters"), businessDate) : List.of();
             String mode = config.has("writeMode") ? text(config, "writeMode") : "APPEND";
-            if ("APPEND".equals(mode)) sync.append(provider.get(sourceId), provider.get(targetId), text(config, "sourceQuery"), values, text(config, "targetTable"), columns, batchSize, cancel);
-            else if ("UPSERT".equals(mode)) {
+            List<String> keys = new ArrayList<>();
+            if ("UPSERT".equals(mode)) {
                 JsonNode keyNodes = config.path("keyColumns");
                 if (!keyNodes.isArray() || keyNodes.isEmpty()) throw new IllegalArgumentException("Primary keys required");
-                List<String> keys = new ArrayList<>();
                 for (JsonNode key : keyNodes) { if (!key.isTextual()) throw new IllegalArgumentException("Invalid primary key"); keys.add(key.textValue()); }
-                sync.upsert(provider.get(sourceId), provider.get(targetId), text(config, "sourceQuery"), values, text(config, "targetTable"), columns, keys, batchSize, cancel);
-            } else throw new IllegalArgumentException("Unsupported write mode");
+            } else if (!"APPEND".equals(mode)) throw new IllegalArgumentException("Unsupported write mode");
+            sinks.log().log("INFO", "同步任务开始");
+            long started = System.nanoTime();
+            int n = "APPEND".equals(mode)
+                    ? sync.append(provider.get(sourceId), provider.get(targetId), text(config, "sourceQuery"), values, text(config, "targetTable"), columns, batchSize, cancel)
+                    : sync.upsert(provider.get(sourceId), provider.get(targetId), text(config, "sourceQuery"), values, text(config, "targetTable"), columns, keys, batchSize, cancel);
+            long elapsed = (System.nanoTime() - started) / 1_000_000;
+            sinks.log().log("INFO", "同步任务完成: 写入 " + n + " 行");
+            sinks.stats().accept(mapper.writeValueAsString(List.of(Map.of("nodeKey", "sync", "rowsIn", n, "rowsOut", n, "durationMs", elapsed))));
         } else if ("FLOW".equals(task.type())) {
             flow.execute(FlowGraph.parse(config), provider, businessDate, cancel, sinks, 0);
         } else throw new IllegalArgumentException("Unsupported task type");

@@ -11,7 +11,8 @@ export function validateNodeConfig(n) {
   const c = n.config || {}
   if (SOURCES.includes(n.component) || SINKS.includes(n.component)) {
     if (!(Number.isInteger(c.sourceId) && c.sourceId >= 1)) errors.push(`节点 ${n.key} 数据源无效`)
-    if (!c.table || !TABLE.test(c.table)) errors.push(`节点 ${n.key} 表名无效`)
+    // 表名仅限表式来源/目标；SOURCE_SQL 以 SQL 为准，不要求 table
+    if ((n.component === 'SOURCE_TABLE' || n.component === 'SINK_TABLE') && (!c.table || !TABLE.test(c.table))) errors.push(`节点 ${n.key} 表名无效`)
   }
   if (n.component === 'SOURCE_SQL' && !c.sql) errors.push(`节点 ${n.key} 未配置 SQL`)
   if (n.component === 'FIELD_MAP' && !(c.mappings || []).length) errors.push(`节点 ${n.key} 未配置映射`)

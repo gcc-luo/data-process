@@ -77,6 +77,7 @@ public class TaskController {
     record VersionRequest(JsonNode configuration) {}
     @PostMapping("/api/tasks/{id}/versions") @Transactional
     ResponseEntity<Map<String, Object>> version(@PathVariable long id, @RequestBody VersionRequest request, Authentication authentication) {
+        if (runs.hasActiveRun(id)) throw new ResponseStatusException(HttpStatus.CONFLICT, "任务运行中，不能修改");
         String type = null;
         try {
             type = tasks.findVersion(id, 1).orElseThrow(() -> new IllegalArgumentException("Unknown task")).type();

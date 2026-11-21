@@ -116,6 +116,29 @@ class TaskStopApiTest {
         assertEquals("手动停止", jdbc.queryForObject("SELECT error_message FROM task_runs WHERE id=?", String.class, runId));
     }
 
+    @Test void versionCreationConflictsWhileRunning() throws Exception {
+        var session = login();
+        insertTask(635);
+        Mockito.when(limiter.acquire()).thenAnswer(invocation -> new TaskExecutionLimiter(8).acquire());
+        CountDownLatch started = new CountDownLatch(1);
+        Mockito.doAnswer(invocation -> {
+            RunCancelContext cancel = invocation.getArgument(2);
+            started.countDown();
+            while (!cancel.isCancelled()) Thread.sleep(10);
+            throw new InterruptedException("手动停止");
+        }).when(runner).execute(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any());
+        mvc.perform(post("/api/tasks/635/runs").session(session).with(csrf()).contentType("application/json").content("{\"version\":1,\"businessDate\":\"2026-11-20\"}"))
+                .andExpect(status().isAccepted());
+        long runId = jdbc.queryForObject("SELECT id FROM task_runs WHERE task_id=635", Long.class);
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        awaitState(runId, "RUNNING");
+        // 运行中新增版本与 PUT/DELETE 一致：409
+        mvc.perform(post("/api/tasks/635/versions").session(session).with(csrf()).contentType("application/json").content("{\"configuration\":{\"sourceId\":1,\"sql\":\"SELECT 1\"}}"))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/tasks/635/stop").session(session).with(csrf())).andExpect(status().isOk());
+        awaitState(runId, "INTERRUPTED");
+    }
+
     @Test void stopWithoutActiveRunConflicts() throws Exception {
         var session = login();
         insertTask(633);
