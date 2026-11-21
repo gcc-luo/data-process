@@ -41,6 +41,8 @@
 | C20 | FIELD_MASK "****" 硬编码未抽共享工具（与 DatasetQueryEngine 语义一致） | FlowTaskExecutor | 抽共享脱敏工具常量 |
 | C21 | FLOW 无 retry 策略 UI 入口（后端支持；与 C15 同类） | TaskFormDialog/FlowEditor | 画布基础信息入口一并补 |
 | C22 | 字段校验行级触发（空来源不报"上游缺少字段"） | FlowTaskExecutor | 可选保存期 schema 预检 |
+| C23 | openConfig 调 configToForm 无 try/catch（外部写入超安全整数参数致抽屉打不开） | FlowEditor.openConfig | 同 saveConfig 加防护 |
+| C24 | paramsToForm 未严格校验 p.type==='VALUE'（比 task-edit 宽松，畸形参数静默归一） | flow-config.js | 对齐 fromParameters 严格校验 |
 
 ## 验收补充场景（二期手工清单之外）
 
