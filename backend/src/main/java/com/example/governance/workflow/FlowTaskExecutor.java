@@ -107,7 +107,7 @@ public final class FlowTaskExecutor {
             return new Outcome(List.copyOf(stats), previews);
         } catch (Exception ex) {
             // 失败诊断：记当前处理节点后重抛；日志自身失败不得掩盖原因异常
-            try { sinks.log().log("ERROR", "节点 " + currentKey + " 处理失败: " + ex.getMessage()); } catch (Exception ignored) { }
+            try { sinks.log().log("ERROR", "节点 " + (currentKey == null ? "流程" : currentKey) + " 处理失败: " + ex.getMessage()); } catch (Exception ignored) { }
             throw ex;
         } finally {
             for (int i = closeables.size() - 1; i >= 0; i--) try { closeables.get(i).close(); } catch (Exception ignored) { }

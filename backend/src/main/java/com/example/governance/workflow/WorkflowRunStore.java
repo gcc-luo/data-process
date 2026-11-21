@@ -154,9 +154,12 @@ public final class WorkflowRunStore {
     }
     public RunLogSink nodeLogSink(long runId, String node) { return new DbRunLogSink(jdbc, "WORKFLOW_NODE", runId, node, currentAttempt(runId, node)); }
     public java.util.function.Consumer<String> nodeStatsSink(long runId, String node) {
+        return nodeStatsSink(runId, node, new DbRunLogSink(jdbc, "WORKFLOW_NODE", runId, node, currentAttempt(runId, node)));
+    }
+    /** 传入业务日志 sink：stats 写入失败的 WARN 与业务日志共用行号计数。 */
+    public java.util.function.Consumer<String> nodeStatsSink(long runId, String node, RunLogSink log) {
         int attempt = currentAttempt(runId, node);
-        return TaskRunService.resilientStats(json -> jdbc.update("UPDATE workflow_node_attempts SET stats=? WHERE run_id=? AND node_key=? AND attempt_no=?", json, runId, node, attempt),
-                new DbRunLogSink(jdbc, "WORKFLOW_NODE", runId, node, attempt));
+        return TaskRunService.resilientStats(json -> jdbc.update("UPDATE workflow_node_attempts SET stats=? WHERE run_id=? AND node_key=? AND attempt_no=?", json, runId, node, attempt), log);
     }
     private record Run(long workflowId, int version, String state) {}
     private record NodeState(String key, String state) {}

@@ -25,7 +25,10 @@ public class TaskController {
     private final TaskDefinitionValidator validator;
     private final DataSourceStore sources;
     private final AuditLog audit;
-    public TaskController(TaskVersionStore tasks, TaskDefinitionValidator validator, DataSourceStore sources, AuditLog audit, TaskRunService runs) { this.runs = runs; this.tasks = tasks; this.validator = validator; this.sources = sources; this.audit = audit; }
+    private final com.example.governance.assets.ExecutionDataSourceProvider provider;
+    private final FlowTaskExecutor flowExecutor = new FlowTaskExecutor();
+    private final com.fasterxml.jackson.databind.ObjectMapper flowMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    public TaskController(TaskVersionStore tasks, TaskDefinitionValidator validator, DataSourceStore sources, AuditLog audit, TaskRunService runs, com.example.governance.assets.ExecutionDataSourceProvider provider) { this.runs = runs; this.tasks = tasks; this.validator = validator; this.sources = sources; this.audit = audit; this.provider = provider; }
     record CreateRequest(String name, String type, JsonNode configuration, Long directoryId, String description) {}
     public record LastRunView(String state, java.time.LocalDateTime startedAt, java.time.LocalDateTime finishedAt) {}
     public record TaskView(long id, String name, String type, int version, String configuration, Long directoryId, String description, String runState, LastRunView lastRun) {}
@@ -88,6 +91,29 @@ public class TaskController {
         try { return ResponseEntity.accepted().body(Map.of("id", runs.start(id, request.version(), request.businessDate(), auth))); }
         catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid task run"); }
         catch (IllegalStateException ex) { throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage()); }
+    }
+    record FlowTestRequest(JsonNode configuration) {}
+    @PostMapping("/api/tasks/flow/test-run")
+    ResponseEntity<Map<String, Object>> flowTest(@RequestBody FlowTestRequest request) {
+        String configuration;
+        try { configuration = flowMapper.writeValueAsString(request.configuration()); validator.validate("FLOW", configuration); }
+        catch (IllegalArgumentException | com.fasterxml.jackson.core.JsonProcessingException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "流程配置无效"); }
+        var cancel = new RunCancelContext();
+        var logs = new java.util.concurrent.CopyOnWriteArrayList<Map<String, Object>>();
+        RunLogSink collect = (level, message) -> logs.add(Map.of("lineNo", logs.size() + 1, "level", level, "message", message));
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var future = executor.submit(() -> flowExecutor.execute(FlowGraph.parse(request.configuration()), provider, java.time.LocalDate.now(), cancel, new ExecutionSinks(collect, json -> {}), 100));
+            var outcome = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            return ResponseEntity.ok(Map.of("logs", logs, "previews", outcome.previews(), "stats", outcome.stats()));
+        } catch (java.util.concurrent.TimeoutException ex) {
+            cancel.cancel();
+            throw new ResponseStatusException(HttpStatus.REQUEST_TIMEOUT, "试运行超过 30 秒");
+        } catch (java.util.concurrent.ExecutionException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getCause() == null ? "试运行失败" : ex.getCause().getMessage());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "试运行被中断");
+        }
     }
     @PostMapping("/api/tasks/{id}/stop")
     ResponseEntity<Map<String, Integer>> stop(@PathVariable long id, Authentication auth) {

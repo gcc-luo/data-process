@@ -56,7 +56,8 @@ public final class WorkflowWorker {
         boolean success; TaskVersionStore.Version task = null;
         try {
             task = tasks.findVersion(node.taskId(), node.taskVersion()).orElseThrow();
-            runner.execute(task, businessDate, new RunCancelContext(), new ExecutionSinks(runs.nodeLogSink(runId, key), runs.nodeStatsSink(runId, key)));
+            var logSink = runs.nodeLogSink(runId, key);
+            runner.execute(task, businessDate, new RunCancelContext(), new ExecutionSinks(logSink, runs.nodeStatsSink(runId, key, logSink)));
             success = true;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
