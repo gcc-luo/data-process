@@ -59,6 +59,7 @@ function openConfig(key) {
   if (!node) return
   editingKey.value = key
   configForm.value = JSON.parse(JSON.stringify(node.config || defaultConfig(node.component)))
+  if (node.component === 'FIELD_MAP') configForm.value.mappings ??= []
   if (node.component === 'SINK_TABLE' && Array.isArray(configForm.value.keyColumns)) configForm.value.keyColumns = configForm.value.keyColumns.join(', ')
   drawerOpen.value = true
 }
@@ -67,20 +68,23 @@ function saveConfig() {
   if (!node) { drawerOpen.value = false; return }
   const config = { ...configForm.value }
   if (node.component === 'SINK_TABLE') config.keyColumns = String(config.keyColumns || '').split(',').map(s => s.trim()).filter(Boolean)
-  if (node.component === 'FIELD_MAP') config.mappings = (config.mappings || []).filter(m => m.from && m.to)
+  if (node.component === 'FIELD_MAP') config.mappings = (config.mappings || []).filter(m => m.from?.trim() && m.to?.trim()).map(m => ({ ...m, from: m.from.trim(), to: m.to.trim() }))
   node.config = config
   drawerOpen.value = false
 }
 const editingDef = computed(() => { const n = graph.value.nodes.find(n => n.key === editingKey.value); return n ? componentDef(n.component) : null })
+function addMapping() {
+  configForm.value.mappings ??= []
+  configForm.value.mappings.push({ from: '', to: '' })
+}
 async function save() {
-  if (busy.value) return
+  if (busy.value || !props.draft) return
   const errors = validateFlow(graph.value)
   if (errors.length) { error.value = errors.join('；'); return }
   busy.value = true; error.value = ''
   try {
-    const configuration = JSON.stringify(graph.value)
     const url = props.draft?.id ? `/api/tasks/${props.draft.id}/versions` : '/api/tasks'
-    const body = props.draft?.id ? { configuration } : { name: props.draft.name, type: 'FLOW', directoryId: props.draft.directoryId ?? null, description: props.draft.description ?? null, configuration }
+    const body = props.draft?.id ? { configuration: graph.value } : { name: props.draft?.name, type: 'FLOW', directoryId: props.draft?.directoryId ?? null, description: props.draft?.description ?? null, configuration: graph.value }
     const response = await authorizedRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务保存权限' : response.status === 409 ? '任务运行中，不能修改' : '流程保存失败，请检查配置')
     emit('saved')
@@ -146,7 +150,7 @@ const previewKeys = computed(() => Object.keys(testResult.value?.previews || {})
               <el-input v-model="m.to" placeholder="输出字段"/>
               <el-button text type="danger" @click="configForm.mappings.splice(i, 1)">删除</el-button>
             </div>
-            <el-button text type="primary" @click="configForm.mappings.push({ from: '', to: '' })">添加映射</el-button>
+            <el-button text type="primary" @click="addMapping">添加映射</el-button>
           </div>
           <el-input v-else v-model="configForm[f.key]"/>
         </el-form-item>
