@@ -47,9 +47,11 @@ export function flowDraftForEdit(row) {
   return { ...row }
 }
 
-/** FLOW 行复制进画布的草稿：置空 id、名称加“-副本”，保留 configuration 供新建预填。 */
+/** FLOW 行复制进画布的草稿：置空 id、名称加“-副本”，保留 configuration 供新建预填；
+ * 剔除源行运行态（runState/lastRun），避免 RUNNING 源行的副本被误判为只读。 */
 export function flowDraftForCopy(row) {
-  return { ...row, id: null, name: `${row.name}-副本` }
+  const { runState, lastRun, ...rest } = row
+  return { ...rest, id: null, name: `${row.name}-副本` }
 }
 
 /** 先序扁平化目录树为 { id, parentId, sortOrder }，供 el-tree 拖拽后全量排序提交。 */

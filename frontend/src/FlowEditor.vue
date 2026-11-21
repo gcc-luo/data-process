@@ -77,6 +77,7 @@ function openConfig(key) {
   drawerOpen.value = true
 }
 function saveConfig() {
+  if (props.readonly) return
   const node = graph.value.nodes.find(n => n.key === editingKey.value)
   if (!node) { drawerOpen.value = false; return }
   const config = formToConfig(node.component, configForm.value)
@@ -150,7 +151,7 @@ const previewTables = computed(() => Object.fromEntries(previewKeys.value.map(k 
       </div>
     </div>
     <el-drawer v-model="drawerOpen" :title="editingDef ? `组件配置：${editingDef.label}` : '组件配置'" size="30%" direction="rtl">
-      <el-form v-if="editingDef" label-position="top">
+      <el-form v-if="editingDef" label-position="top" :disabled="readonly">
         <el-form-item v-for="f in editingDef.fields" :key="f.key" :label="f.label">
           <el-select v-if="f.type === 'source'" v-model="configForm[f.key]" clearable placeholder="选择数据源"><el-option v-for="s in sources" :key="s.id" :label="s.name" :value="s.id"/></el-select>
           <el-select v-else-if="f.type === 'select'" v-model="configForm[f.key]"><el-option v-for="o in f.options" :key="o.value" :label="o.label" :value="o.value"/></el-select>
@@ -169,7 +170,7 @@ const previewTables = computed(() => Object.fromEntries(previewKeys.value.map(k 
           <el-input v-else v-model="configForm[f.key]"/>
         </el-form-item>
       </el-form>
-      <template #footer><el-button @click="drawerOpen = false">取消</el-button><el-button type="primary" @click="saveConfig">确定</el-button></template>
+      <template #footer><el-button @click="drawerOpen = false">取消</el-button><el-button v-if="!readonly" type="primary" @click="saveConfig">确定</el-button></template>
     </el-drawer>
     <el-dialog v-model="testOpen" title="试运行结果" width="min(900px, 95vw)">
       <el-tabs v-model="testTab">

@@ -116,3 +116,14 @@ test('flowDraftForCopy clears id, appends 副本 suffix and keeps configuration'
   assert.equal(row.id, 21)
   assert.equal(row.name, '订单流程')
 })
+
+test('flowDraftForCopy strips runState and lastRun so running source copies stay editable', () => {
+  const row = { id: 21, name: '订单流程', type: 'FLOW', directoryId: 2, runState: 'RUNNING', lastRun: { state: 'RUNNING', startedAt: '2026-11-21T09:00:00' }, configuration: '{"nodes":[],"edges":[]}' }
+  const draft = flowDraftForCopy(row)
+  assert.equal('runState' in draft, false)
+  assert.equal('lastRun' in draft, false)
+  assert.equal(draft.id, null)
+  assert.equal(draft.name, '订单流程-副本')
+  assert.equal(draft.configuration, '{"nodes":[],"edges":[]}')
+  assert.equal(row.runState, 'RUNNING') // 源行不受影响
+})

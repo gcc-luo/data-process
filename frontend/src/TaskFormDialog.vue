@@ -26,7 +26,7 @@ async function save() {
     const name = form.value.name.trim()
     if (!name) { error.value = '请输入任务名称'; return }
     if (name.length > 160) { error.value = '任务名称不能超过 160 个字符'; return }
-    emit('flow', { name: form.value.name, directoryId: directoryId.value, description: description.value }); emit('update:open', false); return
+    emit('flow', { name, directoryId: directoryId.value, description: description.value }); emit('update:open', false); return
   }
   error.value = ''; busy.value = true
   try {
