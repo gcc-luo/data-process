@@ -49,7 +49,7 @@ async function save() {
         <el-form-item label="任务类型"><el-select v-model="form.type" :disabled="editing"><el-option label="SQL 加工" value="SQL"/><el-option label="数据库同步" value="SYNC"/><el-option label="流程编排" value="FLOW"/></el-select></el-form-item>
         <el-form-item label="所属目录"><el-select v-model="directoryId" clearable placeholder="未分类"><el-option v-for="d in directories" :key="d.id" :label="d.name" :value="d.id"/></el-select></el-form-item>
         <el-form-item label="描述"><el-input v-model="description" maxlength="500" placeholder="可选"/></el-form-item>
-        <el-form-item label="源数据源"><el-select v-model="form.sourceId"><el-option v-for="s in sources" :key="s.id" :label="s.name" :value="s.id"/></el-select></el-form-item>
+        <el-form-item v-if="form.type !== 'FLOW'" label="源数据源"><el-select v-model="form.sourceId"><el-option v-for="s in sources" :key="s.id" :label="s.name" :value="s.id"/></el-select></el-form-item>
         <el-form-item v-if="form.type === 'SYNC'" label="目标数据源"><el-select v-model="form.targetId"><el-option v-for="s in sources" :key="s.id" :label="s.name" :value="s.id"/></el-select></el-form-item>
       </div>
       <template v-if="form.type !== 'FLOW'">
@@ -80,10 +80,10 @@ async function save() {
             <el-button text type="danger" @click="form.parameters.splice(index, 1)">删除</el-button>
           </div>
         </div>
+        <div><el-checkbox v-model="form.retrySafe">我已确认任务在工作流中自动重试不会造成重复或错误数据</el-checkbox>
+          <div v-if="form.retrySafe" class="row"><span>最多重试</span><el-input-number v-model="form.maxRetries" :min="1" :max="3"/><span>次，间隔（秒）</span><el-input-number v-model="form.retryDelay" :min="1" :max="3600"/></div>
+        </div>
       </template>
-      <div><el-checkbox v-model="form.retrySafe">我已确认任务在工作流中自动重试不会造成重复或错误数据</el-checkbox>
-        <div v-if="form.retrySafe" class="row"><span>最多重试</span><el-input-number v-model="form.maxRetries" :min="1" :max="3"/><span>次，间隔（秒）</span><el-input-number v-model="form.retryDelay" :min="1" :max="3600"/></div>
-      </div>
       <el-button v-if="!readonly && !prefillFailed && (editing ? can('workflow.task.update') : can('workflow.task.create'))" type="primary" native-type="submit" :loading="busy">{{ editing ? '保存新版本' : '保存任务' }}</el-button>
     </el-form>
     <el-button :disabled="busy" @click="emit('update:open', false)">{{ readonly ? '关闭' : '取消' }}</el-button>

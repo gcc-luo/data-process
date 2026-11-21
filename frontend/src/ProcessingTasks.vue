@@ -100,12 +100,12 @@ async function deleteDirectory(node) {
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 function openCreate() { formTask.value = null; formReadonly.value = false; formOpen.value = true }
-function openFlow(metadata) { flowDraft.value = { ...metadata, id: null }; view.value = 'editor' }
-function openFlowEdit(row) { flowDraft.value = { ...row }; view.value = 'editor' }
+function openFlow(metadata) { selected.value = []; flowDraft.value = { ...metadata, id: null }; view.value = 'editor' }
+function openFlowEdit(row) { selected.value = []; flowDraft.value = { ...row }; view.value = 'editor' }
 function flowSaved() { view.value = 'list'; flowDraft.value = null; message.value = '流程已保存'; loadAll() }
 function flowCancel() { view.value = 'list'; flowDraft.value = null }
 function openEdit(row) { if (row.type === 'FLOW') { openFlowEdit(row); return } formTask.value = row; formReadonly.value = row.runState === 'RUNNING'; formOpen.value = true }
-function openCopy(row) { formTask.value = { ...row, id: null, name: `${row.name}-副本` }; formReadonly.value = false; formOpen.value = true }
+function openCopy(row) { if (row.type === 'FLOW') { openFlow({ ...row, id: null, name: `${row.name}-副本` }); return } formTask.value = { ...row, id: null, name: `${row.name}-副本` }; formReadonly.value = false; formOpen.value = true }
 function openRuns(row) { runsTask.value = row; runsOpen.value = true }
 function openStart(targets) { startTargets.value = targets; startDate.value = new Date().toLocaleDateString('sv-SE'); startOpen.value = true }
 async function confirmStart() {
