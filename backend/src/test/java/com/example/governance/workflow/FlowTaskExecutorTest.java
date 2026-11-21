@@ -43,7 +43,17 @@ class FlowTaskExecutorTest {
         assertEquals("t1", f.jdbc().queryForObject("SELECT tag FROM orders_copy WHERE id=1", String.class));
         assertTrue(logs.stream().anyMatch(l -> l.startsWith("INFO:")));
         assertEquals(1, statsJson.size());
-        assertTrue(statsJson.get(0).contains("\"nodeKey\":\"f\""));
+        var stats = MAPPER.readTree(statsJson.get(0));
+        java.util.function.Function<String, com.fasterxml.jackson.databind.JsonNode> stat = key -> {
+            for (var n : stats) if (n.path("nodeKey").asText().equals(key)) return n;
+            throw new AssertionError("缺少节点统计 " + key);
+        };
+        assertEquals(3, stat.apply("s").path("rowsIn").asLong());
+        assertEquals(3, stat.apply("s").path("rowsOut").asLong());
+        assertEquals(3, stat.apply("f").path("rowsIn").asLong());
+        assertEquals(2, stat.apply("f").path("rowsOut").asLong());
+        assertEquals(2, stat.apply("t").path("rowsIn").asLong());
+        assertEquals(2, stat.apply("t").path("rowsOut").asLong());
         assertTrue(outcome.previews().isEmpty());
     }
 
@@ -64,6 +74,10 @@ class FlowTaskExecutorTest {
         assertNotNull(preview);
         assertEquals(1, preview.rows().size());
         assertEquals(List.of("id", "name", "amount", "tag"), preview.columns());
+        // 预览容量满后不得多拉一行：末级拦截器与 sink 的统计口径对账
+        var byKey = outcome.stats().stream().collect(java.util.stream.Collectors.toMap(FlowTaskExecutor.NodeStat::nodeKey, s -> s));
+        assertEquals(1, byKey.get("c").rowsOut());
+        assertEquals(1, byKey.get("t").rowsIn());
     }
 
     @Test void cancelMidPipelineRollsBackTarget() throws Exception {
@@ -79,10 +93,53 @@ class FlowTaskExecutorTest {
         assertEquals(0, f.jdbc().queryForObject("SELECT COUNT(*) FROM orders_copy", Integer.class));
     }
 
+    @Test void cancelAfterPartialWriteRollsBack() throws Exception {
+        var f = fixture();
+        var cancel = new RunCancelContext();
+        var batches = new java.util.concurrent.atomic.AtomicInteger();
+        var rolledBack = new java.util.concurrent.atomic.AtomicBoolean();
+        var committed = new java.util.concurrent.atomic.AtomicBoolean();
+        // sink 端 DataSource 代理：首批 executeBatch 真实写入后置取消（batchSize=1 逐批），
+        // 下一轮逐行检查中断 → writeSink 必须 rollback 已写批次
+        java.util.function.Function<java.sql.PreparedStatement, java.sql.PreparedStatement> wrapStatement = real ->
+            (java.sql.PreparedStatement) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{java.sql.PreparedStatement.class}, (p, m, a) -> {
+                try {
+                    if (m.getName().equals("executeBatch")) {
+                        if (cancel.isCancelled()) throw new InterruptedException("手动停止");
+                        var result = m.invoke(real, a);
+                        if (batches.incrementAndGet() == 1) cancel.cancel();
+                        return result;
+                    }
+                    return m.invoke(real, a);
+                } catch (java.lang.reflect.InvocationTargetException e) { throw e.getTargetException(); }
+            });
+        var proxyDs = (DataSource) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{DataSource.class}, (p, m, a) -> {
+            try {
+                if (!m.getName().equals("getConnection")) return m.invoke(f.ds(), a);
+                var real = f.ds().getConnection();
+                return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{java.sql.Connection.class}, (p2, m2, a2) -> {
+                    try {
+                        if (m2.getName().equals("prepareStatement")) return wrapStatement.apply((java.sql.PreparedStatement) m2.invoke(real, a2));
+                        if (m2.getName().equals("rollback")) rolledBack.set(true);
+                        if (m2.getName().equals("commit")) committed.set(true);
+                        return m2.invoke(real, a2);
+                    } catch (java.lang.reflect.InvocationTargetException e) { throw e.getTargetException(); }
+                });
+            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getTargetException(); }
+        });
+        String config = CHAIN.replace("\"sourceId\":1,\"table\":\"orders_copy\"", "\"sourceId\":2,\"table\":\"orders_copy\"")
+                .replace("\"writeMode\":\"APPEND\"", "\"writeMode\":\"APPEND\",\"batchSize\":1");
+        assertThrows(Exception.class, () -> new FlowTaskExecutor().execute(graph(config), id -> id == 2 ? proxyDs : f.ds(), LocalDate.of(2026, 11, 20), cancel, ExecutionSinks.NOOP, 0));
+        assertEquals(1, batches.get(), "首批应已真实写入");
+        assertTrue(rolledBack.get(), "必须显式 rollback");
+        assertFalse(committed.get(), "不得 commit");
+        assertEquals(0, f.jdbc().queryForObject("SELECT COUNT(*) FROM orders_copy", Integer.class));
+    }
+
     @Test void missingUpstreamFieldNamesNode() throws Exception {
         var f = fixture();
         String bad = CHAIN.replace("\"field\":\"name\"", "\"field\":\"nope\"");
         var ex = assertThrows(IllegalArgumentException.class, () -> new FlowTaskExecutor().execute(graph(bad), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), ExecutionSinks.NOOP, 0));
-        assertTrue(ex.getMessage().contains("m"));
+        assertTrue(ex.getMessage().contains("节点 m"));
     }
 }

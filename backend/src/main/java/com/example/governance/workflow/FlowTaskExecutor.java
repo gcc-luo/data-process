@@ -30,6 +30,9 @@ public final class FlowTaskExecutor {
         var outputs = new LinkedHashMap<String, Iterator<Map<String, Object>>>();
         var columns = new LinkedHashMap<String, List<String>>();
         var stats = new ArrayList<NodeStat>();
+        // 惰性迭代器的计数在下游排空后才定型：快照延迟到管道结束，避免创建期记 0
+        var nodeCounts = new LinkedHashMap<String, long[]>();
+        var durations = new LinkedHashMap<String, Long>();
         var previews = new LinkedHashMap<String, Preview>();
         var closeables = new ArrayList<AutoCloseable>();
         try {
@@ -70,7 +73,7 @@ public final class FlowTaskExecutor {
                         Iterator<Map<String, Object>> source = outputs.get(up);
                         if (previewLimit > 0) {
                             var collected = new ArrayList<List<Object>>();
-                            while (source.hasNext() && collected.size() < previewLimit) {
+                            while (collected.size() < previewLimit && source.hasNext()) {
                                 var row = source.next();
                                 counts[0]++;
                                 collected.add(cols.stream().map(row::get).toList());
@@ -87,9 +90,13 @@ public final class FlowTaskExecutor {
                 }
                 outputs.put(node.key(), it);
                 columns.put(node.key(), cols);
-                long duration = (System.nanoTime() - started) / 1_000_000;
-                stats.add(new NodeStat(node.key(), counts[0], counts[1], duration));
-                sinks.log().log("INFO", "节点 " + node.key() + " 完成: 入 " + counts[0] + " 出 " + counts[1]);
+                durations.put(node.key(), (System.nanoTime() - started) / 1_000_000);
+                nodeCounts.put(node.key(), counts);
+            }
+            for (var entry : nodeCounts.entrySet()) {
+                long[] counts = entry.getValue();
+                stats.add(new NodeStat(entry.getKey(), counts[0], counts[1], durations.get(entry.getKey())));
+                sinks.log().log("INFO", "节点 " + entry.getKey() + " 完成: 入 " + counts[0] + " 出 " + counts[1]);
             }
             if (previewLimit == 0) sinks.stats().accept(mapper.writeValueAsString(stats));
             return new Outcome(List.copyOf(stats), previews);
@@ -217,6 +224,7 @@ public final class FlowTaskExecutor {
                         String where = keys.stream().map(k -> k + "=?").collect(java.util.stream.Collectors.joining(" AND "));
                         update = target.prepareStatement("UPDATE " + table + " SET " + assignments + " WHERE " + where);
                         update.setQueryTimeout(30);
+                        cancel.register(update);
                     }
                     int pending = 0;
                     while (source.hasNext()) {
