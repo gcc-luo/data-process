@@ -155,7 +155,8 @@ public final class WorkflowRunStore {
     public RunLogSink nodeLogSink(long runId, String node) { return new DbRunLogSink(jdbc, "WORKFLOW_NODE", runId, node, currentAttempt(runId, node)); }
     public java.util.function.Consumer<String> nodeStatsSink(long runId, String node) {
         int attempt = currentAttempt(runId, node);
-        return json -> jdbc.update("UPDATE workflow_node_attempts SET stats=? WHERE run_id=? AND node_key=? AND attempt_no=?", json, runId, node, attempt);
+        return TaskRunService.resilientStats(json -> jdbc.update("UPDATE workflow_node_attempts SET stats=? WHERE run_id=? AND node_key=? AND attempt_no=?", json, runId, node, attempt),
+                new DbRunLogSink(jdbc, "WORKFLOW_NODE", runId, node, attempt));
     }
     private record Run(long workflowId, int version, String state) {}
     private record NodeState(String key, String state) {}

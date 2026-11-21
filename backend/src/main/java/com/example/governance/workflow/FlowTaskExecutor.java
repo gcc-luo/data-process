@@ -18,6 +18,7 @@ import javax.sql.DataSource;
 
 /** Streaming pull pipeline for FLOW tasks; preview mode caps sources and never writes targets. */
 public final class FlowTaskExecutor {
+    /** durationMs 口径：非 sink 节点为迭代器构建期耗时（惰性排空计入下游 sink），sink 节点含上游排空与写入。 */
     public record NodeStat(String nodeKey, long rowsIn, long rowsOut, long durationMs) {}
     public record Preview(List<String> columns, List<List<Object>> rows) {}
     public record Outcome(List<NodeStat> stats, Map<String, Preview> previews) {}
@@ -25,6 +26,8 @@ public final class FlowTaskExecutor {
 
     public Outcome execute(FlowGraph.Graph graph, CamelTaskRunner.DataSourceProvider provider, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks, int previewLimit) throws Exception {
         FlowGraph.validate(graph);
+        // 防御上限：试运行/预览最多收集 1000 行，不信任调用方传入的限额
+        int limit = previewLimit > 0 ? Math.min(previewLimit, 1000) : 0;
         var order = FlowGraph.topoOrder(graph);
         var upstream = FlowGraph.upstream(graph);
         var outputs = new LinkedHashMap<String, Iterator<Map<String, Object>>>();
@@ -35,8 +38,10 @@ public final class FlowTaskExecutor {
         var durations = new LinkedHashMap<String, Long>();
         var previews = new LinkedHashMap<String, Preview>();
         var closeables = new ArrayList<AutoCloseable>();
+        String currentKey = null;
         try {
             for (FlowGraph.Node node : order) {
+                currentKey = node.key();
                 long started = System.nanoTime();
                 sinks.log().log("INFO", "节点 " + node.key() + " (" + node.component() + ") 开始");
                 long[] counts = {0, 0};
@@ -59,7 +64,7 @@ public final class FlowTaskExecutor {
                         closeables.add(rows);
                         cols = new ArrayList<>();
                         for (int i = 1; i <= rows.getMetaData().getColumnCount(); i++) cols.add(rows.getMetaData().getColumnLabel(i).toLowerCase(Locale.ROOT));
-                        it = sourceIterator(rows, cols, cancel, previewLimit, counts);
+                        it = sourceIterator(rows, cols, cancel, limit, counts);
                     }
                     case "FIELD_MAP", "FIELD_FILTER", "FIELD_MASK", "FIELD_CALC" -> {
                         String up = upstream.get(node.key());
@@ -71,9 +76,9 @@ public final class FlowTaskExecutor {
                         String up = upstream.get(node.key());
                         cols = columns.get(up);
                         Iterator<Map<String, Object>> source = outputs.get(up);
-                        if (previewLimit > 0) {
+                        if (limit > 0) {
                             var collected = new ArrayList<List<Object>>();
-                            while (collected.size() < previewLimit && source.hasNext()) {
+                            while (collected.size() < limit && source.hasNext()) {
                                 var row = source.next();
                                 counts[0]++;
                                 collected.add(cols.stream().map(row::get).toList());
@@ -98,8 +103,12 @@ public final class FlowTaskExecutor {
                 stats.add(new NodeStat(entry.getKey(), counts[0], counts[1], durations.get(entry.getKey())));
                 sinks.log().log("INFO", "节点 " + entry.getKey() + " 完成: 入 " + counts[0] + " 出 " + counts[1]);
             }
-            if (previewLimit == 0) sinks.stats().accept(mapper.writeValueAsString(stats));
+            if (limit == 0) sinks.stats().accept(mapper.writeValueAsString(stats));
             return new Outcome(List.copyOf(stats), previews);
+        } catch (Exception ex) {
+            // 失败诊断：记当前处理节点后重抛；日志自身失败不得掩盖原因异常
+            try { sinks.log().log("ERROR", "节点 " + currentKey + " 处理失败: " + ex.getMessage()); } catch (Exception ignored) { }
+            throw ex;
         } finally {
             for (int i = closeables.size() - 1; i >= 0; i--) try { closeables.get(i).close(); } catch (Exception ignored) { }
         }
@@ -146,6 +155,10 @@ public final class FlowTaskExecutor {
     private Iterator<Map<String, Object>> transformIterator(FlowGraph.Node node, Iterator<Map<String, Object>> source, List<String> cols, RunCancelContext cancel, long[] counts) {
         FlowExpression.Expr filter = node.component().equals("FIELD_FILTER") ? FlowExpression.parse(node.config().path("expression").textValue()) : null;
         FlowExpression.Expr calc = node.component().equals("FIELD_CALC") ? FlowExpression.parse(node.config().path("expression").textValue()) : null;
+        // 构建期 hoist：热路径不再遍历 JsonNode
+        List<String[]> mappings = new ArrayList<>();
+        if (node.component().equals("FIELD_MAP")) for (JsonNode m : node.config().path("mappings")) mappings.add(new String[]{m.path("from").textValue().toLowerCase(Locale.ROOT), m.path("to").textValue().toLowerCase(Locale.ROOT)});
+        String field = node.component().equals("FIELD_MASK") || node.component().equals("FIELD_CALC") ? node.config().path("field").textValue().toLowerCase(Locale.ROOT) : null;
         return new Iterator<>() {
             private Map<String, Object> next;
             private void advance() {
@@ -158,10 +171,9 @@ public final class FlowTaskExecutor {
                         switch (node.component()) {
                             case "FIELD_MAP" -> {
                                 var mapped = new LinkedHashMap<String, Object>();
-                                for (JsonNode m : node.config().path("mappings")) {
-                                    String from = m.path("from").textValue().toLowerCase(Locale.ROOT);
-                                    if (!row.containsKey(from)) throw new IllegalArgumentException("节点 " + node.key() + ": 上游缺少字段 " + from);
-                                    mapped.put(m.path("to").textValue().toLowerCase(Locale.ROOT), row.get(from));
+                                for (String[] m : mappings) {
+                                    if (!row.containsKey(m[0])) throw new IllegalArgumentException("节点 " + node.key() + ": 上游缺少字段 " + m[0]);
+                                    mapped.put(m[1], row.get(m[0]));
                                 }
                                 next = mapped; counts[1]++; return;
                             }
@@ -169,7 +181,6 @@ public final class FlowTaskExecutor {
                                 if (Boolean.TRUE.equals(filter.eval(row))) { next = row; counts[1]++; return; }
                             }
                             case "FIELD_MASK" -> {
-                                String field = node.config().path("field").textValue().toLowerCase(Locale.ROOT);
                                 if (!row.containsKey(field)) throw new IllegalArgumentException("节点 " + node.key() + ": 上游缺少字段 " + field);
                                 var masked = new LinkedHashMap<>(row);
                                 masked.put(field, "****");
@@ -177,7 +188,7 @@ public final class FlowTaskExecutor {
                             }
                             case "FIELD_CALC" -> {
                                 var extended = new LinkedHashMap<>(row);
-                                extended.put(node.config().path("field").textValue().toLowerCase(Locale.ROOT), calc.eval(row));
+                                extended.put(field, calc.eval(row));
                                 next = extended; counts[1]++; return;
                             }
                             default -> throw new IllegalArgumentException("Unknown component");
@@ -214,15 +225,19 @@ public final class FlowTaskExecutor {
                 for (String col : cols) if (!targetColumns.contains(col)) throw new IllegalArgumentException("节点 " + node.key() + ": 目标表缺少字段 " + col);
                 if ("UPSERT".equals(mode)) DatabaseSyncExecutor.verifyUniqueKey(target, table, keys);
                 String placeholders = String.join(",", java.util.Collections.nCopies(cols.size(), "?"));
-                try (PreparedStatement insert = target.prepareStatement("INSERT INTO " + table + " (" + String.join(",", cols) + ") VALUES (" + placeholders + ")")) {
+                String assignments = null;
+                String where = null;
+                if ("UPSERT".equals(mode)) {
+                    var nonKeys = cols.stream().filter(c -> !keys.contains(c)).toList();
+                    assignments = nonKeys.isEmpty() ? keys.get(0) + "=" + keys.get(0) : nonKeys.stream().map(c -> c + "=?").collect(java.util.stream.Collectors.joining(","));
+                    where = keys.stream().map(k -> k + "=?").collect(java.util.stream.Collectors.joining(" AND "));
+                }
+                // update 与 insert 同纳入 try-with-resources（非 UPSERT 为 null，自动跳过关闭）
+                try (PreparedStatement insert = target.prepareStatement("INSERT INTO " + table + " (" + String.join(",", cols) + ") VALUES (" + placeholders + ")");
+                     PreparedStatement update = "UPSERT".equals(mode) ? target.prepareStatement("UPDATE " + table + " SET " + assignments + " WHERE " + where) : null) {
                     cancel.register(insert);
                     insert.setQueryTimeout(30);
-                    PreparedStatement update = null;
-                    if ("UPSERT".equals(mode)) {
-                        var nonKeys = cols.stream().filter(c -> !keys.contains(c)).toList();
-                        String assignments = nonKeys.isEmpty() ? keys.get(0) + "=" + keys.get(0) : nonKeys.stream().map(c -> c + "=?").collect(java.util.stream.Collectors.joining(","));
-                        String where = keys.stream().map(k -> k + "=?").collect(java.util.stream.Collectors.joining(" AND "));
-                        update = target.prepareStatement("UPDATE " + table + " SET " + assignments + " WHERE " + where);
+                    if (update != null) {
                         update.setQueryTimeout(30);
                         cancel.register(update);
                     }
@@ -235,6 +250,7 @@ public final class FlowTaskExecutor {
                             int pos = 1;
                             for (String c : cols) if (!keys.contains(c)) update.setObject(pos++, row.get(c));
                             for (String k : keys) {
+                                if (!row.containsKey(k)) throw new IllegalArgumentException("节点 " + node.key() + ": 上游缺少字段 " + k);
                                 Object v = row.get(k);
                                 if (v == null) throw new IllegalArgumentException("节点 " + node.key() + ": 主键值为空 " + k);
                                 update.setObject(pos++, v);

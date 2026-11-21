@@ -87,8 +87,9 @@ public class TaskRunService {
         } catch (Exception ex) { cancel.detach(); active.remove(id); finish(id,attempt,"INTERRUPTED",null); return; }
         if (!claimed) { cancel.detach(); active.remove(id); return; }
         try (var permit = limiter.acquire()) {
-            var sinks = new ExecutionSinks(new DbRunLogSink(jdbc, "TASK_RUN", id, null, attempt),
-                    json -> jdbc.update("UPDATE task_run_attempts SET stats=? WHERE run_id=? AND attempt_no=?", json, id, attempt));
+            var logSink = new DbRunLogSink(jdbc, "TASK_RUN", id, null, attempt);
+            var sinks = new ExecutionSinks(logSink,
+                    resilientStats(json -> jdbc.update("UPDATE task_run_attempts SET stats=? WHERE run_id=? AND attempt_no=?", json, id, attempt), logSink));
             runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel, sinks);
             // 成功路径在摘除上下文前落终态，闭合 remove→finish 窗口；stop 与业务完成竞态判 INTERRUPTED
             if (cancel.isCancelled()) Thread.interrupted(); // 清除 cancel 留下的中断标志，避免带标志取连接失败
@@ -102,6 +103,13 @@ public class TaskRunService {
             finish(id, attempt, cancel.isCancelled() ? "INTERRUPTED" : "FAILED", cancel.isCancelled() ? "手动停止" : "任务执行失败");
         }
         finally { cancel.detach(); active.remove(id); }
+    }
+    /** 统计属观测数据：写入失败降级 WARN 日志，不得击穿业务执行结果。 */
+    static java.util.function.Consumer<String> resilientStats(java.util.function.Consumer<String> delegate, RunLogSink log) {
+        return json -> {
+            try { delegate.accept(json); }
+            catch (org.springframework.dao.DataAccessException ex) { log.log("WARN", "统计写入失败: " + ex.getMessage()); }
+        };
     }
     private void finish(long id, int attempt, String state, String error) {
         tx.executeWithoutResult(status -> {

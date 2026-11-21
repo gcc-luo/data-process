@@ -139,7 +139,87 @@ class FlowTaskExecutorTest {
     @Test void missingUpstreamFieldNamesNode() throws Exception {
         var f = fixture();
         String bad = CHAIN.replace("\"field\":\"name\"", "\"field\":\"nope\"");
-        var ex = assertThrows(IllegalArgumentException.class, () -> new FlowTaskExecutor().execute(graph(bad), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), ExecutionSinks.NOOP, 0));
+        var logs = new ArrayList<String>();
+        var ex = assertThrows(IllegalArgumentException.class, () -> new FlowTaskExecutor().execute(graph(bad), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(),
+                new ExecutionSinks((l, m) -> logs.add(l + ":" + m), s -> { }), 0));
         assertTrue(ex.getMessage().contains("节点 m"));
+        // 失败诊断日志：ERROR 记当前处理节点与原因后重抛
+        assertTrue(logs.stream().anyMatch(l -> l.startsWith("ERROR:") && l.contains("处理失败") && l.contains("上游缺少字段")), String.join("\n", logs));
+    }
+
+    @Test void upsertCancelCancelsBothInsertAndUpdate() throws Exception {
+        var f = fixture();
+        f.jdbc().update("INSERT INTO orders_copy VALUES (1,'old',1,'x')");
+        var cancel = new RunCancelContext();
+        var fired = new java.util.concurrent.atomic.AtomicBoolean();
+        var cancelledSql = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
+        // 代理记录每条语句的 cancel 调用：首次 executeUpdate 真实执行后置取消，
+        // 多语句注册下 insert 与 update 均应被 cancel
+        java.util.function.BiFunction<String, java.sql.PreparedStatement, java.sql.PreparedStatement> wrap = (sql, real) ->
+            (java.sql.PreparedStatement) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{java.sql.PreparedStatement.class}, (p, m, a) -> {
+                try {
+                    if (m.getName().equals("cancel")) { cancelledSql.put(sql, true); return null; }
+                    var result = m.invoke(real, a);
+                    if (m.getName().equals("executeUpdate") && fired.compareAndSet(false, true)) cancel.cancel();
+                    return result;
+                } catch (java.lang.reflect.InvocationTargetException e) { throw e.getTargetException(); }
+            });
+        var proxyDs = (DataSource) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{DataSource.class}, (p, m, a) -> {
+            try {
+                if (!m.getName().equals("getConnection")) return m.invoke(f.ds(), a);
+                var real = f.ds().getConnection();
+                return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{java.sql.Connection.class}, (p2, m2, a2) -> {
+                    try {
+                        if (m2.getName().equals("prepareStatement")) return wrap.apply((String) a2[0], (java.sql.PreparedStatement) m2.invoke(real, a2));
+                        return m2.invoke(real, a2);
+                    } catch (java.lang.reflect.InvocationTargetException e) { throw e.getTargetException(); }
+                });
+            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getTargetException(); }
+        });
+        String config = CHAIN.replace("\"sourceId\":1,\"table\":\"orders_copy\"", "\"sourceId\":2,\"table\":\"orders_copy\"")
+                .replace("\"writeMode\":\"APPEND\"", "\"writeMode\":\"UPSERT\",\"keyColumns\":[\"id\"]");
+        assertThrows(Exception.class, () -> new FlowTaskExecutor().execute(graph(config), id -> id == 2 ? proxyDs : f.ds(), LocalDate.of(2026, 11, 20), cancel, ExecutionSinks.NOOP, 0));
+        assertTrue(cancelledSql.keySet().stream().anyMatch(s -> s.startsWith("INSERT")), "insert 应被 cancel: " + cancelledSql.keySet());
+        assertTrue(cancelledSql.keySet().stream().anyMatch(s -> s.startsWith("UPDATE")), "update 应被 cancel: " + cancelledSql.keySet());
+        assertEquals(1, f.jdbc().queryForObject("SELECT COUNT(*) FROM orders_copy", Integer.class), "回滚后仅剩种子行");
+    }
+
+    @Test void upsertMissingKeyFieldNamesUpstream() throws Exception {
+        var f = fixture();
+        String bad = "{\"nodes\":["
+                + "{\"key\":\"s\",\"component\":\"SOURCE_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"orders\"}},"
+                + "{\"key\":\"m\",\"component\":\"FIELD_MAP\",\"config\":{\"mappings\":[{\"from\":\"name\",\"to\":\"name\"}]}},"
+                + "{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"orders_copy\",\"writeMode\":\"UPSERT\",\"keyColumns\":[\"id\"]}}],"
+                + "\"edges\":[{\"from\":\"s\",\"to\":\"m\"},{\"from\":\"m\",\"to\":\"t\"}]}";
+        var ex = assertThrows(IllegalArgumentException.class, () -> new FlowTaskExecutor().execute(graph(bad), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), ExecutionSinks.NOOP, 0));
+        assertTrue(ex.getMessage().contains("上游缺少字段 id"), ex.getMessage());
+    }
+
+    @Test void fieldMapRenamesColumns() throws Exception {
+        var f = fixture();
+        f.jdbc().update("CREATE TABLE orders_map(id INT PRIMARY KEY, label VARCHAR(50))");
+        String mapGraph = "{\"nodes\":["
+                + "{\"key\":\"s\",\"component\":\"SOURCE_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"orders\"}},"
+                + "{\"key\":\"m\",\"component\":\"FIELD_MAP\",\"config\":{\"mappings\":[{\"from\":\"id\",\"to\":\"id\"},{\"from\":\"name\",\"to\":\"label\"}]}},"
+                + "{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"orders_map\",\"writeMode\":\"APPEND\"}}],"
+                + "\"edges\":[{\"from\":\"s\",\"to\":\"m\"},{\"from\":\"m\",\"to\":\"t\"}]}";
+        new FlowTaskExecutor().execute(graph(mapGraph), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), ExecutionSinks.NOOP, 0);
+        assertEquals(3, f.jdbc().queryForObject("SELECT COUNT(*) FROM orders_map", Integer.class));
+        assertEquals("a", f.jdbc().queryForObject("SELECT label FROM orders_map WHERE id=1", String.class));
+        assertEquals("b", f.jdbc().queryForObject("SELECT label FROM orders_map WHERE id=2", String.class));
+    }
+
+    @Test void sourceSqlBindsBusinessDate() throws Exception {
+        var f = fixture();
+        f.jdbc().update("CREATE TABLE orders_d(d DATE, id INT)");
+        f.jdbc().update("INSERT INTO orders_d VALUES (DATE '2026-11-20',1),(DATE '2026-11-19',2)");
+        f.jdbc().update("CREATE TABLE orders_d_copy(d DATE, id INT)");
+        String sqlGraph = "{\"nodes\":["
+                + "{\"key\":\"s\",\"component\":\"SOURCE_SQL\",\"config\":{\"sourceId\":1,\"sql\":\"SELECT d, id FROM orders_d WHERE d = ?\",\"parameters\":[{\"type\":\"BUSINESS_DATE\"}]}},"
+                + "{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"orders_d_copy\",\"writeMode\":\"APPEND\"}}],"
+                + "\"edges\":[{\"from\":\"s\",\"to\":\"t\"}]}";
+        new FlowTaskExecutor().execute(graph(sqlGraph), id -> f.ds(), LocalDate.of(2026, 11, 20), new RunCancelContext(), ExecutionSinks.NOOP, 0);
+        assertEquals(1, f.jdbc().queryForObject("SELECT COUNT(*) FROM orders_d_copy", Integer.class));
+        assertEquals(1, f.jdbc().queryForObject("SELECT id FROM orders_d_copy", Integer.class));
     }
 }
