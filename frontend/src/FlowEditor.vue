@@ -9,7 +9,8 @@ import '@vue-flow/controls/dist/style.css'
 import { ElMessageBox } from 'element-plus'
 import { authorizedRequest } from './auth.js'
 import { COMPONENTS, GROUPS, componentDef, defaultConfig } from './flow-components.js'
-import { validateFlow, toVueNodes, toVueEdges, newNode } from './flow-graph.js'
+import { validateFlow, toVueNodes, toVueEdges, newNode, canConnect, previewTable } from './flow-graph.js'
+import { configToForm, formToConfig } from './flow-config.js'
 import FlowNode from './FlowNode.vue'
 const props = defineProps({ draft: Object, sources: Array })
 const emit = defineEmits(['saved', 'cancel'])
@@ -22,7 +23,8 @@ const testOpen = ref(false), testBusy = ref(false), testResult = ref(null), test
 const nodeTypes = { flowNode: FlowNode }
 const vueNodes = computed(() => toVueNodes(graph.value))
 const vueEdges = computed(() => toVueEdges(graph.value))
-const { onConnect, onNodeClick, onNodesChange, onEdgesChange, project } = useVueFlow(FLOW_ID)
+const { onConnect, onNodeClick, onNodesChange, onEdgesChange, screenToFlowCoordinate } = useVueFlow(FLOW_ID)
+const canvasEl = ref(null)
 watch(() => props.draft, draft => {
   error.value = ''
   if (draft?.configuration) { try { graph.value = JSON.parse(draft.configuration) } catch { graph.value = { nodes: [], edges: [] }; error.value = '任务配置解析失败' } }
@@ -30,7 +32,7 @@ watch(() => props.draft, draft => {
 }, { immediate: true })
 onNodesChange(changes => {
   for (const c of changes) {
-    if (c.type === 'position' && c.position) { const n = graph.value.nodes.find(n => n.key === c.id); if (n) n.position = { x: c.position.x, y: c.position.y } }
+    if (c.type === 'position' && c.position && c.dragging === false) { const n = graph.value.nodes.find(n => n.key === c.id); if (n) n.position = { x: c.position.x, y: c.position.y } }
     if (c.type === 'remove') graph.value.nodes = graph.value.nodes.filter(n => n.key !== c.id)
   }
 })
@@ -38,37 +40,30 @@ onEdgesChange(changes => {
   for (const c of changes) if (c.type === 'remove') graph.value.edges = graph.value.edges.filter(e => `${e.from}->${e.to}` !== c.id)
 })
 onConnect(params => {
-  if (!params.source || !params.target || params.source === params.target) return
-  if (graph.value.edges.some(e => e.from === params.source && e.to === params.target)) return
-  const target = graph.value.nodes.find(n => n.key === params.target)
-  const source = graph.value.nodes.find(n => n.key === params.source)
-  if (target && ['SOURCE_TABLE', 'SOURCE_SQL'].includes(target.component)) { error.value = '来源节点不能有入边'; return }
-  if (source && source.component === 'SINK_TABLE') { error.value = '目标节点不能有出边'; return }
-  if (target && graph.value.edges.some(e => e.to === params.target)) { error.value = '该节点已有入边（预处理/目标仅允许单入边）'; return }
-  if (source && graph.value.edges.some(e => e.from === params.source)) { error.value = '该节点已有出边（来源/预处理仅允许单出边）'; return }
+  const err = canConnect(graph.value, params)
+  if (err) { error.value = err; return }
   graph.value.edges = [...graph.value.edges, { from: params.source, to: params.target }]
   error.value = ''
 })
 onNodeClick(({ node }) => openConfig(node.id))
 function addComponent(component) {
-  const position = project ? project({ x: 120 + graph.value.nodes.length * 30, y: 80 + graph.value.nodes.length * 40 }) : { x: 120, y: 80 }
+  const rect = canvasEl.value?.getBoundingClientRect()
+  const offset = graph.value.nodes.length * 30
+  const screen = rect ? { x: rect.left + 120 + offset, y: rect.top + 80 + offset } : null
+  const position = screen && screenToFlowCoordinate ? screenToFlowCoordinate(screen) : { x: 120 + offset, y: 80 + offset }
   graph.value.nodes = [...graph.value.nodes, newNode(component, graph.value.nodes, position)]
 }
 function openConfig(key) {
   const node = graph.value.nodes.find(n => n.key === key)
   if (!node) return
   editingKey.value = key
-  configForm.value = JSON.parse(JSON.stringify(node.config || defaultConfig(node.component)))
-  if (node.component === 'FIELD_MAP') configForm.value.mappings ??= []
-  if (node.component === 'SINK_TABLE' && Array.isArray(configForm.value.keyColumns)) configForm.value.keyColumns = configForm.value.keyColumns.join(', ')
+  configForm.value = configToForm(node.component, node.config || defaultConfig(node.component))
   drawerOpen.value = true
 }
 function saveConfig() {
   const node = graph.value.nodes.find(n => n.key === editingKey.value)
   if (!node) { drawerOpen.value = false; return }
-  const config = { ...configForm.value }
-  if (node.component === 'SINK_TABLE') config.keyColumns = String(config.keyColumns || '').split(',').map(s => s.trim()).filter(Boolean)
-  if (node.component === 'FIELD_MAP') config.mappings = (config.mappings || []).filter(m => m.from?.trim() && m.to?.trim()).map(m => ({ ...m, from: m.from.trim(), to: m.to.trim() }))
+  const config = formToConfig(node.component, configForm.value)
   node.config = config
   drawerOpen.value = false
 }
@@ -108,6 +103,7 @@ async function leave() {
   emit('cancel')
 }
 const previewKeys = computed(() => Object.keys(testResult.value?.previews || {}))
+const previewTables = computed(() => Object.fromEntries(previewKeys.value.map(k => [k, previewTable(testResult.value.previews[k])])))
 </script>
 <template>
   <section class="flow-editor">
@@ -127,7 +123,7 @@ const previewKeys = computed(() => Object.keys(testResult.value?.previews || {})
         </div>
         <p>点击组件加入画布；拖动节点调整位置；从节点右侧连接点拖至下一节点左侧建立连线；点击节点配置。</p>
       </aside>
-      <div class="canvas">
+      <div class="canvas" ref="canvasEl" aria-label="流程编排画布">
         <VueFlow :id="FLOW_ID" :nodes="vueNodes" :edges="vueEdges" :node-types="nodeTypes" :default-viewport="{ zoom: 0.9 }" :min-zoom="0.4" :max-zoom="1.5" fit-view-on-init :delete-key-code="['Backspace','Delete']">
           <Background :gap="20" :size="1" pattern-color="#d6e4e1" />
           <Controls position="bottom-right" :show-interactive="false" />
@@ -160,14 +156,14 @@ const previewKeys = computed(() => Object.keys(testResult.value?.previews || {})
     <el-dialog v-model="testOpen" title="试运行结果" width="min(900px, 95vw)">
       <el-tabs v-model="testTab">
         <el-tab-pane label="运行日志" name="logs">
-          <div class="logs"><div v-for="line in testResult?.logs || []" :key="line.lineNo" :class="['log-line', line.level.toLowerCase()]">[{{ line.level }}] {{ line.message }}</div><div v-if="!(testResult?.logs || []).length" class="status-text">无日志</div></div>
+          <div class="logs"><div v-for="line in testResult?.logs || []" :key="line.lineNo" :class="['log-line', (line.level || 'INFO').toLowerCase()]">[{{ line.level }}] {{ line.message }}</div><div v-if="!(testResult?.logs || []).length" class="status-text">无日志</div></div>
         </el-tab-pane>
         <el-tab-pane label="数据预览" name="preview">
           <el-alert title="预览仅基于每个来源的前 100 行，不代表全表比例。" type="info" :closable="false" show-icon/>
           <el-tabs v-model="previewTab" type="card">
             <el-tab-pane v-for="key in previewKeys" :key="key" :label="`目标 ${key}`" :name="key">
-              <el-table :data="(testResult.previews[key].rows || []).map((r, i) => ({ __i: i, ...Object.fromEntries(testResult.previews[key].columns.map((c, j) => [c, r[j]])) }))" max-height="360">
-                <el-table-column v-for="c in testResult.previews[key].columns" :key="c" :prop="c" :label="c" min-width="120"/>
+              <el-table :data="previewTables[key].rows" max-height="360">
+                <el-table-column v-for="c in previewTables[key].columns" :key="c.prop" :prop="c.prop" :label="c.label" min-width="120"/>
               </el-table>
             </el-tab-pane>
           </el-tabs>

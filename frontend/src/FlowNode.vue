@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import { componentDef, configSummary } from './flow-components.js'
 const props = defineProps({ data: Object, selected: Boolean })
-const def = computed(() => componentDef(props.data.component))
-const summary = computed(() => configSummary(props.data.component, props.data.config || {}))
+const def = computed(() => { try { return componentDef(props.data.component) } catch { return { component: props.data.component, group: 'interceptor', label: props.data.component } } })
+const summary = computed(() => { try { return configSummary(props.data.component, props.data.config || {}) } catch { return '' } })
 const isSource = computed(() => def.value.group === 'source')
 const isSink = computed(() => def.value.group === 'sink')
 </script>

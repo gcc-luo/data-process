@@ -72,6 +72,25 @@ export function toVueNodes(graph) {
 export function toVueEdges(graph) {
   return (graph.edges || []).map(e => ({ id: `${e.from}->${e.to}`, source: e.from, target: e.to, type: 'smoothstep', markerEnd: { type: 'arrowclosed', color: '#728a88' } }))
 }
+/** 连线守卫：返回错误文案或 null（与 validateFlow 结构规则一致）。 */
+export function canConnect(graph, params) {
+  const nodes = graph.nodes || [], edges = graph.edges || []
+  if (!params.source || !params.target || params.source === params.target) return '节点不能连接自身'
+  if (edges.some(e => e.from === params.source && e.to === params.target)) return '连线已存在'
+  const target = nodes.find(n => n.key === params.target)
+  const source = nodes.find(n => n.key === params.source)
+  if (target && SOURCES.includes(target.component)) return '来源节点不能有入边'
+  if (source && SINKS.includes(source.component)) return '目标节点不能有出边'
+  if (target && edges.some(e => e.to === params.target)) return '该节点已有入边（预处理/目标仅允许单入边）'
+  if (source && edges.some(e => e.from === params.source)) return '该节点已有出边（来源/预处理仅允许单出边）'
+  return null
+}
+/** 预览转表格：列 prop 用索引，重名列不互相覆盖。 */
+export function previewTable(preview) {
+  const columns = (preview?.columns || []).map((c, j) => ({ prop: `col_${j}`, label: c }))
+  const rows = (preview?.rows || []).map(r => Object.fromEntries(columns.map((c, j) => [c.prop, r[j]])))
+  return { columns, rows }
+}
 export function newNode(component, existing, position) {
   const prefix = component.toLowerCase().replace(/_/g, '')
   let i = 1

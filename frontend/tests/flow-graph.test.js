@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
-import { validateFlow, toVueNodes, toVueEdges, newNode } from '../src/flow-graph.js'
+import { validateFlow, toVueNodes, toVueEdges, newNode, canConnect, previewTable } from '../src/flow-graph.js'
 
 const chain = {
   nodes: [
@@ -90,6 +90,48 @@ test('vue edge adapter sets id type and marker', () => {
   assert.equal(edges[0].id, 's->f')
   assert.equal(edges[0].type, 'smoothstep')
   assert.deepEqual(edges[0].markerEnd, { type: 'arrowclosed', color: '#728a88' })
+})
+
+test('canConnect allows a legal connection', () => {
+  const g = { nodes: chain.nodes.slice(0, 2), edges: [] }
+  assert.equal(canConnect(g, { source: 's', target: 'f' }), null)
+})
+
+test('canConnect rejects self loop', () => {
+  assert.ok(canConnect(chain, { source: 'f', target: 'f' }).includes('自身'))
+})
+
+test('canConnect rejects duplicate edge', () => {
+  assert.ok(canConnect(chain, { source: 's', target: 'f' }).includes('已存在'))
+})
+
+test('canConnect rejects incoming edge on source', () => {
+  assert.ok(canConnect(chain, { source: 'f', target: 's' }).includes('来源节点不能有入边'))
+})
+
+test('canConnect rejects outgoing edge on sink', () => {
+  assert.ok(canConnect(chain, { source: 't', target: 'f' }).includes('目标节点不能有出边'))
+})
+
+test('canConnect rejects second incoming edge', () => {
+  const g = { nodes: [...chain.nodes, { key: 's2', component: 'SOURCE_TABLE', config: { sourceId: 1, table: 'o' }, position: { x: 0, y: 200 } }], edges: chain.edges }
+  assert.ok(canConnect(g, { source: 's2', target: 'f' }).includes('已有入边'))
+})
+
+test('canConnect rejects second outgoing edge', () => {
+  const g = { nodes: [...chain.nodes, { key: 't2', component: 'SINK_TABLE', config: { sourceId: 2, table: 'c2', writeMode: 'APPEND' }, position: { x: 400, y: 200 } }], edges: chain.edges }
+  assert.ok(canConnect(g, { source: 'f', target: 't2' }).includes('已有出边'))
+})
+
+test('previewTable keeps duplicate column names separate via index props', () => {
+  const table = previewTable({ columns: ['id', 'id'], rows: [[1, 2], [3, 4]] })
+  assert.deepEqual(table.columns, [{ prop: 'col_0', label: 'id' }, { prop: 'col_1', label: 'id' }])
+  assert.deepEqual(table.rows, [{ col_0: 1, col_1: 2 }, { col_0: 3, col_1: 4 }])
+})
+
+test('previewTable tolerates empty preview', () => {
+  assert.deepEqual(previewTable({ columns: ['a'], rows: [] }), { columns: [{ prop: 'col_0', label: 'a' }], rows: [] })
+  assert.deepEqual(previewTable(undefined), { columns: [], rows: [] })
 })
 
 test('newNode generates unique keys and default config', () => {
