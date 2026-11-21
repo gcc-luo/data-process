@@ -55,10 +55,12 @@
 **文件：**
 - 创建：两份 V34 迁移
 - 创建：`RunLogSink.java`、`ExecutionSinks.java`、`DbRunLogSink.java`
-- 修改：`WorkflowRunStore.java`、`WorkflowWorker.java`、`TaskRunService.java`
-- 测试：`backend/src/test/java/com/example/governance/workflow/DbRunLogSinkTest.java`、`WorkflowNodeLogTest.java`
+- 修改：`WorkflowRunStore.java`、`WorkflowWorker.java`、`TaskRunService.java`、`CamelTaskRunner.java`
+- 测试：`backend/src/test/java/com/example/governance/workflow/DbRunLogSinkTest.java`、`WorkflowNodeLogTest.java`、`RealRunnerCancelPropagationTest.java`
 
-- [ ] **步骤 1：编写失败的测试**
+**P0 防护（审查后补充，必做）：** TaskRunService 改调四参后，CamelTaskRunner 必须立即增加四参 override 委托三参（保 cancel 传递；sinks 暂忽略，任务 4 替换为完整实现），否则接口 default 委托两参时新建永不取消的上下文→真实任务停止回归（mock 会掩盖）。配套真实 runner 回归测试 RealRunnerCancelPropagationTest：代理 PreparedStatement 在 executeUpdate 阻塞等待 cancel，断言 Statement.cancel 被四参路径触发。
+
+- [x] **步骤 1：编写失败的测试**
 
 `DbRunLogSinkTest.java`：
 ```java
@@ -144,12 +146,12 @@ class WorkflowNodeLogTest {
 ```
 （workflow_runs 列以 V9 实际 schema 为准，若列名不符按迁移调整插入语句。）
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && TMP=D:/tmp TEMP=D:/tmp JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=DbRunLogSinkTest,WorkflowNodeLogTest -DfailIfNoTests=false`
 预期：FAIL（类/表不存在）。
 
-- [ ] **步骤 3：编写迁移与 sink 类**
+- [x] **步骤 3：编写迁移与 sink 类**
 
 `db/migration/V34__execution_logs_and_stats.sql`：
 ```sql
@@ -222,7 +224,7 @@ public final class DbRunLogSink implements RunLogSink {
 }
 ```
 
-- [ ] **步骤 4：接线 WorkflowRunStore / WorkflowWorker / TaskRunService**
+- [x] **步骤 4：接线 WorkflowRunStore / WorkflowWorker / TaskRunService**
 
 `WorkflowRunStore.java` 新增（jdbc 字段已存在）：
 ```java
@@ -255,12 +257,12 @@ public final class DbRunLogSink implements RunLogSink {
             runner.execute(tasks.findVersion(taskId, version).orElseThrow(), date, cancel, sinks);
 ```
 
-- [ ] **步骤 5：运行测试验证通过**
+- [x] **步骤 5：运行测试验证通过**
 
 运行：同步骤 2 命令；再跑 `mvn test -Dtest=WorkflowWorkerTest,TaskStopApiTest,StandaloneTaskRetryTest -DfailIfNoTests=false`（mock 桩若因四参失效按一期惯例同步桩签名，不得削弱断言）。
 预期：PASS。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 git add backend/src/main/resources/db/migration/V34__execution_logs_and_stats.sql backend/src/main/resources/db/mysql/V34__execution_logs_and_stats.sql backend/src/main/java/com/example/governance/workflow/RunLogSink.java backend/src/main/java/com/example/governance/workflow/ExecutionSinks.java backend/src/main/java/com/example/governance/workflow/DbRunLogSink.java backend/src/main/java/com/example/governance/workflow/WorkflowRunStore.java backend/src/main/java/com/example/governance/workflow/WorkflowWorker.java backend/src/main/java/com/example/governance/workflow/TaskRunService.java backend/src/test/java/com/example/governance/workflow/DbRunLogSinkTest.java backend/src/test/java/com/example/governance/workflow/WorkflowNodeLogTest.java
@@ -278,7 +280,7 @@ DbRunLogSink 行号自增与 2000 行截断；worker/service 注入对应 sink�
 - 创建：`backend/.../workflow/FlowExpression.java`
 - 测试：`backend/src/test/java/com/example/governance/workflow/FlowExpressionTest.java`
 
-- [ ] **步骤 1：编写失败的测试**
+- [x] **步骤 1：编写失败的测试**
 
 ```java
 package com.example.governance.workflow;
@@ -345,12 +347,12 @@ class FlowExpressionTest {
 }
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && TMP=D:/tmp TEMP=D:/tmp JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=FlowExpressionTest -DfailIfNoTests=false`
 预期：FAIL（类不存在）。
 
-- [ ] **步骤 3：实现 FlowExpression**
+- [x] **步骤 3：实现 FlowExpression**
 
 创建 `FlowExpression.java`（递归下降；值域 String/BigDecimal/Boolean/null；列名统一小写）：
 ```java
@@ -418,16 +420,17 @@ public final class FlowExpression {
     private Token peek() { return pos < tokens.size() ? tokens.get(pos) : null; }
     private Token take() { Token t = peek(); if (t == null) throw new IllegalArgumentException("表达式语法错误: 意外结束"); pos++; return t; }
     private boolean matchOp(String op) { Token t = peek(); if (t != null && t.kind().equals("OP") && t.text().equals(op)) { pos++; return true; } return false; }
+    private boolean matchKind(String kind) { Token t = peek(); if (t != null && t.kind().equals(kind)) { pos++; return true; } return false; }
     private boolean matchIdent(String word) { Token t = peek(); if (t != null && t.kind().equals("IDENT") && t.text().equalsIgnoreCase(word)) { pos++; return true; } return false; }
 
     private Expr or() {
         Expr left = and();
-        while (matchIdent("OR")) { Expr right = and(); Expr l = left; left = row -> { Object a = l.eval(row); Object b = right.eval(row); if (a == null || b == null) return null; return bool(a) || bool(b); }; }
+        while (matchIdent("OR")) { Expr right = and(); Expr l = left; left = row -> { Object a = l.eval(row); Object b = right.eval(row); return boolOrFalse(a) || boolOrFalse(b); }; }
         return left;
     }
     private Expr and() {
         Expr left = not();
-        while (matchIdent("AND")) { Expr right = not(); Expr l = left; left = row -> { Object a = l.eval(row); Object b = right.eval(row); if (a == null || b == null) return null; return bool(a) && bool(b); }; }
+        while (matchIdent("AND")) { Expr right = not(); Expr l = left; left = row -> { Object a = l.eval(row); Object b = right.eval(row); return boolOrFalse(a) && boolOrFalse(b); }; }
         return left;
     }
     private Expr not() {
@@ -490,9 +493,9 @@ public final class FlowExpression {
                 if (!FUNCTIONS.contains(word.toUpperCase(java.util.Locale.ROOT))) throw new IllegalArgumentException("表达式语法错误: 未知函数 " + word);
                 pos++;
                 var args = new ArrayList<Expr>();
-                if (!matchOp(")")) {
+                if (!matchKind(")")) {
                     args.add(or());
-                    while (matchOp(",")) args.add(or());
+                    while (matchKind(",")) args.add(or());
                     expect(")");
                 }
                 return call(word.toUpperCase(java.util.Locale.ROOT), args);
@@ -573,15 +576,19 @@ public final class FlowExpression {
         if (v instanceof Boolean b) return b;
         throw new IllegalArgumentException("表达式类型错误: 期望布尔, 实际 " + v.getClass().getSimpleName());
     }
+    /** AND/OR 的 falsy-null：null 条件不保留行（过滤语义）；非 null 非布尔仍报错。 */
+    private static boolean boolOrFalse(Object v) { return v == null ? false : bool(v); }
 }
 ```
 注意：`'a' > 'b' + 1` 用例中右侧先算 `'b'+1` 抛类型错误，符合测试预期；除零返回 null（过滤视为不保留）。
 
-- [ ] **步骤 4：运行测试验证通过**
+**语义定稿（审查后确认）：** 算术/比较/NOT 遇 null 传播 null；**AND/OR 将 null 视为 false**（falsy-null，符合 FIELD_FILTER 过滤语义：null 条件不保留行；与 SQL 三值逻辑在过滤结果上等价）；非 null 操作数仍严格布尔校验；CONCAT 视 null 为 ""、**BigDecimal 隐式转 toPlainString**（SQL CONCAT 语义，任务 4 审查定案；Boolean 仍拒绝）；UPPER/LOWER/TRIM/SUBSTR 保持严格字符串。函数参数列表的 `)`/`,` 用独立 matchKind 匹配（tokenize 将其 kind 设为字面符号而非 OP）。
+
+- [x] **步骤 4：运行测试验证通过**
 
 运行：同步骤 2 命令。预期：`Tests run: 8, Failures: 0`。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add backend/src/main/java/com/example/governance/workflow/FlowExpression.java backend/src/test/java/com/example/governance/workflow/FlowExpressionTest.java
@@ -600,7 +607,7 @@ null 传播、类型错误与语法错误明确拒绝，不执行任意代码。
 - 修改：`backend/.../workflow/TaskDefinitionValidator.java`、`TaskVersionStore.java`
 - 测试：`backend/src/test/java/com/example/governance/workflow/FlowGraphTest.java`
 
-- [ ] **步骤 1：编写失败的测试**
+- [x] **步骤 1：编写失败的测试**
 
 ```java
 package com.example.governance.workflow;
@@ -664,12 +671,12 @@ class FlowGraphTest {
 }
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && TMP=D:/tmp TEMP=D:/tmp JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=FlowGraphTest -DfailIfNoTests=false`
 预期：FAIL（FlowGraph 不存在）。
 
-- [ ] **步骤 3：实现 FlowGraph**
+- [x] **步骤 3：实现 FlowGraph**
 
 创建 `FlowGraph.java`：
 ```java
@@ -824,7 +831,7 @@ public final class FlowGraph {
 }
 ```
 
-- [ ] **步骤 4：validator 与 create 类型集合**
+- [x] **步骤 4：validator 与 create 类型集合**
 
 `TaskDefinitionValidator.validate`：把无条件 `id(root, "sourceId");` 移入 SQL 与 SYNC 分支首行；新增分支：
 ```java
@@ -836,12 +843,12 @@ public final class FlowGraph {
 
 `TaskVersionStore.create` 五参中 `Set.of("SQL", "SYNC")` 改为 `Set.of("SQL", "SYNC", "FLOW")`。
 
-- [ ] **步骤 5：运行测试验证通过**
+- [x] **步骤 5：运行测试验证通过**
 
 运行：同步骤 2 命令 + `mvn test -Dtest=TaskDefinitionValidatorTest,TaskVersionStoreTest -DfailIfNoTests=false`。
 预期：PASS（既有 SQL/SYNC 校验不回归）。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 git add backend/src/main/java/com/example/governance/workflow/FlowGraph.java backend/src/main/java/com/example/governance/workflow/TaskDefinitionValidator.java backend/src/main/java/com/example/governance/workflow/TaskVersionStore.java backend/src/test/java/com/example/governance/workflow/FlowGraphTest.java
@@ -853,6 +860,23 @@ git commit -m "feat(processing): FLOW 图模型与结构/配置校验
 
 ---
 
+### 任务 3b：FLOW 源引用接线与校验定案（审查后新增，必做）
+
+**K1（关键）：** `TaskController.verify` 取根级 sourceId（FLOW 为 0）→ lockSources 抛错 → FLOW 创建/加版本必 400；`DataSourceStore.deleteUnused` 遇 FLOW 版本行抛 IllegalStateException → 存在 FLOW 任务后所有数据源删除 500。修复：
+- verify 按类型提取：FLOW 遍历 nodes[].config.sourceId 收集集合；SQL/SYNC 保持根级 sourceId(+targetId)。
+- deleteUnused 增加 FLOW 分支：遍历 nodes[].config.sourceId，任一等于被删 id → IllegalStateException("Data source is referenced by a task version")；非法节点 sourceId → Cannot check safely；非 SQL/SYNC/FLOW 类型仍拒绝。
+- FLOW 保存报错放行 ex.getMessage()：create 与 version 均保持抛 ResponseStatusException(BAD_REQUEST)（内层事务 rollback-only 下正常返回会 UnexpectedRollbackException），仅 reason 条件化（FLOW→ex.getMessage()，其他→通用文案），配合 W3 节点定位消息。
+
+**W1 定案：** 非 sink 节点出度 ≤1（链/森林模型，与任务 4 单上游拉取执行器一致）；validate 增加 `非 sink outdeg>1 → IAE("节点只能有一条出边: key")`；前端 flow-graph.validateFlow 与 FlowEditor onConnect 同步该规则（任务 6/7 落实）。
+**W2：** 补 sink 出边/孤立 sink 入度两个分支锁定用例。
+**W3：** validate 内 validateConfig 调用 try/catch 重抛前置 "节点 key: "。
+**N1：** upstream javadoc 注明仅对已 validate 图有意义。
+**N6：** 补重复边/自环/非法 key/parse 限额/upstream 用例。
+
+测试：FlowSourceReferenceApiTest（FLOW 创建 201 + 加版本 201；数据源被 FLOW 引用删除 409；无引用 FLOW 存在时其他数据源可删）+ FlowGraphTest 扩充。全量回归。
+
+---
+
 ### 任务 4：FlowTaskExecutor 流式管道
 
 **文件：**
@@ -860,7 +884,7 @@ git commit -m "feat(processing): FLOW 图模型与结构/配置校验
 - 修改：`backend/.../workflow/CamelTaskRunner.java`
 - 测试：`backend/src/test/java/com/example/governance/workflow/FlowTaskExecutorTest.java`
 
-- [ ] **步骤 1：编写失败的测试**
+- [x] **步骤 1：编写失败的测试**
 
 ```java
 package com.example.governance.workflow;
@@ -955,12 +979,12 @@ class FlowTaskExecutorTest {
     }
 }
 ```
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && TMP=D:/tmp TEMP=D:/tmp JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=FlowTaskExecutorTest -DfailIfNoTests=false`
 预期：FAIL（FlowTaskExecutor 不存在）。
 
-- [ ] **步骤 3：实现 FlowTaskExecutor**
+- [x] **步骤 3：实现 FlowTaskExecutor**
 
 创建 `FlowTaskExecutor.java`：
 ```java
@@ -1254,16 +1278,16 @@ public final class FlowTaskExecutor {
 ```
 注意：sourceIterator 的 counts[1] 在 next() 自增（ emitted），sink 消费时 counts[0] 自增；统计语义 source rowsIn=rowsOut=读取数（counts[0] 读取、counts[1] 发出，二者相等）。wrap 把 InterruptedException 包成 IllegalStateException 以穿越 Iterator 接口；TaskRunService 的 catch(Exception) 按 cancel.isCancelled() 分类 INTERRUPTED/手动停止（一期已有语义）。
 
-- [ ] **步骤 4：CamelTaskRunner FLOW 分支与重载**
+- [x] **步骤 4：CamelTaskRunner FLOW 分支与重载**
 
 字段增加 `private final FlowTaskExecutor flow = new FlowTaskExecutor();`
-方法重载链：
+方法重载链（四参 override 已在任务 1 存在且委托三参；本任务把四参改为完整实现、三参委托四参）：
 ```java
     @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception { execute(task, businessDate, new RunCancelContext(), ExecutionSinks.NOOP); }
     public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel) throws Exception { execute(task, businessDate, cancel, ExecutionSinks.NOOP); }
     @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks) throws Exception {
 ```
-（原三参方法体改为四参；接口 default 四参被此 override 覆盖。）
+（原三参方法体移入四参；FLOW 分支使用 sinks。）
 方法体 SYNC 分支后增加：
 ```java
         } else if ("FLOW".equals(task.type())) {
@@ -1271,12 +1295,12 @@ public final class FlowTaskExecutor {
         } else throw new IllegalArgumentException("Unsupported task type");
 ```
 
-- [ ] **步骤 5：运行测试验证通过**
+- [x] **步骤 5：运行测试验证通过**
 
 运行：同步骤 2 命令 + `mvn test -Dtest=CamelTaskRunnerTest,DatabaseSyncExecutorTest,SqlTaskExecutorTest,WorkflowWorkerTest,TaskStopApiTest -DfailIfNoTests=false`（mock 桩按四参同步，不削弱断言）。
 预期：PASS。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 git add backend/src/main/java/com/example/governance/workflow/FlowTaskExecutor.java backend/src/main/java/com/example/governance/workflow/CamelTaskRunner.java backend/src/test/java/com/example/governance/workflow/FlowTaskExecutorTest.java
@@ -1295,7 +1319,7 @@ git commit -m "feat(processing): FLOW 流式管道执行器与预览模式
 - 修改：`backend/.../workflow/TaskController.java`、`backend/.../security/PermissionCatalog.java`
 - 测试：`backend/src/test/java/com/example/governance/workflow/FlowTestRunApiTest.java`
 
-- [ ] **步骤 1：编写失败的测试**
+- [x] **步骤 1：编写失败的测试**
 
 ```java
 package com.example.governance.workflow;
@@ -1367,12 +1391,12 @@ class FlowTestRunApiTest {
 }
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd backend && TMP=D:/tmp TEMP=D:/tmp JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot" mvn test -Dtest=FlowTestRunApiTest -DfailIfNoTests=false`
 预期：FAIL（404/403 路由未注册）。
 
-- [ ] **步骤 3：实现端点**
+- [x] **步骤 3：实现端点**
 
 `TaskController` 构造器追加注入 `com.example.governance.assets.ExecutionDataSourceProvider provider`（字段+参数）；新增字段 `private final FlowTaskExecutor flowExecutor = new FlowTaskExecutor(); private final com.fasterxml.jackson.databind.ObjectMapper flowMapper = new com.fasterxml.jackson.databind.ObjectMapper();`
 新增端点：
@@ -1406,12 +1430,12 @@ class FlowTestRunApiTest {
         route(routes, "POST", "/api/tasks/flow/test-run", "workflow.task.execute");
 ```
 
-- [ ] **步骤 4：运行测试验证通过**
+- [x] **步骤 4：运行测试验证通过**
 
 运行：同步骤 2 命令 + 全量 `mvn test`（应 242+新增）。
 预期：PASS。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add backend/src/main/java/com/example/governance/workflow/TaskController.java backend/src/main/java/com/example/governance/security/PermissionCatalog.java backend/src/test/java/com/example/governance/workflow/FlowTestRunApiTest.java
@@ -1429,7 +1453,7 @@ POST /api/tasks/flow/test-run：每来源限量 100 行、不写目标表、
 - 创建：`frontend/src/flow-components.js`、`frontend/src/flow-graph.js`
 - 测试：`frontend/tests/flow-components.test.js`、`frontend/tests/flow-graph.test.js`
 
-- [ ] **步骤 1：编写失败的测试**
+- [x] **步骤 1：编写失败的测试**
 
 `frontend/tests/flow-components.test.js`：
 ```js
@@ -1516,12 +1540,12 @@ test('newNode generates unique keys and default config', () => {
 })
 ```
 
-- [ ] **步骤 2：运行测试验证失败**
+- [x] **步骤 2：运行测试验证失败**
 
 运行：`cd frontend && node --test "tests/flow-components.test.js" "tests/flow-graph.test.js"`
 预期：FAIL（模块不存在）。
 
-- [ ] **步骤 3：实现两个模块**
+- [x] **步骤 3：实现两个模块**
 
 `frontend/src/flow-components.js`：
 ```js
@@ -1595,6 +1619,7 @@ export function validateFlow(graph) {
     if (SOURCES.includes(n.component)) { hasSource = true; if (i) errors.push(`来源节点不能有入边: ${n.key}`) }
     else if (SINKS.includes(n.component)) { hasSink = true; if (o) errors.push(`目标节点不能有出边: ${n.key}`); if (i !== 1) errors.push(`目标节点需恰一个入边: ${n.key}`) }
     else if (i !== 1) errors.push(`预处理节点需恰一个入边: ${n.key}`)
+    if (!SINKS.includes(n.component) && o > 1) errors.push(`节点只能有一条出边: ${n.key}`)
     const c = n.config || {}
     if (SOURCES.includes(n.component) || SINKS.includes(n.component)) {
       if (!c.sourceId) errors.push(`节点 ${n.key} 未选择数据源`)
@@ -1641,12 +1666,12 @@ export function newNode(component, existing, position) {
 }
 ```
 
-- [ ] **步骤 4：运行测试验证通过**
+- [x] **步骤 4：运行测试验证通过**
 
 运行：同步骤 2 命令 + 全量 `node --test "tests/*.test.js"`（应 59+新增）。
 预期：PASS。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add frontend/src/flow-components.js frontend/src/flow-graph.js frontend/tests/flow-components.test.js frontend/tests/flow-graph.test.js
@@ -1663,7 +1688,7 @@ VueFlow 适配与节点 key 生成，带 node:test 覆盖。"
 **文件：**
 - 创建：`frontend/src/FlowNode.vue`、`frontend/src/FlowEditor.vue`
 
-- [ ] **步骤 1：实现 FlowNode.vue**
+- [x] **步骤 1：实现 FlowNode.vue**
 
 ```vue
 <script setup>
@@ -1693,7 +1718,7 @@ const isSink = computed(() => def.value.group === 'sink')
 </style>
 ```
 
-- [ ] **步骤 2：实现 FlowEditor.vue**
+- [x] **步骤 2：实现 FlowEditor.vue**
 
 ```vue
 <script setup>
@@ -1742,6 +1767,7 @@ onConnect(params => {
   if (target && ['SOURCE_TABLE', 'SOURCE_SQL'].includes(target.component)) { error.value = '来源节点不能有入边'; return }
   if (source && source.component === 'SINK_TABLE') { error.value = '目标节点不能有出边'; return }
   if (target && graph.value.edges.some(e => e.to === params.target)) { error.value = '该节点已有入边（预处理/目标仅允许单入边）'; return }
+  if (source && graph.value.edges.some(e => e.from === params.source)) { error.value = '该节点已有出边（来源/预处理仅允许单出边）'; return }
   graph.value.edges = [...graph.value.edges, { from: params.source, to: params.target }]
   error.value = ''
 })
@@ -1887,12 +1913,12 @@ const previewKeys = computed(() => Object.keys(testResult.value?.previews || {})
 ```
 注意：`useVueFlow()` 需在 VueFlow 组件上下文内调用——本组件 template 含 VueFlow 且 setup 中调用 useVueFlow 会创建/绑定默认 store；若告警找不到 provider，把 `useVueFlow` 调用移入子组件或给 VueFlow 传 `:id` 并以 `useVueFlow(id)` 获取。实现时以 build+运行无告警为准，必要时调整（属机械修正，汇报说明）。
 
-- [ ] **步骤 3：构建验证**
+- [x] **步骤 3：构建验证**
 
 运行：`cd frontend && npm run build && node --test "tests/*.test.js"`
 预期：build 成功、既有测试不回归。
 
-- [ ] **步骤 4：Commit**
+- [x] **步骤 4：Commit**
 
 ```bash
 git add frontend/src/FlowNode.vue frontend/src/FlowEditor.vue
@@ -1909,28 +1935,29 @@ git commit -m "feat(processing): 流程画布编辑器与节点卡片
 **文件：**
 - 修改：`frontend/src/ProcessingTasks.vue`、`frontend/src/TaskFormDialog.vue`
 
-- [ ] **步骤 1：TaskFormDialog 增加 FLOW 选项与 flow emit**
+- [x] **步骤 1：TaskFormDialog 增加 FLOW 选项与 flow emit**
 
 - emits 增加 `'flow'`：`const emit = defineEmits(['update:open', 'saved', 'flow'])`
 - 类型 select 增加 `<el-option label="流程编排" value="FLOW"/>`
-- SQL/SYNC 配置区与参数编辑器外包 `<template v-if="form.type !== 'FLOW'"> … </template>`（retry 区保留）
+- SQL/SYNC 配置区、参数编辑器、源数据源下拉与 retry 区均包进 `<template v-if="form.type !== 'FLOW'"> … </template>`（FLOW 基础信息仅名称/类型/目录/描述；审查后修订）
 - save() 开头（busy 守卫后）增加：
 ```js
     if (form.value.type === 'FLOW') { emit('flow', { name: form.value.name, directoryId: directoryId.value, description: description.value }); emit('update:open', false); return }
 ```
 （FLOW 的配置由画布产生，表单不 POST。）
 
-- [ ] **步骤 2：ProcessingTasks 视图切换与 FLOW 入口**
+- [x] **步骤 2：ProcessingTasks 视图切换与 FLOW 入口**
 
 - import FlowEditor；新增 `const view = ref('list'), flowDraft = ref(null)`
 - openCreate 保持（表单选 FLOW 后 emit flow）；新增：
 ```js
-function openFlow(metadata) { flowDraft.value = { ...metadata, id: null }; view.value = 'editor' }
-function openFlowEdit(row) { flowDraft.value = { ...row }; view.value = 'editor' }
+function openFlow(metadata) { selected.value = []; flowDraft.value = { ...metadata, id: null }; view.value = 'editor' }
+function openFlowEdit(row) { selected.value = []; flowDraft.value = { ...row }; view.value = 'editor' }
 function flowSaved() { view.value = 'list'; flowDraft.value = null; message.value = '流程已保存'; loadAll() }
 function flowCancel() { view.value = 'list'; flowDraft.value = null }
 ```
 - openEdit 改为：`function openEdit(row) { if (row.type === 'FLOW') { openFlowEdit(row); return } formTask.value = row; formReadonly.value = row.runState === 'RUNNING'; formOpen.value = true }`
+- openCopy 对 FLOW 走画布复制：`if (row.type === 'FLOW') { openFlow({ ...row, id: null, name: row.name + '-副本' }); return }`（审查后补充，保证复制对 FLOW 一致）
 - 类型列模板：`{{ scope.row.type === 'SQL' ? 'SQL 加工' : scope.row.type === 'SYNC' ? '数据库同步' : '流程编排' }}`
 - template 根 section 内：列表布局与对话框包 `<template v-if="view === 'list'"> … </template>`；新增：
 ```html
@@ -1939,7 +1966,7 @@ function flowCancel() { view.value = 'list'; flowDraft.value = null }
 - TaskFormDialog 增加 `@flow="openFlow"`
 - 轮询 watch 保持（editor 视图下轮询继续刷新 tasks 无害；如需暂停可在 watch 条件加 view.value==='list'，自行选择并说明）
 
-- [ ] **步骤 3：全量验证**
+- [x] **步骤 3：全量验证**
 
 运行：
 ```bash
@@ -1948,7 +1975,7 @@ cd ../backend && TMP=D:/tmp TEMP=D:/tmp JAVA_HOME="C:\Program Files\Eclipse Adop
 ```
 预期：build 成功、前端测试全过、后端全量 0 失败。
 
-- [ ] **步骤 4：用户验收清单（本环境无浏览器，转交控制者）**
+- [x] **步骤 4：用户验收清单（本环境无浏览器，转交控制者）**
 
 1. 新增任务选“流程编排”→ 保存基础信息后进入画布；点击组件入画布、连线、点击节点配置抽屉
 2. 非法连线即时提示（来源入边/目标出边/多入边）；删除节点/连线可用
@@ -1959,7 +1986,7 @@ cd ../backend && TMP=D:/tmp TEMP=D:/tmp JAVA_HOME="C:\Program Files\Eclipse Adop
 7. 运行记录/重试/删除/复制对 FLOW 与 SQL/SYNC 一致
 8. 窄屏画布面板置顶
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add frontend/src/ProcessingTasks.vue frontend/src/TaskFormDialog.vue
