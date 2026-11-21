@@ -2,6 +2,7 @@ package com.example.governance.assets;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import static org.junit.jupiter.api.Assertions.*;
@@ -45,6 +46,40 @@ class DatabaseInspectorTest {
         var inspector = new DatabaseInspector((definition, password) -> datasource.getConnection());
         var definition = new DataSourceDefinition("test", "POSTGRESQL:general", "localhost", 5432, "test", "sa");
         assertThrows(DatabaseInspector.InspectionException.class, () -> inspector.columns(definition, "password", null, null, "ITEMS"));
+    }
+    @Test void mysqlStyleNullSchemaFallsBackToCatalog() throws Exception {
+        var ds = new DriverManagerDataSource("jdbc:h2:mem:inspect_" + java.util.UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
+        try (var c = ds.getConnection(); var st = c.createStatement()) { st.execute("CREATE TABLE BOOK (ID INT)"); }
+        var inspector = new DatabaseInspector((d, p) -> mysqlLike(ds.getConnection()));
+        var definition = new DataSourceDefinition("test", "MYSQL:8.x", "localhost", 3306, "sparta1", "sa");
+        var tables = inspector.tables(definition, "p", null, null);
+        var book = tables.stream().filter(t -> t.name().equals("BOOK")).findFirst().orElseThrow();
+        assertNotNull(book.schema());
+        assertEquals(book.catalog(), book.schema());
+        var columns = inspector.columns(definition, "p", book.catalog(), book.schema(), "BOOK");
+        assertEquals("ID", columns.getFirst().name());
+    }
+    /** Models MySQL drivers: database lives in TABLE_CAT, TABLE_SCHEM is null and schema patterns are ignored. */
+    private static Connection mysqlLike(Connection real) {
+        return (Connection) java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[]{Connection.class}, (proxy, method, args) -> {
+            if (method.getName().equals("getMetaData")) return mysqlLikeMetaData(real.getMetaData());
+            return method.invoke(real, args);
+        });
+    }
+    private static java.sql.DatabaseMetaData mysqlLikeMetaData(java.sql.DatabaseMetaData real) {
+        return (java.sql.DatabaseMetaData) java.lang.reflect.Proxy.newProxyInstance(java.sql.DatabaseMetaData.class.getClassLoader(), new Class<?>[]{java.sql.DatabaseMetaData.class}, (proxy, method, args) -> {
+            if (method.getName().equals("getTables") || method.getName().equals("getColumns")) {
+                args[1] = null;
+                return nullSchema((java.sql.ResultSet) method.invoke(real, args));
+            }
+            return method.invoke(real, args);
+        });
+    }
+    private static java.sql.ResultSet nullSchema(java.sql.ResultSet real) {
+        return (java.sql.ResultSet) java.lang.reflect.Proxy.newProxyInstance(java.sql.ResultSet.class.getClassLoader(), new Class<?>[]{java.sql.ResultSet.class}, (proxy, method, args) -> {
+            if (method.getName().equals("getString") && args != null && args.length == 1 && "TABLE_SCHEM".equals(args[0])) return null;
+            return method.invoke(real, args);
+        });
     }
     @Test void schemaNamesAreLiteralsRatherThanWildcardPatterns() throws Exception {
         var ds = new DriverManagerDataSource("jdbc:h2:mem:inspect_" + java.util.UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
