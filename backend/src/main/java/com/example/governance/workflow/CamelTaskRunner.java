@@ -14,16 +14,16 @@ public final class CamelTaskRunner implements WorkflowWorker.TaskRunner, AutoClo
     private final DataSourceProvider provider;
     private final SqlTaskExecutor sql;
     private final DatabaseSyncExecutor sync;
+    private final FlowTaskExecutor flow = new FlowTaskExecutor();
     private final ObjectMapper mapper = new ObjectMapper();
     public CamelTaskRunner(DataSourceProvider provider) throws Exception {
         this.provider = provider;
         sql = new SqlTaskExecutor();
         try { sync = new DatabaseSyncExecutor(); } catch (Exception e) { sql.close(); throw e; }
     }
-    @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception { execute(task, businessDate, new RunCancelContext()); }
-    // sinks 由二期任务 4 接线（FLOW）；此处仅保 cancel 透传。
-    @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks) throws Exception { execute(task, businessDate, cancel); }
-    public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel) throws Exception {
+    @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception { execute(task, businessDate, new RunCancelContext(), ExecutionSinks.NOOP); }
+    public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel) throws Exception { execute(task, businessDate, cancel, ExecutionSinks.NOOP); }
+    @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks) throws Exception {
         JsonNode config = mapper.readTree(task.configuration());
         if (config == null || !config.isObject() || businessDate == null) throw new IllegalArgumentException("Invalid task configuration");
         if ("SQL".equals(task.type())) {
@@ -48,6 +48,8 @@ public final class CamelTaskRunner implements WorkflowWorker.TaskRunner, AutoClo
                 for (JsonNode key : keyNodes) { if (!key.isTextual()) throw new IllegalArgumentException("Invalid primary key"); keys.add(key.textValue()); }
                 sync.upsert(provider.get(sourceId), provider.get(targetId), text(config, "sourceQuery"), values, text(config, "targetTable"), columns, keys, batchSize, cancel);
             } else throw new IllegalArgumentException("Unsupported write mode");
+        } else if ("FLOW".equals(task.type())) {
+            flow.execute(FlowGraph.parse(config), provider, businessDate, cancel, sinks, 0);
         } else throw new IllegalArgumentException("Unsupported task type");
     }
     private static List<Object> parameters(JsonNode parameters, LocalDate businessDate) {

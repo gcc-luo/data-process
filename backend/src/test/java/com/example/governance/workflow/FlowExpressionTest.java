@@ -46,6 +46,12 @@ class FlowExpressionTest {
         assertEquals("a", eval("CONCAT('a', missing)", Map.of()));
     }
 
+    @Test void concatCoercesNumbersToPlainString() {
+        assertEquals("t1", eval("CONCAT('t', id)", Map.of("id", new BigDecimal("1"))));
+        assertEquals("v10.50", eval("CONCAT('v', amount)", Map.of("amount", new BigDecimal("10.50"))));
+        assertThrows(IllegalArgumentException.class, () -> eval("CONCAT('a', flag)", Map.of("flag", Boolean.TRUE)));
+    }
+
     @Test void typeErrorsAreRejected() {
         assertThrows(IllegalArgumentException.class, () -> eval("'a' + 1", Map.of()));
         assertThrows(IllegalArgumentException.class, () -> eval("1 AND true", Map.of()));

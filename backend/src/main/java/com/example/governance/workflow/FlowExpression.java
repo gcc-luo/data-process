@@ -210,7 +210,8 @@ public final class FlowExpression {
                 }
                 case "CONCAT": {
                     var sb = new StringBuilder();
-                    for (Object v : values) sb.append(v == null ? "" : str(v));
+                    // 数字隐式转字符串（SQL CONCAT 语义）：FIELD_CALC 常见 CONCAT('t', id)；其余字符串函数仍严格校验
+                    for (Object v : values) sb.append(v == null ? "" : v instanceof BigDecimal d ? d.toPlainString() : str(v));
                     return sb.toString();
                 }
                 case "ABS": {

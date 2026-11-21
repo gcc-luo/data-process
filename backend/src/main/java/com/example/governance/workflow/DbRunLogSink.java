@@ -15,6 +15,7 @@ public final class DbRunLogSink implements RunLogSink {
         this.jdbc = jdbc; this.ownerType = ownerType; this.ownerId = ownerId; this.nodeKey = nodeKey; this.attempt = attempt;
     }
     @Override public void log(String level, String message) {
+        if (message == null) message = "";
         int line = lines.incrementAndGet();
         if (line > 2001) return;
         boolean marker = line == 2001;
