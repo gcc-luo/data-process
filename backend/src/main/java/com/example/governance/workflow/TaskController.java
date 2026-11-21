@@ -104,6 +104,7 @@ public class TaskController {
         try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
             var future = executor.submit(() -> {
                 cancel.worker(Thread.currentThread()); // 使 cancel 的 interrupt 能打断阻塞等待
+                if (cancel.isCancelled()) throw new InterruptedException("试运行已取消"); // 闭合注册前已超时的竞态
                 return flowExecutor.execute(FlowGraph.parse(request.configuration()), provider, java.time.LocalDate.now(), cancel, new ExecutionSinks(collect, json -> {}), 100);
             });
             // 内层先取消再抛：try-with-resources 的 close 先于外层 catch 执行，
@@ -111,7 +112,7 @@ public class TaskController {
             try {
                 var outcome = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
                 return ResponseEntity.ok(Map.of("logs", logs, "previews", outcome.previews(), "stats", outcome.stats()));
-            } catch (java.util.concurrent.TimeoutException ex) {
+            } catch (java.util.concurrent.TimeoutException | InterruptedException ex) {
                 cancel.cancel(); // 先取消，外层 close 等待的即是会迅速退出的任务
                 throw ex;
             }

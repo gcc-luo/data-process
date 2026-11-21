@@ -52,8 +52,10 @@ class FlowTestRunApiTest {
                 .andExpect(jsonPath("$.previews.t.rows.length()").value(2))
                 .andExpect(jsonPath("$.stats.length()").value(3));
         assertEquals(0, src.queryForObject("SELECT COUNT(*) FROM orders_copy", Integer.class));
-        jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (812,'flow-none',?,811,TRUE,'v2')", encoder.encode("password"));
-        jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (812,811)");
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id=812", Integer.class) == 0) {
+            jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (812,'flow-none',?,811,TRUE,'v2')", encoder.encode("password"));
+            jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (812,811)");
+        }
         jdbc.update("DELETE FROM role_permissions WHERE role_id=811 AND permission='workflow.task.execute'");
         var none = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username", "flow-none").param("password", "password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
         mvc.perform(post("/api/tasks/flow/test-run").session(none).with(csrf()).contentType("application/json").content("{\"configuration\":" + config + "}"))
