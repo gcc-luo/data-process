@@ -12,13 +12,13 @@ import { COMPONENTS, GROUPS, componentDef, defaultConfig } from './flow-componen
 import { validateFlow, toVueNodes, toVueEdges, newNode, canConnect, previewTable } from './flow-graph.js'
 import { configToForm, formToConfig } from './flow-config.js'
 import FlowNode from './FlowNode.vue'
-const props = defineProps({ draft: Object, sources: Array })
+const props = defineProps({ draft: Object, sources: Array, readonly: Boolean })
 const emit = defineEmits(['saved', 'cancel'])
 const can = inject('canPermission', () => false)
 const FLOW_ID = 'processing-flow-editor'
 const graph = ref({ nodes: [], edges: [] })
 const error = ref(''), busy = ref(false)
-const drawerOpen = ref(false), editingKey = ref(null), configForm = ref({})
+const drawerOpen = ref(false), editingKey = ref(null), configForm = ref({}), selectedKey = ref(null)
 const testOpen = ref(false), testBusy = ref(false), testResult = ref(null), testTab = ref('logs'), previewTab = ref('')
 const nodeTypes = { flowNode: FlowNode }
 const vueNodes = computed(() => toVueNodes(graph.value))
@@ -26,14 +26,21 @@ const vueEdges = computed(() => toVueEdges(graph.value))
 const { onConnect, onNodeClick, onNodesChange, onEdgesChange, screenToFlowCoordinate } = useVueFlow(FLOW_ID)
 const canvasEl = ref(null)
 watch(() => props.draft, draft => {
-  error.value = ''
-  if (draft?.configuration) { try { graph.value = JSON.parse(draft.configuration) } catch { graph.value = { nodes: [], edges: [] }; error.value = '任务配置解析失败' } }
+  error.value = ''; selectedKey.value = null
+  if (draft?.configuration) {
+    try {
+      const parsed = JSON.parse(draft.configuration)
+      // 形状守卫：非 { nodes: [], edges: [] } 结构一律降级空画布，避免后续渲染崩溃
+      if (!parsed || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) throw new Error('bad')
+      graph.value = parsed
+    } catch { graph.value = { nodes: [], edges: [] }; error.value = '任务配置解析失败' }
+  }
   else graph.value = { nodes: [], edges: [] }
 }, { immediate: true })
 onNodesChange(changes => {
   for (const c of changes) {
     if (c.type === 'position' && c.position && c.dragging === false) { const n = graph.value.nodes.find(n => n.key === c.id); if (n) n.position = { x: c.position.x, y: c.position.y } }
-    if (c.type === 'remove') graph.value.nodes = graph.value.nodes.filter(n => n.key !== c.id)
+    if (c.type === 'remove') { graph.value.nodes = graph.value.nodes.filter(n => n.key !== c.id); if (selectedKey.value === c.id) selectedKey.value = null }
   }
 })
 onEdgesChange(changes => {
@@ -45,7 +52,14 @@ onConnect(params => {
   graph.value.edges = [...graph.value.edges, { from: params.source, to: params.target }]
   error.value = ''
 })
-onNodeClick(({ node }) => openConfig(node.id))
+onNodeClick(({ node }) => { selectedKey.value = node.id; openConfig(node.id) })
+function removeSelectedNode() {
+  const key = selectedKey.value
+  if (!key || props.readonly) return
+  graph.value.nodes = graph.value.nodes.filter(n => n.key !== key)
+  graph.value.edges = graph.value.edges.filter(e => e.from !== key && e.to !== key)
+  selectedKey.value = null
+}
 function addComponent(component) {
   const rect = canvasEl.value?.getBoundingClientRect()
   const offset = graph.value.nodes.length * 30
@@ -83,7 +97,7 @@ async function save() {
     const url = props.draft?.id ? `/api/tasks/${props.draft.id}/versions` : '/api/tasks'
     const body = props.draft?.id ? { configuration: graph.value } : { name: props.draft?.name, type: 'FLOW', directoryId: props.draft?.directoryId ?? null, description: props.draft?.description ?? null, configuration: graph.value }
     const response = await authorizedRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务保存权限' : response.status === 409 ? '任务运行中，不能修改' : '流程保存失败，请检查配置')
+    if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有任务保存权限' : response.status === 409 ? '任务运行中，不能修改' : response.status === 400 ? '任务名称或配置无效，请返回检查名称与节点配置' : '流程保存失败，请检查配置')
     emit('saved')
   } catch (e) { error.value = e.message } finally { busy.value = false }
 }
@@ -109,24 +123,26 @@ const previewTables = computed(() => Object.fromEntries(previewKeys.value.map(k 
 </script>
 <template>
   <section class="flow-editor">
+    <el-alert v-if="readonly" title="任务运行中，仅查看；保存与试运行不可用" type="warning" :closable="false" show-icon/>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
     <div class="toolbar">
       <div><el-button text @click="leave">← 返回任务列表</el-button><strong>{{ draft?.id ? '编辑流程' : '新建流程' }}：{{ draft?.name }}</strong></div>
       <div class="row">
-        <el-button v-if="can('workflow.task.execute')" :loading="testBusy" @click="testRun">试运行</el-button>
-        <el-button v-if="draft?.id ? can('workflow.task.update') : can('workflow.task.create')" type="primary" :loading="busy" @click="save">保存</el-button>
+        <el-button :disabled="readonly || !selectedKey" @click="removeSelectedNode">删除节点</el-button>
+        <el-button v-if="!readonly && can('workflow.task.execute')" :loading="testBusy" @click="testRun">试运行</el-button>
+        <el-button v-if="!readonly && (draft?.id ? can('workflow.task.update') : can('workflow.task.create'))" type="primary" :loading="busy" @click="save">保存</el-button>
       </div>
     </div>
     <div class="editor-layout">
       <aside class="palette">
         <div v-for="g in GROUPS" :key="g.key" class="palette-group">
           <strong>{{ g.label }}</strong>
-          <el-button v-for="c in COMPONENTS.filter(c => c.group === g.key)" :key="c.component" class="palette-item" @click="addComponent(c.component)">{{ c.label }}</el-button>
+          <el-button v-for="c in COMPONENTS.filter(c => c.group === g.key)" :key="c.component" class="palette-item" :disabled="readonly" @click="addComponent(c.component)">{{ c.label }}</el-button>
         </div>
         <p>点击组件加入画布；拖动节点调整位置；从节点右侧连接点拖至下一节点左侧建立连线；点击节点配置。</p>
       </aside>
       <div class="canvas" ref="canvasEl" aria-label="流程编排画布">
-        <VueFlow :id="FLOW_ID" :nodes="vueNodes" :edges="vueEdges" :node-types="nodeTypes" :default-viewport="{ zoom: 0.9 }" :min-zoom="0.4" :max-zoom="1.5" fit-view-on-init :delete-key-code="['Backspace','Delete']">
+        <VueFlow :id="FLOW_ID" :nodes="vueNodes" :edges="vueEdges" :node-types="nodeTypes" :default-viewport="{ zoom: 0.9 }" :min-zoom="0.4" :max-zoom="1.5" fit-view-on-init :nodes-draggable="!readonly" :nodes-connectable="!readonly" :delete-key-code="readonly ? null : ['Backspace','Delete']">
           <Background :gap="20" :size="1" pattern-color="#d6e4e1" />
           <Controls position="bottom-right" :show-interactive="false" />
           <div v-if="!vueNodes.length" class="empty">从左侧点击组件开始编排。</div>

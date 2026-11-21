@@ -3,7 +3,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { authorizedRequest } from './auth.js'
 import { usePagination } from './pagination.js'
-import { filterTasks, batchParts, flattenTree } from './processing-tasks.js'
+import { filterTasks, batchParts, flattenTree, flowDraftForEdit, flowDraftForCopy } from './processing-tasks.js'
 import TaskFormDialog from './TaskFormDialog.vue'
 import TaskRunsDialog from './TaskRunsDialog.vue'
 import FlowEditor from './FlowEditor.vue'
@@ -100,12 +100,12 @@ async function deleteDirectory(node) {
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 function openCreate() { formTask.value = null; formReadonly.value = false; formOpen.value = true }
-function openFlow(metadata) { selected.value = []; flowDraft.value = { ...metadata, id: null }; view.value = 'editor' }
-function openFlowEdit(row) { selected.value = []; flowDraft.value = { ...row }; view.value = 'editor' }
-function flowSaved() { view.value = 'list'; flowDraft.value = null; message.value = '流程已保存'; loadAll() }
-function flowCancel() { view.value = 'list'; flowDraft.value = null }
+function openFlow(metadata) { error.value = ''; message.value = ''; selected.value = []; flowDraft.value = { ...metadata, id: null }; view.value = 'editor' }
+function openFlowEdit(row) { error.value = ''; message.value = ''; selected.value = []; flowDraft.value = flowDraftForEdit(row); view.value = 'editor' }
+function flowSaved() { error.value = ''; view.value = 'list'; flowDraft.value = null; message.value = '流程已保存'; loadAll() }
+function flowCancel() { error.value = ''; message.value = ''; view.value = 'list'; flowDraft.value = null }
 function openEdit(row) { if (row.type === 'FLOW') { openFlowEdit(row); return } formTask.value = row; formReadonly.value = row.runState === 'RUNNING'; formOpen.value = true }
-function openCopy(row) { if (row.type === 'FLOW') { openFlow({ ...row, id: null, name: `${row.name}-副本` }); return } formTask.value = { ...row, id: null, name: `${row.name}-副本` }; formReadonly.value = false; formOpen.value = true }
+function openCopy(row) { if (row.type === 'FLOW') { openFlow(flowDraftForCopy(row)); return } formTask.value = { ...row, id: null, name: `${row.name}-副本` }; formReadonly.value = false; formOpen.value = true }
 function openRuns(row) { runsTask.value = row; runsOpen.value = true }
 function openStart(targets) { startTargets.value = targets; startDate.value = new Date().toLocaleDateString('sv-SE'); startOpen.value = true }
 async function confirmStart() {
@@ -216,7 +216,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
             <el-table-column v-if="can('workflow.task.execute')" type="selection" width="45"/>
             <el-table-column type="index" label="序号" width="60"/>
             <el-table-column prop="name" label="任务名称" min-width="160"/>
-            <el-table-column label="类型" width="110"><template #default="scope">{{ scope.row.type === 'SQL' ? 'SQL 加工' : scope.row.type === 'SYNC' ? '数据库同步' : '流程编排' }}</template></el-table-column>
+            <el-table-column label="类型" width="110"><template #default="scope">{{ scope.row.type === 'SQL' ? 'SQL 加工' : scope.row.type === 'SYNC' ? '数据库同步' : scope.row.type === 'FLOW' ? '流程编排' : scope.row.type }}</template></el-table-column>
             <el-table-column prop="version" label="版本" width="70"/>
             <el-table-column label="目录" min-width="110"><template #default="scope">{{ directories.find(d => d.id === scope.row.directoryId)?.name ?? '未分类' }}</template></el-table-column>
             <el-table-column label="运行状态" width="90"><template #default="scope"><el-tag :type="scope.row.runState === 'RUNNING' ? 'success' : 'info'" size="small">{{ scope.row.runState === 'RUNNING' ? '运行中' : '停止' }}</el-tag></template></el-table-column>
@@ -241,7 +241,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
         <template #footer><el-button :disabled="batchBusy" @click="startOpen = false">取消</el-button><el-button type="primary" :loading="batchBusy" @click="confirmStart">启动</el-button></template>
       </el-dialog>
     </template>
-    <FlowEditor v-else :draft="flowDraft" :sources="sources" @saved="flowSaved" @cancel="flowCancel"/>
+    <FlowEditor v-else :draft="flowDraft" :sources="sources" :readonly="flowDraft?.runState === 'RUNNING'" @saved="flowSaved" @cancel="flowCancel"/>
   </section>
 </template>
 <style scoped>

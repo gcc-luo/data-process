@@ -21,8 +21,13 @@ watch(() => props.open, open => {
 watch(() => form.value.type, () => { if (!editing.value && props.task && form.value.type !== props.task.type) form.value.originalConfiguration = {} })
 async function save() {
   if (busy.value || prefillFailed.value) return
-  // FLOW 的配置由画布产生，表单只交基础信息，不在此 POST
-  if (form.value.type === 'FLOW') { emit('flow', { name: form.value.name, directoryId: directoryId.value, description: description.value }); emit('update:open', false); return }
+  // FLOW 的配置由画布产生，表单只交基础信息，不在此 POST；名称在此拦截，避免画布保存才报 400
+  if (form.value.type === 'FLOW') {
+    const name = form.value.name.trim()
+    if (!name) { error.value = '请输入任务名称'; return }
+    if (name.length > 160) { error.value = '任务名称不能超过 160 个字符'; return }
+    emit('flow', { name: form.value.name, directoryId: directoryId.value, description: description.value }); emit('update:open', false); return
+  }
   error.value = ''; busy.value = true
   try {
     const configuration = configurationFromForm(form.value)

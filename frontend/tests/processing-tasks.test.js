@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
-import { subtreeIds, filterTasks, batchSummary, batchParts, flattenTree } from '../src/processing-tasks.js'
+import { subtreeIds, filterTasks, batchSummary, batchParts, flattenTree, flowDraftForEdit, flowDraftForCopy } from '../src/processing-tasks.js'
 
 const directories = [
   { id: 1, parentId: null, name: '订单域', sortOrder: 0 },
@@ -93,4 +93,26 @@ test('flatten tree produces parent links and sibling order', () => {
     { id: 4, parentId: null, sortOrder: 1 }
   ])
   assert.deepEqual(flattenTree([]), [])
+})
+
+test('flowDraftForEdit keeps id and configuration for canvas edit', () => {
+  const row = { id: 21, name: '订单流程', type: 'FLOW', directoryId: 2, runState: 'STOPPED', configuration: '{"nodes":[],"edges":[]}' }
+  const draft = flowDraftForEdit(row)
+  assert.equal(draft.id, 21)
+  assert.equal(draft.configuration, '{"nodes":[],"edges":[]}')
+  assert.equal(draft.name, '订单流程')
+  assert.notEqual(draft, row) // 拷贝，改动 draft 不应污染列表行
+  draft.name = '改名'
+  assert.equal(row.name, '订单流程')
+})
+
+test('flowDraftForCopy clears id, appends 副本 suffix and keeps configuration', () => {
+  const row = { id: 21, name: '订单流程', type: 'FLOW', directoryId: 2, configuration: '{"nodes":[{"key":"a"}],"edges":[]}' }
+  const draft = flowDraftForCopy(row)
+  assert.equal(draft.id, null)
+  assert.equal(draft.name, '订单流程-副本')
+  assert.equal(draft.configuration, '{"nodes":[{"key":"a"}],"edges":[]}')
+  assert.notEqual(draft, row)
+  assert.equal(row.id, 21)
+  assert.equal(row.name, '订单流程')
 })
