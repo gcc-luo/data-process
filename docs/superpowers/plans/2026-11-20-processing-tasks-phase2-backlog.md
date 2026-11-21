@@ -11,7 +11,7 @@
 3. **预览口径**：limit 施加在 source（前 100 行），filter 后统计为截断流口径而非全表比例；前端预览 Tab 已标注"仅基于前 100 行"。
 4. **stats 无终态守卫**：attempt 钉定（创建时捕获 attempt 号）限制影响半径；stats 写失败降级 WARN 不击穿执行结果（resilientStats）。
 5. **durationMs 口径**：非 sink 节点为构建期耗时、sink 含排空与写入（流式拓扑固有语义，NodeStat javadoc 已注明）。
-6. **RUNNING FLOW 只读画布**：readonly prop 禁保存/试运行/拖拽/连线/删除/抽屉写回；后端 409 兜底。复制草稿剔除 runState/lastRun 保证副本可编辑。
+6. **RUNNING FLOW 只读画布**：readonly prop 禁保存/试运行/拖拽/连线/删除/抽屉写回；后端 PUT/DELETE/versions 均有活跃 run 409 守卫（最终审查后补 versions 守卫）。复制草稿剔除 runState/lastRun 保证副本可编辑。
 7. **试运行超时残留**：不可中断 JDBC 建连阶段（无已注册语句）超时仍受驱动连接超时约束；cancel.worker 注册后自检闭合注册前竞态。
 8. **CONCAT 数字隐式转 toPlainString**（SQL CONCAT 语义）；UPPER/LOWER/TRIM/SUBSTR 严格字符串；AND/OR falsy-null、其余 null 传播。
 
@@ -37,6 +37,10 @@
 | C16 | 空画布/未改动离开也弹确认 | FlowEditor.leave | 脏检查（同 C11） |
 | C17 | 轮询失败横幅跨视图残留 | ProcessingTasks loadTasks catch | editor 视图下抑制父级 error 或分源 |
 | C18 | 预览统计口径易误读（已标注提示） | 前端预览 Tab | 维持标注；可选加"截断流"字样 |
+| C19 | schema 独立 schema 字段并入 qualified table（与规格配置模型形状不同、前后端一致功能等价） | FlowGraph/flow-components | 补记设计决策或恢复独立字段 |
+| C20 | FIELD_MASK "****" 硬编码未抽共享工具（与 DatasetQueryEngine 语义一致） | FlowTaskExecutor | 抽共享脱敏工具常量 |
+| C21 | FLOW 无 retry 策略 UI 入口（后端支持；与 C15 同类） | TaskFormDialog/FlowEditor | 画布基础信息入口一并补 |
+| C22 | 字段校验行级触发（空来源不报"上游缺少字段"） | FlowTaskExecutor | 可选保存期 schema 预检 |
 
 ## 验收补充场景（二期手工清单之外）
 
