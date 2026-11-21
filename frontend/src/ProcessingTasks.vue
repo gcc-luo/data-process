@@ -6,12 +6,12 @@ import { usePagination } from './pagination.js'
 import { filterTasks, batchParts, flattenTree } from './processing-tasks.js'
 import TaskFormDialog from './TaskFormDialog.vue'
 import TaskRunsDialog from './TaskRunsDialog.vue'
+import FlowEditor from './FlowEditor.vue'
 import RefreshIcon from './RefreshIcon.vue'
-// view 预留三期监控视图切换
-defineProps({ view: { type: String, default: 'tasks' } })
 const can = inject('canPermission', () => false)
 const directories = ref([]), tasks = ref([]), sources = ref([]), error = ref(''), message = ref('')
 const tree = ref(null), currentDirectory = ref(0)
+const view = ref('list'), flowDraft = ref(null)
 const nameSearch = ref(''), nameFilter = ref(''), stateSearch = ref(''), stateFilter = ref('')
 const selected = ref([]), formOpen = ref(false), formTask = ref(null), formReadonly = ref(false), runsOpen = ref(false), runsTask = ref(null)
 const startOpen = ref(false), startTargets = ref([]), startDate = ref(new Date().toLocaleDateString('sv-SE')), batchBusy = ref(false)
@@ -100,7 +100,11 @@ async function deleteDirectory(node) {
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 function openCreate() { formTask.value = null; formReadonly.value = false; formOpen.value = true }
-function openEdit(row) { formTask.value = row; formReadonly.value = row.runState === 'RUNNING'; formOpen.value = true }
+function openFlow(metadata) { flowDraft.value = { ...metadata, id: null }; view.value = 'editor' }
+function openFlowEdit(row) { flowDraft.value = { ...row }; view.value = 'editor' }
+function flowSaved() { view.value = 'list'; flowDraft.value = null; message.value = '流程已保存'; loadAll() }
+function flowCancel() { view.value = 'list'; flowDraft.value = null }
+function openEdit(row) { if (row.type === 'FLOW') { openFlowEdit(row); return } formTask.value = row; formReadonly.value = row.runState === 'RUNNING'; formOpen.value = true }
 function openCopy(row) { formTask.value = { ...row, id: null, name: `${row.name}-副本` }; formReadonly.value = false; formOpen.value = true }
 function openRuns(row) { runsTask.value = row; runsOpen.value = true }
 function openStart(targets) { startTargets.value = targets; startDate.value = new Date().toLocaleDateString('sv-SE'); startOpen.value = true }
@@ -175,66 +179,69 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
   <section class="processing">
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
     <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon/>
-    <el-select v-model="currentDirectory" class="directory-select" aria-label="任务目录"><el-option v-for="o in directoryOptions" :key="o.id" :label="o.label" :value="o.id"/></el-select>
-    <div class="processing-layout">
-      <aside class="directory-pane">
-        <div class="directory-head"><strong>任务目录</strong><el-button v-if="can('workflow.task.create')" text type="primary" @click="addDirectory(null)">新增</el-button></div>
-        <el-tree ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all :draggable="can('workflow.task.update')" :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-drop="submitSort">
-          <template #default="{ data }">
-            <span class="tree-node">
-              <span>{{ data.name }}</span>
-              <span v-if="data.id !== 0" class="tree-actions">
-                <el-button v-if="can('workflow.task.create')" text size="small" @click.stop="addDirectory(data)">新增</el-button>
-                <el-button v-if="can('workflow.task.update')" text size="small" @click.stop="renameDirectory(data)">重命名</el-button>
-                <el-button v-if="can('workflow.task.delete')" text size="small" type="danger" @click.stop="deleteDirectory(data)">删除</el-button>
+    <template v-if="view === 'list'">
+      <el-select v-model="currentDirectory" class="directory-select" aria-label="任务目录"><el-option v-for="o in directoryOptions" :key="o.id" :label="o.label" :value="o.id"/></el-select>
+      <div class="processing-layout">
+        <aside class="directory-pane">
+          <div class="directory-head"><strong>任务目录</strong><el-button v-if="can('workflow.task.create')" text type="primary" @click="addDirectory(null)">新增</el-button></div>
+          <el-tree ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all :draggable="can('workflow.task.update')" :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-drop="submitSort">
+            <template #default="{ data }">
+              <span class="tree-node">
+                <span>{{ data.name }}</span>
+                <span v-if="data.id !== 0" class="tree-actions">
+                  <el-button v-if="can('workflow.task.create')" text size="small" @click.stop="addDirectory(data)">新增</el-button>
+                  <el-button v-if="can('workflow.task.update')" text size="small" @click.stop="renameDirectory(data)">重命名</el-button>
+                  <el-button v-if="can('workflow.task.delete')" text size="small" type="danger" @click.stop="deleteDirectory(data)">删除</el-button>
+                </span>
               </span>
-            </span>
-          </template>
-        </el-tree>
-      </aside>
-      <div class="list-pane">
-        <div class="toolbar list-query-toolbar">
-          <div class="list-query-controls">
-            <el-input v-model="nameSearch" clearable placeholder="搜索任务名称" @keyup.enter="applyQuery"/>
-            <el-select v-model="stateSearch" clearable placeholder="运行状态" style="width:130px"><el-option label="运行中" value="RUNNING"/><el-option label="停止" value="STOPPED"/></el-select>
-            <el-button type="primary" @click="applyQuery">查询</el-button>
-            <span>当前目录：{{ currentDirectoryName }}</span>
+            </template>
+          </el-tree>
+        </aside>
+        <div class="list-pane">
+          <div class="toolbar list-query-toolbar">
+            <div class="list-query-controls">
+              <el-input v-model="nameSearch" clearable placeholder="搜索任务名称" @keyup.enter="applyQuery"/>
+              <el-select v-model="stateSearch" clearable placeholder="运行状态" style="width:130px"><el-option label="运行中" value="RUNNING"/><el-option label="停止" value="STOPPED"/></el-select>
+              <el-button type="primary" @click="applyQuery">查询</el-button>
+              <span>当前目录：{{ currentDirectoryName }}</span>
+            </div>
+            <div class="list-query-actions">
+              <el-button v-if="can('workflow.task.create') && can('datasource.source.read')" type="primary" @click="openCreate">新增</el-button>
+              <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="openStart(selected)">批量启动</el-button>
+              <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="stopBatch">批量停止</el-button>
+              <el-button class="refresh-button" title="刷新" aria-label="刷新" @click="loadAll"><RefreshIcon /></el-button>
+            </div>
           </div>
-          <div class="list-query-actions">
-            <el-button v-if="can('workflow.task.create') && can('datasource.source.read')" type="primary" @click="openCreate">新增</el-button>
-            <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="openStart(selected)">批量启动</el-button>
-            <el-button v-if="can('workflow.task.execute')" :disabled="!selected.length || batchBusy" @click="stopBatch">批量停止</el-button>
-            <el-button class="refresh-button" title="刷新" aria-label="刷新" @click="loadAll"><RefreshIcon /></el-button>
-          </div>
+          <el-table :data="paging.visible.value" empty-text="暂无任务" row-key="id" @selection-change="selected = $event">
+            <el-table-column v-if="can('workflow.task.execute')" type="selection" width="45"/>
+            <el-table-column type="index" label="序号" width="60"/>
+            <el-table-column prop="name" label="任务名称" min-width="160"/>
+            <el-table-column label="类型" width="110"><template #default="scope">{{ scope.row.type === 'SQL' ? 'SQL 加工' : scope.row.type === 'SYNC' ? '数据库同步' : '流程编排' }}</template></el-table-column>
+            <el-table-column prop="version" label="版本" width="70"/>
+            <el-table-column label="目录" min-width="110"><template #default="scope">{{ directories.find(d => d.id === scope.row.directoryId)?.name ?? '未分类' }}</template></el-table-column>
+            <el-table-column label="运行状态" width="90"><template #default="scope"><el-tag :type="scope.row.runState === 'RUNNING' ? 'success' : 'info'" size="small">{{ scope.row.runState === 'RUNNING' ? '运行中' : '停止' }}</el-tag></template></el-table-column>
+            <el-table-column label="最近运行" min-width="170"><template #default="scope"><span v-if="scope.row.lastRun">{{ runStateText(scope.row.lastRun.state) }} · {{ fmtRunTime(scope.row.lastRun.finishedAt || scope.row.lastRun.startedAt) }}</span><span v-else class="status-text">未运行</span></template></el-table-column>
+            <el-table-column label="操作" min-width="280" fixed="right"><template #default="scope">
+              <el-button v-if="can('workflow.task.execute') && scope.row.runState !== 'RUNNING'" text type="primary" @click="openStart([scope.row])">启动</el-button>
+              <el-popconfirm v-if="can('workflow.task.execute') && scope.row.runState === 'RUNNING'" title="停止会中断运行，可能已写入部分数据，确定停止？" @confirm="stopOne(scope.row)"><template #reference><el-button text type="warning">停止</el-button></template></el-popconfirm>
+              <el-button v-if="can('workflow.task.update') || scope.row.runState === 'RUNNING'" text @click="openEdit(scope.row)">{{ scope.row.runState === 'RUNNING' ? '查看' : '编辑' }}</el-button>
+              <el-button v-if="can('workflow.task.create')" text @click="openCopy(scope.row)">复制</el-button>
+              <el-popconfirm v-if="can('workflow.task.delete')" :title="`确定删除任务 ${scope.row.name}？运行历史将一并清除。`" @confirm="removeTask(scope.row)"><template #reference><el-button text type="danger" :disabled="scope.row.runState === 'RUNNING'">删除</el-button></template></el-popconfirm>
+              <el-button v-if="can('workflow.task.read')" text @click="openRuns(scope.row)">运行记录</el-button>
+            </template></el-table-column>
+          </el-table>
+          <div class="pagination"><el-pagination v-model:current-page="paging.page.value" v-model:page-size="paging.pageSize.value" :total="paging.total.value" :page-sizes="[10,20,50]" layout="total, sizes, prev, pager, next"/></div>
         </div>
-        <el-table :data="paging.visible.value" empty-text="暂无任务" row-key="id" @selection-change="selected = $event">
-          <el-table-column v-if="can('workflow.task.execute')" type="selection" width="45"/>
-          <el-table-column type="index" label="序号" width="60"/>
-          <el-table-column prop="name" label="任务名称" min-width="160"/>
-          <el-table-column label="类型" width="110"><template #default="scope">{{ scope.row.type === 'SQL' ? 'SQL 加工' : '数据库同步' }}</template></el-table-column>
-          <el-table-column prop="version" label="版本" width="70"/>
-          <el-table-column label="目录" min-width="110"><template #default="scope">{{ directories.find(d => d.id === scope.row.directoryId)?.name ?? '未分类' }}</template></el-table-column>
-          <el-table-column label="运行状态" width="90"><template #default="scope"><el-tag :type="scope.row.runState === 'RUNNING' ? 'success' : 'info'" size="small">{{ scope.row.runState === 'RUNNING' ? '运行中' : '停止' }}</el-tag></template></el-table-column>
-          <el-table-column label="最近运行" min-width="170"><template #default="scope"><span v-if="scope.row.lastRun">{{ runStateText(scope.row.lastRun.state) }} · {{ fmtRunTime(scope.row.lastRun.finishedAt || scope.row.lastRun.startedAt) }}</span><span v-else class="status-text">未运行</span></template></el-table-column>
-          <el-table-column label="操作" min-width="280" fixed="right"><template #default="scope">
-            <el-button v-if="can('workflow.task.execute') && scope.row.runState !== 'RUNNING'" text type="primary" @click="openStart([scope.row])">启动</el-button>
-            <el-popconfirm v-if="can('workflow.task.execute') && scope.row.runState === 'RUNNING'" title="停止会中断运行，可能已写入部分数据，确定停止？" @confirm="stopOne(scope.row)"><template #reference><el-button text type="warning">停止</el-button></template></el-popconfirm>
-            <el-button v-if="can('workflow.task.update') || scope.row.runState === 'RUNNING'" text @click="openEdit(scope.row)">{{ scope.row.runState === 'RUNNING' ? '查看' : '编辑' }}</el-button>
-            <el-button v-if="can('workflow.task.create')" text @click="openCopy(scope.row)">复制</el-button>
-            <el-popconfirm v-if="can('workflow.task.delete')" :title="`确定删除任务 ${scope.row.name}？运行历史将一并清除。`" @confirm="removeTask(scope.row)"><template #reference><el-button text type="danger" :disabled="scope.row.runState === 'RUNNING'">删除</el-button></template></el-popconfirm>
-            <el-button v-if="can('workflow.task.read')" text @click="openRuns(scope.row)">运行记录</el-button>
-          </template></el-table-column>
-        </el-table>
-        <div class="pagination"><el-pagination v-model:current-page="paging.page.value" v-model:page-size="paging.pageSize.value" :total="paging.total.value" :page-sizes="[10,20,50]" layout="total, sizes, prev, pager, next"/></div>
       </div>
-    </div>
-    <TaskFormDialog v-model:open="formOpen" :task="formTask" :sources="sources" :directories="directories" :readonly="formReadonly" @saved="message = '任务已保存'; loadAll()"/>
-    <TaskRunsDialog v-model:open="runsOpen" :task="runsTask"/>
-    <el-dialog v-model="startOpen" :title="`启动 ${startTargets.length} 个任务`" width="min(480px, 95vw)">
-      <el-form label-position="top"><el-form-item label="业务日期"><el-date-picker v-model="startDate" type="date" value-format="YYYY-MM-DD" :clearable="false"/></el-form-item></el-form>
-      <p v-for="target in startTargets" :key="target.id" class="status-text">{{ target.name }}（版本 {{ target.version }}）</p>
-      <template #footer><el-button :disabled="batchBusy" @click="startOpen = false">取消</el-button><el-button type="primary" :loading="batchBusy" @click="confirmStart">启动</el-button></template>
-    </el-dialog>
+      <TaskFormDialog v-model:open="formOpen" :task="formTask" :sources="sources" :directories="directories" :readonly="formReadonly" @saved="message = '任务已保存'; loadAll()" @flow="openFlow"/>
+      <TaskRunsDialog v-model:open="runsOpen" :task="runsTask"/>
+      <el-dialog v-model="startOpen" :title="`启动 ${startTargets.length} 个任务`" width="min(480px, 95vw)">
+        <el-form label-position="top"><el-form-item label="业务日期"><el-date-picker v-model="startDate" type="date" value-format="YYYY-MM-DD" :clearable="false"/></el-form-item></el-form>
+        <p v-for="target in startTargets" :key="target.id" class="status-text">{{ target.name }}（版本 {{ target.version }}）</p>
+        <template #footer><el-button :disabled="batchBusy" @click="startOpen = false">取消</el-button><el-button type="primary" :loading="batchBusy" @click="confirmStart">启动</el-button></template>
+      </el-dialog>
+    </template>
+    <FlowEditor v-else :draft="flowDraft" :sources="sources" @saved="flowSaved" @cancel="flowCancel"/>
   </section>
 </template>
 <style scoped>

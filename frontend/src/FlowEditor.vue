@@ -56,6 +56,8 @@ function addComponent(component) {
 function openConfig(key) {
   const node = graph.value.nodes.find(n => n.key === key)
   if (!node) return
+  // 旧版本可能含当前平台不认识的组件：提示而不崩溃，不开抽屉
+  try { componentDef(node.component) } catch { error.value = `未知组件: ${node.component}，请删除该节点或升级平台`; return }
   editingKey.value = key
   configForm.value = configToForm(node.component, node.config || defaultConfig(node.component))
   drawerOpen.value = true
@@ -67,7 +69,7 @@ function saveConfig() {
   node.config = config
   drawerOpen.value = false
 }
-const editingDef = computed(() => { const n = graph.value.nodes.find(n => n.key === editingKey.value); return n ? componentDef(n.component) : null })
+const editingDef = computed(() => { const n = graph.value.nodes.find(n => n.key === editingKey.value); if (!n) return null; try { return componentDef(n.component) } catch { return null } })
 function addMapping() {
   configForm.value.mappings ??= []
   configForm.value.mappings.push({ from: '', to: '' })
