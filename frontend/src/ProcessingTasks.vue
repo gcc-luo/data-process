@@ -319,7 +319,7 @@ onBeforeUnmount(() => {
 .list-pane :deep(.task-table){flex:1;min-height:0;background:#fff}
 .tree-node{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
 .tree-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.directory-folder-icon{width:15px;height:14px;flex:none;color:#ad8b4d;fill:currentColor}
+.directory-folder-icon{width:15px;height:14px;flex:none;color:#c3c9d1;fill:currentColor}
 .directory-folder-icon .folder-highlight{fill:none;stroke:#fff;stroke-opacity:.72;stroke-width:.85}
 .directory-tree :deep(.el-tree-node__content.is-current) .directory-folder-icon{color:#4282c1}
 .directory-menu-trigger{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;flex:none;margin-left:auto;padding:0;border:0;border-radius:4px;background:transparent;color:#61758e;font-size:19px;line-height:1;opacity:0;cursor:pointer}
