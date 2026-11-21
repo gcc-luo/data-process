@@ -102,14 +102,24 @@ public class TaskController {
         var logs = new java.util.concurrent.CopyOnWriteArrayList<Map<String, Object>>();
         RunLogSink collect = (level, message) -> logs.add(Map.of("lineNo", logs.size() + 1, "level", level, "message", message));
         try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-            var future = executor.submit(() -> flowExecutor.execute(FlowGraph.parse(request.configuration()), provider, java.time.LocalDate.now(), cancel, new ExecutionSinks(collect, json -> {}), 100));
-            var outcome = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
-            return ResponseEntity.ok(Map.of("logs", logs, "previews", outcome.previews(), "stats", outcome.stats()));
+            var future = executor.submit(() -> {
+                cancel.worker(Thread.currentThread()); // 使 cancel 的 interrupt 能打断阻塞等待
+                return flowExecutor.execute(FlowGraph.parse(request.configuration()), provider, java.time.LocalDate.now(), cancel, new ExecutionSinks(collect, json -> {}), 100);
+            });
+            // 内层先取消再抛：try-with-resources 的 close 先于外层 catch 执行，
+            // 若在外层才 cancel，close 会无限期等待未取消的任务，30s 上限落空
+            try {
+                var outcome = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+                return ResponseEntity.ok(Map.of("logs", logs, "previews", outcome.previews(), "stats", outcome.stats()));
+            } catch (java.util.concurrent.TimeoutException ex) {
+                cancel.cancel(); // 先取消，外层 close 等待的即是会迅速退出的任务
+                throw ex;
+            }
         } catch (java.util.concurrent.TimeoutException ex) {
-            cancel.cancel();
             throw new ResponseStatusException(HttpStatus.REQUEST_TIMEOUT, "试运行超过 30 秒");
         } catch (java.util.concurrent.ExecutionException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getCause() == null ? "试运行失败" : ex.getCause().getMessage());
+            String message = ex.getCause() == null ? null : ex.getCause().getMessage();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message == null ? "试运行失败" : message);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "试运行被中断");

@@ -60,6 +60,36 @@ class FlowTestRunApiTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test void timeoutCancelsAndReturns408() throws Exception {
+        var session = login();
+        // 源端 getConnection 阻塞于可中断 latch：只有 cancel 前置 + worker interrupt 才能迅速退出
+        var gate = new java.util.concurrent.CountDownLatch(1);
+        var blocking = (javax.sql.DataSource) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{javax.sql.DataSource.class}, (p, m, a) -> {
+            if (m.getName().equals("getConnection")) { gate.await(); return null; }
+            throw new UnsupportedOperationException(m.getName());
+        });
+        Mockito.when(provider.get(Mockito.anyLong())).thenReturn(blocking);
+        String config = "{\"nodes\":[{\"key\":\"s\",\"component\":\"SOURCE_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"orders\"}},{\"key\":\"t\",\"component\":\"SINK_TABLE\",\"config\":{\"sourceId\":1,\"table\":\"orders_copy\",\"writeMode\":\"APPEND\"}}],\"edges\":[{\"from\":\"s\",\"to\":\"t\"}]}";
+        // 请求放独立守护线程并加 45s 上限：缺陷现状（close 先于 cancel）会永久挂起，红阶段有界失败
+        var request = new java.util.concurrent.FutureTask<Object[]>(() -> {
+            long start = System.nanoTime();
+            var result = mvc.perform(post("/api/tasks/flow/test-run").session(session).with(csrf()).contentType("application/json").content("{\"configuration\":" + config + "}")).andReturn();
+            return new Object[]{result, (System.nanoTime() - start) / 1_000_000};
+        });
+        var thread = new Thread(request);
+        thread.setDaemon(true);
+        thread.start();
+        try {
+            Object[] pair;
+            try { pair = request.get(45, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (java.util.concurrent.TimeoutException hung) { request.cancel(true); throw new AssertionError("请求挂起超过 45s：close 先于 cancel，30s 上限落空", hung); }
+            var result = (org.springframework.test.web.servlet.MvcResult) pair[0];
+            long elapsed = (Long) pair[1];
+            assertEquals(408, result.getResponse().getStatus());
+            assertTrue(elapsed < 40_000, "应取消后迅速返回而非等流程跑完, elapsed=" + elapsed + "ms");
+        } finally { gate.countDown(); } // 失败路径释放 worker，避免泄漏
+    }
+
     @Test void invalidFlowConfigurationRejected() throws Exception {
         var session = login();
         mvc.perform(post("/api/tasks/flow/test-run").session(session).with(csrf()).contentType("application/json").content("{\"configuration\":{\"nodes\":[],\"edges\":[]}}"))
