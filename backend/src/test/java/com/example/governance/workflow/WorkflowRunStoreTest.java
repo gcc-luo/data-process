@@ -15,7 +15,7 @@ class WorkflowRunStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("task", "SQL", "{}");
+        long task = OrchFixtures.published(new TaskVersionStore(jdbc, tx), "task", "{}");
         var definitions = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = definitions.create("daily", List.of(new WorkflowDefinitionStore.Node("a", task, 1), new WorkflowDefinitionStore.Node("b", task, 1)), List.of(new WorkflowGraph.Edge("a", "b")));
         var runs = new WorkflowRunStore(jdbc, tx, definitions);
@@ -31,7 +31,7 @@ class WorkflowRunStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("task", "SQL", "{}");
+        long task = OrchFixtures.published(new TaskVersionStore(jdbc, tx), "task", "{}");
         var definitions = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = definitions.create("daily", List.of(new WorkflowDefinitionStore.Node("a", task, 1)), List.of());
         var runs = new WorkflowRunStore(jdbc, tx, definitions);
@@ -48,7 +48,7 @@ class WorkflowRunStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("task", "SQL", "{}");
+        long task = OrchFixtures.published(new TaskVersionStore(jdbc, tx), "task", "{}");
         var definitions = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = definitions.create("daily", List.of(new WorkflowDefinitionStore.Node("a", task, 1)), List.of());
         var runs = new WorkflowRunStore(jdbc, tx, definitions);
@@ -62,7 +62,7 @@ class WorkflowRunStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("task", "SQL", "{}");
+        long task = OrchFixtures.published(new TaskVersionStore(jdbc, tx), "task", "{}");
         var definitions = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = definitions.create("daily", List.of(new WorkflowDefinitionStore.Node("a", task, 1), new WorkflowDefinitionStore.Node("b", task, 1)), List.of(new WorkflowGraph.Edge("a", "b")));
         var runs = new WorkflowRunStore(jdbc, tx, definitions);
@@ -79,7 +79,7 @@ class WorkflowRunStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("task", "SQL", "{}");
+        long task = OrchFixtures.published(new TaskVersionStore(jdbc, tx), "task", "{}");
         var definitions = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = definitions.create("daily", List.of(new WorkflowDefinitionStore.Node("a", task, 1)), List.of());
         var runs = new WorkflowRunStore(jdbc, tx, definitions);
@@ -99,7 +99,7 @@ class WorkflowRunStoreTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("task", "SQL", "{}");
+        long task = OrchFixtures.published(new TaskVersionStore(jdbc, tx), "task", "{}");
         var definitions = new WorkflowDefinitionStore(jdbc, tx);
         long a = definitions.create("a", List.of(new WorkflowDefinitionStore.Node("n",task,1)), List.of());
         long b = definitions.create("b", List.of(new WorkflowDefinitionStore.Node("n",task,1)), List.of());

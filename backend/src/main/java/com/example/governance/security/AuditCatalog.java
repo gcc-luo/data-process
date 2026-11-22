@@ -17,7 +17,8 @@ public final class AuditCatalog {
             Map.entry("datasource.create", "新增数据源"), Map.entry("datasource.update", "修改数据源"), Map.entry("datasource.delete", "删除数据源"),
             Map.entry("driver.upload", "上传驱动"), Map.entry("driver.delete", "删除驱动"),
             Map.entry("dataset.create", "登记数据集"), Map.entry("dataset.delete", "删除数据集"), Map.entry("dataset.refresh", "刷新数据集"), Map.entry("dataset.policy", "配置数据范围"), Map.entry("dataset.policy.revoke", "撤销数据范围"),
-            Map.entry("task.create", "新增任务"), Map.entry("task.version", "保存任务版本"), Map.entry("task.run", "执行任务"), Map.entry("task.retry", "重试任务"),
+            Map.entry("task.create", "新增任务"), Map.entry("task.update", "修改任务信息"), Map.entry("task.draft", "保存任务草稿"), Map.entry("task.publish", "发布任务"), Map.entry("task.version", "保存任务版本"), Map.entry("task.copy", "复制任务"), Map.entry("task.delete", "删除任务"), Map.entry("task.run", "执行任务"), Map.entry("task.stop", "停止任务"), Map.entry("task.retry", "重试任务"), Map.entry("task.schedule", "配置任务定时"), Map.entry("task.schedule.delete", "删除任务定时"), Map.entry("task.schedule.fire", "任务调度触发"),
+            Map.entry("directory.create", "新增任务目录"), Map.entry("directory.update", "修改任务目录"), Map.entry("directory.delete", "删除任务目录"), Map.entry("directory.sort", "任务目录排序"),
             Map.entry("workflow.create", "新增工作流"), Map.entry("workflow.version", "保存工作流版本"), Map.entry("workflow.run", "执行工作流"), Map.entry("workflow.retry", "重试工作流"), Map.entry("workflow.backfill", "补跑工作流"), Map.entry("workflow.schedule.fire", "调度触发"),
             Map.entry("schedule.create", "新增调度"),
             Map.entry("realtime.create", "新增实时同步"), Map.entry("realtime.settings", "修改实时同步配置"), Map.entry("realtime.start", "启动实时同步"), Map.entry("realtime.stop", "停止实时同步"),
@@ -28,7 +29,7 @@ public final class AuditCatalog {
 
     private static final Map<String, String> OBJECT_TYPES = Map.ofEntries(
             Map.entry("user", "用户"), Map.entry("account", "账号"), Map.entry("department", "部门"), Map.entry("role", "角色"), Map.entry("menu", "菜单"),
-            Map.entry("datasource", "数据源"), Map.entry("driver", "JDBC 驱动"), Map.entry("dataset", "数据集"), Map.entry("task", "任务"), Map.entry("workflow", "工作流"), Map.entry("run", "运行实例"),
+            Map.entry("datasource", "数据源"), Map.entry("driver", "JDBC 驱动"), Map.entry("dataset", "数据集"), Map.entry("task", "任务"), Map.entry("task_directory", "任务目录"), Map.entry("task_run", "任务运行"), Map.entry("workflow", "工作流"), Map.entry("run", "运行实例"),
             Map.entry("schedule", "调度"), Map.entry("realtime", "实时同步"), Map.entry("service", "数据服务"), Map.entry("caller", "调用方"), Map.entry("report", "报表"), Map.entry("dashboard", "看板"));
 
     private static final Map<String, String> RESULTS = Map.of("SUCCESS", "成功", "FAILURE", "失败");

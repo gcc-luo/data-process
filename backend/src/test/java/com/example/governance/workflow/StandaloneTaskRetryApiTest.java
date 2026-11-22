@@ -27,7 +27,7 @@ class StandaloneTaskRetryApiTest {
         jdbc.update("INSERT INTO roles(id,name) VALUES (501,'role')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (501,'retry-user',?,501,TRUE,'v')",encoder.encode("password"));
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (501,501)");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (501,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (501,'task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (501,1,'{}')");
         jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no) VALUES (501,501,1,DATE '2026-11-16','FAILED',CURRENT_TIMESTAMP,1)");
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,finished_at,error_message) VALUES (501,1,'FAILED',CURRENT_TIMESTAMP,'任务执行失败')");
@@ -47,7 +47,7 @@ class StandaloneTaskRetryApiTest {
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (601,'retry-active-user',?,601,TRUE,'v')",encoder.encode("password"));
         jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (601,601)");
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (601,'workflow.task.retry')");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (601,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (601,'task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (601,1,'{}')");
         jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no) VALUES (601,601,1,DATE '2026-11-16','FAILED',CURRENT_TIMESTAMP,1)");
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state,finished_at,error_message) VALUES (601,1,'FAILED',CURRENT_TIMESTAMP,'任务执行失败')");

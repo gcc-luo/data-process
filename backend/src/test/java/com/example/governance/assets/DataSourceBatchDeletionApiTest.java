@@ -25,7 +25,7 @@ class DataSourceBatchDeletionApiTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PasswordEncoder encoder;
     @BeforeEach void setup() {
-        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM dataset_fields"); jdbc.update("DELETE FROM datasets"); jdbc.update("DELETE FROM realtime_jobs"); jdbc.update("DELETE FROM processing_task_versions"); jdbc.update("DELETE FROM processing_tasks"); jdbc.update("DELETE FROM data_sources"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions"); jdbc.update("DELETE FROM users"); jdbc.update("DELETE FROM roles"); jdbc.update("DELETE FROM departments");
+        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM dataset_fields"); jdbc.update("DELETE FROM datasets"); jdbc.update("DELETE FROM realtime_jobs"); jdbc.update("DELETE FROM task_drafts"); jdbc.update("DELETE FROM task_watermarks"); jdbc.update("DELETE FROM task_schedules"); jdbc.update("DELETE FROM processing_task_versions"); jdbc.update("DELETE FROM processing_tasks"); jdbc.update("DELETE FROM data_sources"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions"); jdbc.update("DELETE FROM users"); jdbc.update("DELETE FROM roles"); jdbc.update("DELETE FROM departments");
         jdbc.update("INSERT INTO departments(id,name) VALUES (10,'test')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (10,'manager',?,10,TRUE,'v')", encoder.encode("password"));
         jdbc.update("INSERT INTO roles(id,name) VALUES (10,'manager')"); jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (10,10)");
@@ -55,8 +55,8 @@ class DataSourceBatchDeletionApiTest {
     @Test void deletesUnreferencedAndReportsReferencedAndMissing() throws Exception {
         grantDelete(); var session = login();
         jdbc.update("INSERT INTO datasets(id,source_id,name,table_name) VALUES (1,16,'dataset','orders')");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (1,'task','SQL',1)");
-        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (1,1,?)", "{\"sourceId\":17}");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (1,'task','ORCH',1)");
+        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (1,1,?)", com.example.governance.workflow.OrchFixtures.dml(17, "UPDATE t SET x=1"));
         batchDelete(session, "{\"ids\":[15,16,17,999,15]}").andExpect(status().isOk())
             .andExpect(jsonPath("$.deleted.length()").value(1))
             .andExpect(jsonPath("$.deleted[0]").value(15))

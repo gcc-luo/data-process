@@ -37,7 +37,7 @@ class TaskDeleteApiTest {
 
     @Test void deleteGuardsWorkflowReferencesAndCascadesRuns() throws Exception {
         var session = login();
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (641,'被引用','SQL',1),(642,'可删除','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (641,'被引用','ORCH',1),(642,'可删除','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (641,1,'{}'),(642,1,'{}')");
         jdbc.update("INSERT INTO workflow_definitions(id,name,current_version) VALUES (641,'wf',1)");
         jdbc.update("INSERT INTO workflow_versions(workflow_id,version) VALUES (641,1)");
@@ -64,7 +64,7 @@ class TaskDeleteApiTest {
 
     @Test void deleteWhileRunningConflicts() throws Exception {
         var session = login();
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (643,'运行中','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (643,'运行中','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (643,1,'{}')");
         jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no) VALUES (643,643,1,DATE '2026-11-20','PENDING',CURRENT_TIMESTAMP,1)");
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state) VALUES (643,1,'PENDING')");
@@ -82,7 +82,7 @@ class TaskDeleteApiTest {
     @Test void storeDeleteRechecksActiveRunInsideLock() throws Exception {
         // 固化 store 层权威守卫：绕过控制器前置 hasActiveRun 直调 delete，
         // 模拟控制器检查与 start/retry 的并发窗口：锁内复查必须拒绝活跃 run
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (645,'锁内守卫','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (645,'锁内守卫','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (645,1,'{}')");
         jdbc.update("INSERT INTO task_runs(id,task_id,task_version,business_date,state,created_at,attempt_no) VALUES (645,645,1,DATE '2026-11-20','PENDING',CURRENT_TIMESTAMP,1)");
         jdbc.update("INSERT INTO task_run_attempts(run_id,attempt_no,state) VALUES (645,1,'PENDING')");

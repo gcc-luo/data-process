@@ -18,10 +18,10 @@ class StandaloneTaskRetryTest {
     @Test void failedRunCanRetryWithPinnedVersionAndAttemptHistory() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db); var manager = new DataSourceTransactionManager(db);
-        var tasks = new TaskVersionStore(jdbc, manager); long task = tasks.create("task", "SQL", "{}");
+        var tasks = new TaskVersionStore(jdbc, manager); long task = OrchFixtures.published(tasks, "task", "{}");
         var jobs = new CopyOnWriteArrayList<Runnable>(); var executor = mock(ThreadPoolTaskExecutor.class);
         doAnswer(call -> { jobs.add(call.getArgument(0)); return null; }).when(executor).execute(any(Runnable.class));
-        var runner = mock(CamelTaskRunner.class); doThrow(new IllegalStateException("sensitive")).doNothing().when(runner).execute(any(), any(), any(), any());
+        var runner = mock(CamelTaskRunner.class); doThrow(new IllegalStateException("sensitive")).doReturn(null).when(runner).execute(any(), any(), any(), any(), any(), anyInt(), anyInt());
         var audit = mock(AuditLog.class); var service = new TaskRunService(jdbc, tasks, runner, executor, audit);
         var date = LocalDate.of(2026, 11, 16); var tx = new TransactionTemplate(manager);
         long run = tx.execute(status -> service.start(task, 1, date, null)); jobs.getFirst().run();
@@ -32,7 +32,7 @@ class StandaloneTaskRetryTest {
         assertEquals("SUCCEEDED", view.state()); assertEquals(1, view.taskVersion());
         assertEquals(java.util.List.of("FAILED", "SUCCEEDED"), view.attempts().stream().map(TaskRunService.Attempt::state).toList());
         assertEquals("任务执行失败", view.attempts().getFirst().errorMessage());
-        verify(runner, times(2)).execute(argThat(version -> version.version() == 1), eq(date), any(), any());
+        verify(runner, times(2)).execute(argThat(version -> version.version() == 1), argThat(ctx -> date.equals(ctx.businessDate())), any(), any(), any(), anyInt(), anyInt());
         verify(audit).success(null, "task.retry", "task_run", run);
         assertThrows(IllegalStateException.class, () -> tx.executeWithoutResult(status -> service.retry(task, run, null)));
         assertThrows(IllegalArgumentException.class, () -> tx.executeWithoutResult(status -> service.retry(task + 1, run, null)));
@@ -40,7 +40,7 @@ class StandaloneTaskRetryTest {
     @Test void recoveryAndConcurrentRetryCannotRunAnOldAttemptTwice() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db); var manager = new DataSourceTransactionManager(db);
-        var tasks = new TaskVersionStore(jdbc, manager); long task = tasks.create("task", "SQL", "{}");
+        var tasks = new TaskVersionStore(jdbc, manager); long task = OrchFixtures.published(tasks, "task", "{}");
         var jobs = new CopyOnWriteArrayList<Runnable>(); var executor = mock(ThreadPoolTaskExecutor.class);
         doAnswer(call -> { jobs.add(call.getArgument(0)); return null; }).when(executor).execute(any(Runnable.class));
         var runner = mock(CamelTaskRunner.class); var service = new TaskRunService(jdbc, tasks, runner, executor, mock(AuditLog.class));
@@ -55,7 +55,7 @@ class StandaloneTaskRetryTest {
             assertEquals("PENDING",service.list(task).getFirst().state()); verifyNoInteractions(runner);
             jobs.get(1).run(); var view = service.list(task).getFirst();
             assertEquals("SUCCEEDED",view.state()); assertEquals(java.util.List.of("INTERRUPTED","SUCCEEDED"),view.attempts().stream().map(TaskRunService.Attempt::state).toList());
-            verify(runner,times(1)).execute(any(),any(),any(),any());
+            verify(runner,times(1)).execute(any(),any(),any(),any(),any(),anyInt(),anyInt());
         } finally { pool.shutdownNow(); }
     }
 }

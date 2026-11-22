@@ -18,7 +18,7 @@ class WorkflowDispatcherTest {
         new JdbcTemplate(business).execute("CREATE TABLE output_data (business_day DATE)");
         var jdbc = new JdbcTemplate(metadata); var tx = new DataSourceTransactionManager(metadata);
         var tasks = new TaskVersionStore(jdbc, tx);
-        long task = tasks.create("daily", "SQL", "{\"sourceId\":1,\"sql\":\"INSERT INTO output_data(business_day) VALUES (?)\",\"parameters\":[{\"type\":\"BUSINESS_DATE\"}]}");
+        long task = OrchFixtures.published(tasks, "daily", OrchFixtures.dml(1, "INSERT INTO output_data(business_day) VALUES (:business_date)"));
         var definitions = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = definitions.create("daily", List.of(new WorkflowDefinitionStore.Node("a", task, 1)), List.of());
         var runs = new WorkflowRunStore(jdbc, tx, definitions);

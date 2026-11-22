@@ -15,11 +15,17 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableScheduling
 public class WorkflowConfiguration {
     @Bean TaskVersionStore taskVersionStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new TaskVersionStore(jdbc, tx); }
+    @Bean OrchDraftStore orchDraftStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new OrchDraftStore(jdbc, tx); }
     @Bean TaskDirectoryStore taskDirectoryStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new TaskDirectoryStore(jdbc, tx); }
     @Bean WorkflowDefinitionStore workflowDefinitionStore(JdbcTemplate jdbc, PlatformTransactionManager tx) { return new WorkflowDefinitionStore(jdbc, tx); }
     @Bean WorkflowRunStore workflowRunStore(JdbcTemplate jdbc, PlatformTransactionManager tx, WorkflowDefinitionStore definitions) { return new WorkflowRunStore(jdbc, tx, definitions); }
     @Bean ExecutionDataSourceProvider executionDataSourceProvider(DataSourceStore sources, com.example.governance.assets.driver.ConnectionFactory factory) { return new ExecutionDataSourceProvider(sources, factory); }
-    @Bean(destroyMethod = "close") CamelTaskRunner camelTaskRunner(ExecutionDataSourceProvider provider) throws Exception { return new CamelTaskRunner(provider); }
+    @Bean WatermarkStore watermarkStore(JdbcTemplate jdbc) { return new WatermarkStore(jdbc); }
+    @Bean HttpTargetGuard httpTargetGuard(@org.springframework.beans.factory.annotation.Value("${governance.http.allowed-hosts:}") String allowedHosts) { return new HttpTargetGuard(allowedHosts); }
+    @Bean(destroyMethod = "close") CamelTaskRunner camelTaskRunner(ExecutionDataSourceProvider provider, WatermarkStore watermarks, HttpTargetGuard guard,
+            @org.springframework.beans.factory.annotation.Value("${governance.orch.max-artifact-rows:50000}") int maxArtifactRows) throws Exception {
+        return new CamelTaskRunner(provider, watermarks, guard, maxArtifactRows);
+    }
     @Bean ThreadPoolTaskScheduler taskScheduler() {
         var scheduler = new ThreadPoolTaskScheduler(); scheduler.setPoolSize(3); scheduler.setThreadNamePrefix("scheduler-");
         scheduler.setWaitForTasksToCompleteOnShutdown(true); scheduler.setAwaitTerminationSeconds(30); return scheduler;
@@ -35,6 +41,8 @@ public class WorkflowConfiguration {
     @Bean SmartInitializingSingleton recoverInterruptedRuns(WorkflowRunStore runs, TaskRunService taskRuns) { return () -> { runs.markInterrupted(); taskRuns.recover(); }; }
     @Bean WorkflowScheduleStore workflowScheduleStore(JdbcTemplate jdbc, PlatformTransactionManager tx, WorkflowDefinitionStore definitions, WorkflowRunStore runs) { return new WorkflowScheduleStore(jdbc, tx, definitions, runs); }
     @Bean WorkflowSchedulePoller workflowSchedulePoller(WorkflowScheduleStore schedules, WorkflowDispatcher dispatcher) { return new WorkflowSchedulePoller(schedules, dispatcher); }
+    @Bean TaskScheduleStore taskScheduleStore(JdbcTemplate jdbc, PlatformTransactionManager tx, TaskVersionStore tasks, TaskRunService runs) { return new TaskScheduleStore(jdbc, tx, tasks, runs); }
+    @Bean TaskSchedulePoller taskSchedulePoller(TaskScheduleStore schedules) { return new TaskSchedulePoller(schedules); }
     @Bean WorkflowRetryPoller workflowRetryPoller(WorkflowRunStore runs, WorkflowDispatcher dispatcher) { return new WorkflowRetryPoller(runs, dispatcher); }
-    @Bean TaskDefinitionValidator taskDefinitionValidator() { return new TaskDefinitionValidator(); }
+    @Bean TaskDefinitionValidator taskDefinitionValidator(DataSourceStore sources) { return new TaskDefinitionValidator(sources); }
 }

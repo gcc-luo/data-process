@@ -53,7 +53,7 @@ class StartupRecoveryOrderingTest {
         var url = "jdbc:h2:mem:recovery_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1";
         var db = new DriverManagerDataSource(url, "sa", ""); Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("pending", "SQL", "{}");
+        long task = OrchFixtures.published(new TaskVersionStore(jdbc, tx), "pending", "{}");
         var defs = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = defs.create("pending", List.of(new WorkflowDefinitionStore.Node("n", task, 1)), List.of());
         long run = new WorkflowRunStore(jdbc, tx, defs).create(workflow, 1, LocalDate.of(2026, 11, 16));

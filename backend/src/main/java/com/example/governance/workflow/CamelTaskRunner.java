@@ -2,95 +2,60 @@ package com.example.governance.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.sql.Date;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.sql.DataSource;
 
-/** Runs only pre-authorized task definitions. Connections are resolved by a trusted provider. */
+/** Runs only pre-authorized ORCH definitions. Connections are resolved by a trusted provider. */
 public final class CamelTaskRunner implements WorkflowWorker.TaskRunner, AutoCloseable {
     @FunctionalInterface public interface DataSourceProvider { DataSource get(long sourceId) throws Exception; }
+    public static final int DEFAULT_MAX_ARTIFACT_ROWS = 50000;
+
     private final DataSourceProvider provider;
     private final SqlTaskExecutor sql;
-    private final DatabaseSyncExecutor sync;
-    private final FlowTaskExecutor flow = new FlowTaskExecutor();
+    private final OrchTaskExecutor orch;
+    private final WatermarkStore watermarks;
+    private final int maxArtifactRows;
     private final ObjectMapper mapper = new ObjectMapper();
-    public CamelTaskRunner(DataSourceProvider provider) throws Exception {
+
+    public CamelTaskRunner(DataSourceProvider provider) throws Exception { this(provider, null, new HttpTargetGuard(""), DEFAULT_MAX_ARTIFACT_ROWS); }
+    public CamelTaskRunner(DataSourceProvider provider, WatermarkStore watermarks, HttpTargetGuard guard, int maxArtifactRows) throws Exception {
         this.provider = provider;
+        this.watermarks = watermarks;
+        this.maxArtifactRows = maxArtifactRows;
         sql = new SqlTaskExecutor();
-        try { sync = new DatabaseSyncExecutor(); } catch (Exception e) { sql.close(); throw e; }
+        try { orch = new OrchTaskExecutor(sql, guard); } catch (RuntimeException e) { sql.close(); throw e; }
     }
+
     @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate) throws Exception { execute(task, businessDate, new RunCancelContext(), ExecutionSinks.NOOP); }
     public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel) throws Exception { execute(task, businessDate, cancel, ExecutionSinks.NOOP); }
     @Override public void execute(TaskVersionStore.Version task, LocalDate businessDate, RunCancelContext cancel, ExecutionSinks sinks) throws Exception {
+        execute(task, new OrchTaskExecutor.Context(task.taskId(), null, businessDate, Map.of(), false), cancel, sinks, null, 0, maxArtifactRows);
+    }
+
+    /** Full execution entry: run context, per-node state sink, dry-run preview limit and artifact cap. */
+    public OrchTaskExecutor.Outcome execute(TaskVersionStore.Version task, OrchTaskExecutor.Context ctx, RunCancelContext cancel, ExecutionSinks sinks,
+                        OrchTaskExecutor.NodeSink nodeSink, int previewLimit, int maxRows) throws Exception {
         JsonNode config = mapper.readTree(task.configuration());
-        if (config == null || !config.isObject() || businessDate == null) throw new IllegalArgumentException("Invalid task configuration");
-        if ("SQL".equals(task.type())) {
-            long sourceId = positiveId(config, "sourceId");
-            String statement = text(config, "sql");
-            List<Object> values = parameters(config.path("parameters"), businessDate);
-            // SQL/SYNC 与 FLOW 一致：开始/完成日志与 stats 经 sinks 落库（不改执行器签名）
-            sinks.log().log("INFO", "SQL 任务开始");
-            long started = System.nanoTime();
-            int n = sql.execute(provider.get(sourceId), statement, values, cancel);
-            long elapsed = (System.nanoTime() - started) / 1_000_000;
-            sinks.log().log("INFO", "SQL 任务完成: 写入 " + n + " 行");
-            sinks.stats().accept(mapper.writeValueAsString(List.of(Map.of("nodeKey", "sql", "rowsIn", 0, "rowsOut", n, "durationMs", elapsed))));
-        } else if ("SYNC".equals(task.type())) {
-            long sourceId = positiveId(config, "sourceId"), targetId = positiveId(config, "targetId");
-            JsonNode fields = config.path("targetColumns");
-            if (!fields.isArray() || fields.isEmpty()) throw new IllegalArgumentException("Invalid target columns");
-            List<String> columns = new ArrayList<>();
-            for (JsonNode field : fields) { if (!field.isTextual()) throw new IllegalArgumentException("Invalid target column"); columns.add(field.textValue()); }
-            int batchSize = config.path("batchSize").asInt(500);
-            List<Object> values = config.has("sourceParameters") ? parameters(config.path("sourceParameters"), businessDate) : List.of();
-            String mode = config.has("writeMode") ? text(config, "writeMode") : "APPEND";
-            List<String> keys = new ArrayList<>();
-            if ("UPSERT".equals(mode)) {
-                JsonNode keyNodes = config.path("keyColumns");
-                if (!keyNodes.isArray() || keyNodes.isEmpty()) throw new IllegalArgumentException("Primary keys required");
-                for (JsonNode key : keyNodes) { if (!key.isTextual()) throw new IllegalArgumentException("Invalid primary key"); keys.add(key.textValue()); }
-            } else if (!"APPEND".equals(mode)) throw new IllegalArgumentException("Unsupported write mode");
-            sinks.log().log("INFO", "同步任务开始");
-            long started = System.nanoTime();
-            int n = "APPEND".equals(mode)
-                    ? sync.append(provider.get(sourceId), provider.get(targetId), text(config, "sourceQuery"), values, text(config, "targetTable"), columns, batchSize, cancel)
-                    : sync.upsert(provider.get(sourceId), provider.get(targetId), text(config, "sourceQuery"), values, text(config, "targetTable"), columns, keys, batchSize, cancel);
-            long elapsed = (System.nanoTime() - started) / 1_000_000;
-            sinks.log().log("INFO", "同步任务完成: 写入 " + n + " 行");
-            sinks.stats().accept(mapper.writeValueAsString(List.of(Map.of("nodeKey", "sync", "rowsIn", n, "rowsOut", n, "durationMs", elapsed))));
-        } else if ("FLOW".equals(task.type())) {
-            flow.execute(FlowGraph.parse(config), provider, businessDate, cancel, sinks, 0);
-        } else throw new IllegalArgumentException("Unsupported task type");
+        if (config == null || !config.isObject() || ctx.businessDate() == null) throw new IllegalArgumentException("Invalid task configuration");
+        if (!"ORCH".equals(task.type())) throw new IllegalArgumentException("Unsupported task type");
+        var definition = OrchDefinition.parse(config);
+        var noop = new OrchTaskExecutor.NodeSink() {
+            @Override public void start(String nodeKey, int attempt) {}
+            @Override public void success(String nodeKey, int attempt, long rowsIn, long rowsOut, long durationMs) {}
+            @Override public void failure(String nodeKey, int attempt, String error, long durationMs) {}
+            @Override public void skipped(String nodeKey) {}
+        };
+        return orch.execute(definition, provider, ctx, cancel, sinks, nodeSink == null ? noop : nodeSink, previewLimit, maxRows > 0 ? maxRows : maxArtifactRows, watermarks);
     }
-    private static List<Object> parameters(JsonNode parameters, LocalDate businessDate) {
-        if (!parameters.isArray() || parameters.size() > 1000) throw new IllegalArgumentException("Invalid task parameters");
-        List<Object> values = new ArrayList<>();
-        for (JsonNode parameter : parameters) {
-            String type = text(parameter, "type");
-            if ("BUSINESS_DATE".equals(type)) values.add(Date.valueOf(businessDate));
-            else if ("VALUE".equals(type)) {
-                JsonNode value = parameter.get("value");
-                if (value == null || value.isNull()) values.add(null);
-                else if (value.isTextual()) values.add(value.textValue());
-                else if (value.isBoolean()) values.add(value.booleanValue());
-                else if (value.isNumber()) values.add(value.decimalValue());
-                else throw new IllegalArgumentException("Invalid parameter value");
-            } else throw new IllegalArgumentException("Invalid parameter type");
-        }
-        return values;
+
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> parseVariables(String parametersJson) {
+        if (parametersJson == null || parametersJson.isBlank()) return Map.of();
+        try { return new ObjectMapper().readValue(parametersJson, LinkedHashMap.class); }
+        catch (java.io.IOException ex) { throw new IllegalArgumentException("运行参数解析失败"); }
     }
-    private static long positiveId(JsonNode config, String key) {
-        JsonNode value = config.get(key);
-        if (value == null || !value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() < 1) throw new IllegalArgumentException("Invalid source ID");
-        return value.longValue();
-    }
-    private static String text(JsonNode config, String key) {
-        JsonNode value = config.get(key);
-        if (value == null || !value.isTextual() || value.textValue().isBlank()) throw new IllegalArgumentException("Invalid task field");
-        return value.textValue();
-    }
-    @Override public void close() { try { sync.close(); } finally { sql.close(); } }
+
+    @Override public void close() { sql.close(); }
 }

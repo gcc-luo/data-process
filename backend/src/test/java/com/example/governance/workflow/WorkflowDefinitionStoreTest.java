@@ -16,8 +16,8 @@ class WorkflowDefinitionStoreTest {
         var jdbc = new JdbcTemplate(db);
         var transaction = new DataSourceTransactionManager(db);
         var tasks = new TaskVersionStore(jdbc, transaction);
-        long first = tasks.create("first", "SQL", "{\"sql\":\"one\"}");
-        long second = tasks.create("second", "SQL", "{\"sql\":\"two\"}");
+        long first = OrchFixtures.published(tasks, "first", "{\"sql\":\"one\"}");
+        long second = OrchFixtures.published(tasks, "second", "{\"sql\":\"two\"}");
         var store = new WorkflowDefinitionStore(jdbc, transaction);
         var nodes = List.of(new WorkflowDefinitionStore.Node("a", first, 1, 120.5, 42.0), new WorkflowDefinitionStore.Node("b", second, 1, 350.0, 200.0));
         long workflow = store.create("daily", nodes, List.of(new WorkflowGraph.Edge("a", "b")));
@@ -36,7 +36,7 @@ class WorkflowDefinitionStoreTest {
         Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db);
         var tx = new DataSourceTransactionManager(db);
-        long task = new TaskVersionStore(jdbc, tx).create("task", "SQL", "{}");
+        long task = new TaskVersionStore(jdbc, tx).create("task", "ORCH", "{}");
         var store = new WorkflowDefinitionStore(jdbc, tx);
         var nodes = List.of(new WorkflowDefinitionStore.Node("a", task, 1), new WorkflowDefinitionStore.Node("b", task, 1));
         assertThrows(IllegalArgumentException.class, () -> store.create("bad", nodes, List.of(new WorkflowGraph.Edge("a", "b"), new WorkflowGraph.Edge("b", "a"))));

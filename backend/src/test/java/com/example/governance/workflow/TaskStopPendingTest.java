@@ -36,7 +36,7 @@ class TaskStopPendingTest {
         for (String permission : new String[]{"workflow.task.read", "workflow.task.create", "workflow.task.update", "workflow.task.execute"})
             jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (641,?)", permission);
         var session = (MockHttpSession) mvc.perform(post("/api/login").with(csrf()).param("username", "pending-user").param("password", "password")).andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (641,'pending-task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (641,'pending-task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (641,1,'{}')");
         // executor 被 mock：派发被捕获但不执行，run 停留 PENDING
         mvc.perform(post("/api/tasks/641/runs").session(session).with(csrf()).contentType("application/json").content("{\"version\":1,\"businessDate\":\"2026-11-20\"}"))

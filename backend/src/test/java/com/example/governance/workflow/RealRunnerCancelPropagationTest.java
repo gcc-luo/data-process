@@ -22,7 +22,7 @@ class RealRunnerCancelPropagationTest {
         var connection = (Connection) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{Connection.class}, (p, m, a) -> m.getName().equals("prepareStatement") ? statement : null);
         var ds = (DataSource) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{DataSource.class}, (p, m, a) -> m.getName().equals("getConnection") ? connection : null);
         try (var runner = new CamelTaskRunner(id -> ds)) {
-            var version = new TaskVersionStore.Version(1, 1, "SQL", "{\"sourceId\":1,\"sql\":\"SELECT 1\",\"parameters\":[]}");
+            var version = new TaskVersionStore.Version(1, 1, "ORCH", OrchFixtures.dml(1, "INSERT INTO t(x) VALUES (:business_date)"));
             var cancel = new RunCancelContext();
             var thread = new Thread(() -> {
                 try { runner.execute(version, LocalDate.of(2026, 11, 20), cancel, ExecutionSinks.NOOP); }

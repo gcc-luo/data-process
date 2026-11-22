@@ -72,23 +72,13 @@ public final class DataSourceStore {
             try {
                 var config = mapper.readTree(rs.getString(2)); String type = rs.getString(1);
                 if (config == null || !config.isObject()) throw new IllegalStateException("Cannot check task references safely");
-                if ("FLOW".equals(type)) {
-                    for (com.fasterxml.jackson.databind.JsonNode node : config.path("nodes")) {
-                        String component = node.path("component").asText("");
-                        if (java.util.Set.of("FIELD_MAP", "FIELD_FILTER", "FIELD_MASK", "FIELD_CALC").contains(component)) continue;
-                        if (!java.util.Set.of("SOURCE_TABLE", "SOURCE_SQL", "SINK_TABLE").contains(component)) throw new IllegalStateException("Cannot check task references safely");
-                        com.fasterxml.jackson.databind.JsonNode sid = node.path("config").path("sourceId");
-                        if (!sid.isIntegralNumber() || !sid.canConvertToLong() || sid.longValue() < 1) throw new IllegalStateException("Cannot check task references safely");
-                        if (sid.longValue() == id) throw new IllegalStateException("Data source is referenced by a task version");
-                    }
-                    return;
+                if (!"ORCH".equals(type)) throw new IllegalStateException("Cannot check task references safely");
+                for (com.fasterxml.jackson.databind.JsonNode node : config.path("nodes")) {
+                    com.fasterxml.jackson.databind.JsonNode sid = node.path("config").path("sourceId");
+                    if (sid.isMissingNode() || sid.isNull()) continue;
+                    if (!sid.isIntegralNumber() || !sid.canConvertToLong() || sid.longValue() < 1) throw new IllegalStateException("Cannot check task references safely");
+                    if (sid.longValue() == id) throw new IllegalStateException("Data source is referenced by a task version");
                 }
-                if (!java.util.Set.of("SQL", "SYNC").contains(type)) throw new IllegalStateException("Cannot check task references safely");
-                var source = config.get("sourceId");
-                if (source == null || !source.isIntegralNumber() || !source.canConvertToLong() || source.longValue() < 1) throw new IllegalStateException("Cannot check task references safely");
-                var target = config.get("targetId");
-                if ("SYNC".equals(type) && (target == null || !target.isIntegralNumber() || !target.canConvertToLong() || target.longValue() < 1)) throw new IllegalStateException("Cannot check task references safely");
-                if (source.longValue() == id || ("SYNC".equals(type) && target.longValue() == id)) throw new IllegalStateException("Data source is referenced by a task version");
             } catch (java.io.IOException ex) { throw new IllegalStateException("Cannot check task references safely", ex); }
         });
         return jdbc.update("DELETE FROM data_sources WHERE id=?", id) == 1;

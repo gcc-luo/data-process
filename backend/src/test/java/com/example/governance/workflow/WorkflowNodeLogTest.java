@@ -17,7 +17,7 @@ class WorkflowNodeLogTest {
     @MockitoBean CamelTaskRunner runner;
 
     @Test void nodeLogsAndStatsLandOnNodeAttempt() throws Exception {
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (801,'t','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (801,'t','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (801,1,'{}')");
         jdbc.update("INSERT INTO workflow_definitions(id,name,current_version) VALUES (801,'wf',1)");
         jdbc.update("INSERT INTO workflow_versions(workflow_id,version) VALUES (801,1)");

@@ -19,16 +19,17 @@ class TaskConcurrencyIntegrationTest {
     @Test void independentAndWorkflowTasksShareConfiguredExecutionCapacity() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db);
-        var tasks = new TaskVersionStore(jdbc,tx); long task=tasks.create("task","SQL","{}");
+        var tasks = new TaskVersionStore(jdbc,tx); long task=OrchFixtures.published(tasks,"task","{}");
         var defs=new WorkflowDefinitionStore(jdbc,tx); long flow=defs.create("flow",List.of(new WorkflowDefinitionStore.Node("a",task,1)),List.of());
         var runs=new WorkflowRunStore(jdbc,tx,defs); long run=runs.create(flow,1,LocalDate.now());
         var started=new CountDownLatch(1); var release=new CountDownLatch(1); var active=new AtomicInteger();
         var runner=mock(CamelTaskRunner.class);
-        // 任务与工作流路径均经四参重载；mock 不走真实委托，历史重载一并打桩
+        // 任务路径经七参重载、工作流路径经四参重载；mock 不走真实委托，历史重载一并打桩
         org.mockito.stubbing.Answer<Object> gate = inv -> { active.incrementAndGet(); started.countDown(); if(!release.await(3,TimeUnit.SECONDS)) throw new IllegalStateException(); return null; };
         doAnswer(gate).when(runner).execute(any(),any());
         doAnswer(gate).when(runner).execute(any(),any(),any());
         doAnswer(gate).when(runner).execute(any(),any(),any(),any());
+        doAnswer(gate).when(runner).execute(any(),any(),any(),any(),any(),anyInt(),anyInt());
         var limiter=new TaskExecutionLimiter(1); var executor=new ThreadPoolTaskExecutor(); executor.setCorePoolSize(1); executor.initialize();
         var tasksService=new TaskRunService(jdbc,tasks,runner,executor,mock(AuditLog.class),limiter);
         var workflow=new WorkflowWorker(runs,defs,tasks,runner,limiter); var worker=Executors.newSingleThreadExecutor();

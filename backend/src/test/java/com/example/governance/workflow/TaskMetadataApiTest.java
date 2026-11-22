@@ -39,9 +39,11 @@ class TaskMetadataApiTest {
         long directory = 621;
         // 创建带目录与描述
         mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
-                .content("{\"name\":\"加工任务\",\"type\":\"SQL\",\"configuration\":{\"sourceId\":1,\"sql\":\"SELECT 1\",\"parameters\":[]},\"directoryId\":" + directory + ",\"description\":\"每日加工\"}"))
+                .content("{\"name\":\"加工任务\",\"directoryId\":" + directory + ",\"description\":\"每日加工\"}"))
                 .andExpect(status().isCreated());
         long taskId = jdbc.queryForObject("SELECT id FROM processing_tasks WHERE name='加工任务'", Long.class);
+        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (?,1,'{}')", taskId);
+        jdbc.update("UPDATE processing_tasks SET current_version=1 WHERE id=?", taskId);
         // 列表富化：无运行时 STOPPED（本测试库仅此一任务，用 $[0]）
         mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].runState").value("STOPPED"))
@@ -93,7 +95,7 @@ class TaskMetadataApiTest {
                 .andExpect(status().isBadRequest());
         // 不存在的目录：创建与 PUT 均 400
         mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
-                .content("{\"name\":\"坏目录\",\"type\":\"SQL\",\"configuration\":{\"sourceId\":1,\"sql\":\"SELECT 1\",\"parameters\":[]},\"directoryId\":999999}"))
+                .content("{\"name\":\"坏目录\",\"directoryId\":999999}"))
                 .andExpect(status().isBadRequest());
         mvc.perform(put("/api/tasks/" + taskId).session(session).with(csrf()).contentType("application/json").content("{\"directoryId\":999999}"))
                 .andExpect(status().isBadRequest());

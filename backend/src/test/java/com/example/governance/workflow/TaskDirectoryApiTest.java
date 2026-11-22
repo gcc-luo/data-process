@@ -45,7 +45,7 @@ class TaskDirectoryApiTest {
         // 含子目录禁止删除
         mvc.perform(delete("/api/task-directories/" + root).session(session).with(csrf())).andExpect(status().isConflict());
         // 含任务禁止删除
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version,directory_id) VALUES (601,'t','SQL',1,?)", child);
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version,directory_id) VALUES (601,'t','ORCH',1,?)", child);
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (601,1,'{}')");
         mvc.perform(delete("/api/task-directories/" + child).session(session).with(csrf())).andExpect(status().isConflict());
         // 移入自身子孙禁止

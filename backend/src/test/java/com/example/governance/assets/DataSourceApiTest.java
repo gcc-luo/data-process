@@ -31,7 +31,7 @@ class DataSourceApiTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PasswordEncoder encoder;
     @BeforeEach void setup() {
-        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM task_runs"); jdbc.update("DELETE FROM workflow_node_attempts"); jdbc.update("DELETE FROM workflow_run_nodes"); jdbc.update("DELETE FROM workflow_runs"); jdbc.update("DELETE FROM workflow_schedules"); jdbc.update("DELETE FROM workflow_edges"); jdbc.update("DELETE FROM workflow_nodes"); jdbc.update("DELETE FROM workflow_versions"); jdbc.update("DELETE FROM workflow_definitions"); jdbc.update("DELETE FROM processing_task_versions"); jdbc.update("DELETE FROM processing_tasks"); jdbc.update("DELETE FROM service_invocations"); jdbc.update("DELETE FROM service_grants"); jdbc.update("DELETE FROM service_callers"); jdbc.update("DELETE FROM data_services"); jdbc.update("DELETE FROM dashboard_reports"); jdbc.update("DELETE FROM dashboards"); jdbc.update("DELETE FROM reports"); jdbc.update("DELETE FROM realtime_jobs"); jdbc.update("DELETE FROM dataset_role_fields"); jdbc.update("DELETE FROM dataset_role_rules"); jdbc.update("DELETE FROM dataset_fields"); jdbc.update("DELETE FROM datasets"); jdbc.update("DELETE FROM data_sources"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions");
+        jdbc.update("DELETE FROM audit_events"); jdbc.update("DELETE FROM task_node_runs"); jdbc.update("DELETE FROM task_runs"); jdbc.update("DELETE FROM workflow_node_attempts"); jdbc.update("DELETE FROM workflow_run_nodes"); jdbc.update("DELETE FROM workflow_runs"); jdbc.update("DELETE FROM workflow_schedules"); jdbc.update("DELETE FROM workflow_edges"); jdbc.update("DELETE FROM workflow_nodes"); jdbc.update("DELETE FROM workflow_versions"); jdbc.update("DELETE FROM workflow_definitions"); jdbc.update("DELETE FROM task_drafts"); jdbc.update("DELETE FROM task_watermarks"); jdbc.update("DELETE FROM task_schedules"); jdbc.update("DELETE FROM processing_task_versions"); jdbc.update("DELETE FROM processing_tasks"); jdbc.update("DELETE FROM service_invocations"); jdbc.update("DELETE FROM service_grants"); jdbc.update("DELETE FROM service_callers"); jdbc.update("DELETE FROM data_services"); jdbc.update("DELETE FROM dashboard_reports"); jdbc.update("DELETE FROM dashboards"); jdbc.update("DELETE FROM reports"); jdbc.update("DELETE FROM realtime_jobs"); jdbc.update("DELETE FROM dataset_role_fields"); jdbc.update("DELETE FROM dataset_role_rules"); jdbc.update("DELETE FROM dataset_fields"); jdbc.update("DELETE FROM datasets"); jdbc.update("DELETE FROM data_sources"); jdbc.update("DELETE FROM user_roles"); jdbc.update("DELETE FROM role_permissions");
         jdbc.update("DELETE FROM users"); jdbc.update("DELETE FROM roles"); jdbc.update("DELETE FROM departments");
         jdbc.update("INSERT INTO departments(id,name) VALUES (10,'test')");
         jdbc.update("INSERT INTO users(id,username,password_hash,department_id,enabled,security_version) VALUES (10,'manager',?,10,TRUE,'version')", encoder.encode("password"));
@@ -153,17 +153,17 @@ class DataSourceApiTest {
             """)).andReturn();
         long source = new com.fasterxml.jackson.databind.ObjectMapper().readTree(created.getResponse().getContentAsString()).get("id").asLong();
         mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
-            .content("{\"name\":\"daily\",\"type\":\"SQL\",\"configuration\":{\"sourceId\":" + source + ",\"sql\":\"UPDATE t SET a=1\",\"parameters\":[]}}"))
-            .andExpect(status().isCreated()).andExpect(jsonPath("$.version").value(1));
+            .content("{\"name\":\"daily\"}"))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.revision").value(1));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='task.create' AND actor_id=10 AND result='SUCCESS'", Integer.class));
         mvc.perform(get("/api/tasks").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$[0].name").value("daily"));
         mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json")
-            .content("{\"name\":\"bad\",\"type\":\"SQL\",\"configuration\":{}}"))
+            .content("{\"name\":\"   \"}"))
             .andExpect(status().isBadRequest());
     }
     @Test void savesWorkflowWithPinnedTaskVersion() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (10,1,'{}')");
         var session = login();
         mvc.perform(post("/api/workflows").session(session).with(csrf()).contentType("application/json").content("""
@@ -175,7 +175,7 @@ class DataSourceApiTest {
     }
     @Test void workflowRunCanBeSubmittedAndObserved() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (10,1,'{}')");
         var session = login();
         var created = mvc.perform(post("/api/workflows").session(session).with(csrf()).contentType("application/json").content("""
@@ -193,7 +193,7 @@ class DataSourceApiTest {
     }
     @Test void failedRunCanBeRetriedWithAnotherAttempt() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (10,1,'{}')");
         doThrow(new IllegalStateException()).doNothing().when(runner).execute(any(), any(), any(), any());
         var session = login();
@@ -213,7 +213,7 @@ class DataSourceApiTest {
     }
     @Test void scheduleCanBeCreatedAndPaused() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (10,1,'{}')");
         var session = login();
         var created = mvc.perform(post("/api/workflows").session(session).with(csrf()).contentType("application/json").content("""
@@ -231,8 +231,12 @@ class DataSourceApiTest {
     }
     @Test void backfillRequiresBusinessDateParametersAndCreatesOneRunPerDay() throws Exception {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','SQL',1)");
-        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (10,1,?)", "{\"sourceId\":1,\"sql\":\"UPDATE x SET day=?\",\"parameters\":[{\"type\":\"BUSINESS_DATE\"}]}");
+        // backfill 仍通过顶层 sourceParameters 检测业务日期；ORCH 解析忽略额外顶层字段，节点内用 :business_date 占位符
+        jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (10,'task','ORCH',1)");
+        String orchWithDate = com.example.governance.workflow.OrchFixtures.dml(1, "UPDATE x SET day=:business_date");
+        orchWithDate = orchWithDate.substring(0, orchWithDate.length() - 1) + ",\"sourceParameters\":[{\"type\":\"BUSINESS_DATE\"}]}";
+        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (10,1,?)", orchWithDate);
         var session = login();
         var created = mvc.perform(post("/api/workflows").session(session).with(csrf()).contentType("application/json").content("""
             {"name":"daily","nodes":[{"key":"a","taskId":10,"taskVersion":1}],"edges":[]}
@@ -349,13 +353,22 @@ class DataSourceApiTest {
         jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.read'),(10,'workflow.task.create'),(10,'workflow.task.update'),(10,'workflow.task.execute'),(10,'workflow.task.retry'),(10,'workflow.workflow.read'),(10,'workflow.workflow.create'),(10,'workflow.workflow.update'),(10,'workflow.workflow.execute'),(10,'workflow.workflow.retry'),(10,'workflow.workflow.validate'),(10,'workflow.schedule.read'),(10,'workflow.schedule.create'),(10,'workflow.schedule.update'),(10,'workflow.schedule.backfill'),(10,'workflow.realtime.read'),(10,'workflow.realtime.create'),(10,'workflow.realtime.update'),(10,'workflow.realtime.start'),(10,'workflow.realtime.stop')");
         jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (15,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
         var session = login();
+        jdbc.update("INSERT INTO role_permissions(role_id,permission) VALUES (10,'workflow.task.publish')");
         var task = mvc.perform(post("/api/tasks").session(session).with(csrf()).contentType("application/json").content("""
-          {"name":"daily","type":"SQL","configuration":{"sourceId":15,"sql":"UPDATE t SET x=1","parameters":[]}}
+          {"name":"daily"}
           """)).andExpect(status().isCreated()).andReturn();
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper(); long id = mapper.readTree(task.getResponse().getContentAsString()).get("id").asLong();
-        mvc.perform(post("/api/tasks/" + id + "/versions").session(session).with(csrf()).contentType("application/json").content("""
-          {"configuration":{"sourceId":15,"sql":"UPDATE t SET x=2","parameters":[]}}
-          """)).andExpect(status().isCreated()).andExpect(jsonPath("$.version").value(2));
+        // 旧 POST /versions 已删除：草稿+发布产生不可变版本 1、2
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/tasks/" + id + "/draft").session(session).with(csrf()).contentType("application/json")
+          .content("{\"expectedRevision\":1,\"definition\":" + com.example.governance.workflow.OrchFixtures.dml(15, "UPDATE t SET x=1") + "}"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.revision").value(2));
+        mvc.perform(post("/api/tasks/" + id + "/publish").session(session).with(csrf()).contentType("application/json").content("{\"expectedRevision\":2,\"comment\":\"v1\"}"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.version").value(1));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/tasks/" + id + "/draft").session(session).with(csrf()).contentType("application/json")
+          .content("{\"expectedRevision\":2,\"definition\":" + com.example.governance.workflow.OrchFixtures.dml(15, "UPDATE t SET x=2") + "}"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.revision").value(3));
+        mvc.perform(post("/api/tasks/" + id + "/publish").session(session).with(csrf()).contentType("application/json").content("{\"expectedRevision\":3,\"comment\":\"v2\"}"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.version").value(2));
         var created = mvc.perform(post("/api/workflows").session(session).with(csrf()).contentType("application/json")
           .content("{\"name\":\"flow\",\"nodes\":[{\"key\":\"a\",\"taskId\":" + id + ",\"taskVersion\":1}],\"edges\":[]}"))
           .andExpect(status().isCreated()).andReturn();
@@ -366,8 +379,8 @@ class DataSourceApiTest {
         mvc.perform(get("/api/workflows/" + workflow + "/versions/1").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.nodes[0].taskVersion").value(1));
     }
     @Test void standaloneTaskRunPinsVersionAndRequiresPermission() throws Exception {
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (77,'single','SQL',1)");
-        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (77,1,?)", "{\"sourceId\":1,\"sql\":\"SELECT 1\",\"parameters\":[]}");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (77,'single','ORCH',1)");
+        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (77,1,?)", com.example.governance.workflow.OrchFixtures.dml(1, "UPDATE t SET x=1"));
         var session = login();
         mvc.perform(post("/api/tasks/77/runs").session(session).with(csrf()).contentType("application/json").content("{\"version\":1,\"businessDate\":\"2026-11-16\"}"))
             .andExpect(status().isForbidden());
@@ -392,7 +405,7 @@ class DataSourceApiTest {
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='datasource.update'", Integer.class));
     }
     @Test void workflowRunHistoryRequiresPermissionAndFiltersByDate() throws Exception {
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (77,'task','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (77,'task','ORCH',1)");
         jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (77,1,'{}')");
         jdbc.update("INSERT INTO workflow_definitions(id,name,current_version) VALUES (77,'flow',1)");
         jdbc.update("INSERT INTO workflow_versions(workflow_id,version) VALUES (77,1)");

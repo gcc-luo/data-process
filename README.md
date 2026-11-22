@@ -27,6 +27,7 @@
 | :--- | :--- | :--- |
 | 前端框架 | Vue 3.5 / Element Plus 2.14 | 统一前端界面 |
 | 画布与图表 | Vue Flow 1.48 / ECharts 6 | 工作流编排、报表看板 |
+| 代码编辑 | Monaco Editor 0.52 | SQL 脚本编辑（懒加载） |
 | 前端构建 | Vite 7 | 开发服务器将 `/api` 代理至后端 8080 端口 |
 | 后端框架 | Spring Boot 3.5.8（Java 21） | 模块化单体后端 |
 | 集成路由 | Apache Camel 4.18 | 数据库读写、字段映射、SQL 加工 |
@@ -45,7 +46,7 @@
 6.  驱动管理：内置常用 JDBC 驱动，启动时自动释放注册；管理员可上传驱动 jar，隔离类加载、多版本共存，上传驱动持久保存。
 7.  数据集管理：数据集登记、查看、删除及仅新增字段的重新采集，按角色配置行（部门范围）列（字段访问）权限，预览、分析与服务由后端统一执行规则。
 8.  数据查询：受权限约束的数据集预览、多条件筛选、分组、聚合和排序。
-9.  任务编排：Camel SQL 加工、数据库追加及按目标主键或唯一索引更新插入；不可变任务版本，实例固定版本；有序配置文本、数字、布尔、空值及业务日期参数；任务可独立运行、失败后手动重试。
+9.  任务编排（DataCraft 式组件化 DAG）：左侧组件库拖拽来源/处理/目的/控制组件，中央 Vue Flow 画布连线，右侧动态配置面板（基础/高级/重试/日志四页签，Monaco SQL 编辑、命名参数绑定、字段映射表），底部运行控制台（运行日志/节点状态/数据预览）。草稿 revision 乐观锁保存、后端校验定位节点、发布冻结不可变版本、手动运行与运行测试（dry-run）、逐节点状态/重试、增量水位、条件分支/数据清洗/UNION 汇聚、HTTP 来源/推送（SSRF 守卫）、任务级 Cron 定时。组件注册表驱动，未实现组件（Kafka/Python/存储过程/Flink 等）标“即将支持”禁用。详见 [架构决策](docs/workflow/ARCHITECTURE_DECISIONS.md)。
 10. 工作流：DAG 画布拖动连线、顺序及有限并行分支、固定任务版本与节点布局；手动、定时触发，执行记录、有限次数的安全重试和按业务日期补跑，进程重启后中断实例可恢复。
 11. 实时同步：基于单调递增水位及主键复合游标的数据库轮询同步，支持启停及停止状态下调整间隔和批次。不能捕获删除和迟到数据，不等同于 CDC。
 12. 数据服务：基于授权数据集发布数据 API，调用方令牌鉴权、授权和限流，调用统计。
@@ -125,6 +126,27 @@ npm --prefix frontend run build
 
 自动化单元及接口测试主要使用 H2；MySQL 8.0.33 已验证元数据库迁移和基础工作流持久化，业务源/目标数据库的完整兼容性仍待验证。
 
+### 任务编排端到端演示
+
+本地已验证的真实闭环（MySQL 3307）：在“数据处理 · 任务编排”新增任务 → 拖入 `MySQL 来源 → 字段映射 → MySQL 写入(UPSERT)` → 保存草稿 → 校验 → 发布 → 运行；运行控制台显示逐节点状态与日志，目标表可查到映射后的数据，重跑不产生重复（UPSERT 幂等）。
+
+后端 API 演示（需先登录取得会话与 CSRF）：
+
+```sh
+# 组件注册表
+curl -b cookies.txt http://localhost:8080/api/orch/components
+# 创建 → 草稿 → 校验 → 发布 → 运行
+curl -b cookies.txt -X POST http://localhost:8080/api/tasks -H 'Content-Type: application/json' -d '{"name":"订单同步","template":"SYNC"}'
+curl -b cookies.txt -X PUT  http://localhost:8080/api/tasks/1/draft   -H 'Content-Type: application/json' -d '{"expectedRevision":1,"definition":{...}}'
+curl -b cookies.txt -X POST http://localhost:8080/api/tasks/1/validate -H 'Content-Type: application/json' -d '{}'
+curl -b cookies.txt -X POST http://localhost:8080/api/tasks/1/publish  -H 'Content-Type: application/json' -d '{"expectedRevision":2,"comment":"首发"}'
+curl -b cookies.txt -X POST http://localhost:8080/api/tasks/1/runs     -H 'Content-Type: application/json' -d '{"businessDate":"2026-11-21"}'
+curl -b cookies.txt http://localhost:8080/api/task-runs/1            # 汇总 + 节点状态
+curl -b cookies.txt http://localhost:8080/api/task-runs/1/logs       # 运行日志
+```
+
+相关配置：`governance.orch.max-artifact-rows`（节点内存交接行数上限，默认 50000）、`governance.http.allowed-hosts`（HTTP 来源/推送主机白名单，默认拒绝内部网络）。
+
 ## 首次管理员初始化
 
 先按上方环境变量配置并启动后端一次，确保数据库迁移完成。仅在受信任的交互终端执行以下命令；数据库必须没有用户，密码通过终端无回显输入，不得放入命令参数。
@@ -178,7 +200,7 @@ data-process
 
 ## 已知限制与注意事项
 
-- **未完成能力**：全量覆盖写入、任务级可配置超时与取消，以及设计中其他管理能力仍需实现或完善，详见 [子系统计划](docs/superpowers/plans/2026-11-15-subsystems.md) 与 [功能进度清单](docs/superpowers/plans/progress-checklist.md)。
+- **未完成能力**：任务编排中 Kafka、Python Worker、存储过程、Flink、MinIO/S3、FTP、SQL Server、异常处理/DLQ、JOIN/WAIT_ALL 汇聚均标“即将支持”并禁用；节点间大数据对象存储交接、SSE 实时推送、数据预览持久化尚未实现。详见 [架构决策](docs/workflow/ARCHITECTURE_DECISIONS.md) 与 [资产差距](docs/workflow/EXISTING_ASSETS.md)。
 - **重放风险**：数据库处理和工作流的重试与补跑可能重放数据，使用前必须自行确认写入幂等性和业务日期条件；追加重试可能产生重复。
 - **增量同步边界**：轮询同步不能捕获删除和迟到数据，不等同于 CDC。
 - **权限快照**：数据权限在查询开始时按一致性快照解析。授权撤销后新查询会使用新规则；已经开始的查询可能继续完成。

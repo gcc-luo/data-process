@@ -144,9 +144,12 @@ async function loadNavigation() {
   } catch { navigation.value = []; section.value = '' }
 }
 const taskStudio = ref(null)
+const processingTasks = ref(null)
 async function canLeave() {
-  if (section.value !== 'tasks' || !taskStudio.value?.hasUnsavedWorkflow()) return true
-  try { await ElMessageBox.confirm('当前工作流编排尚未保存，离开后修改将丢失。', '确认离开', { confirmButtonText: '离开', cancelButtonText: '继续编辑', type: 'warning' }); return true } catch { return false }
+  const dirtyWorkflow = section.value === 'tasks' && taskStudio.value?.hasUnsavedWorkflow()
+  const dirtyProcessing = section.value === 'processing' && processingTasks.value?.hasUnsaved?.()
+  if (!dirtyWorkflow && !dirtyProcessing) return true
+  try { await ElMessageBox.confirm('当前编排尚未保存，离开后修改将丢失。', '确认离开', { confirmButtonText: '离开', cancelButtonText: '继续编辑', type: 'warning' }); return true } catch { return false }
 }
 async function navigate(item) {
   if (item.children) {
@@ -234,7 +237,7 @@ onMounted(async () => {
         </div>
       </header>
       <div v-if="section === 'assets'" class="content"><DataSources :view="groupPages.assets || 'sources'" /></div>
-      <div v-else-if="section === 'processing'" class="content"><ProcessingTasks :view="groupPages.processing || 'tasks'" /></div>
+      <div v-else-if="section === 'processing'" class="content"><ProcessingTasks ref="processingTasks" :view="groupPages.processing || 'tasks'" /></div>
       <div v-else-if="section === 'tasks'" class="content"><TaskStudio ref="taskStudio" /></div>
       <div v-else-if="section === 'system'" class="content"><Organization :view="groupPages.system || 'departments'" @navigation-updated="loadSession" /></div>
       <div v-else-if="section === 'query'" class="content"><DataExplorer /></div>

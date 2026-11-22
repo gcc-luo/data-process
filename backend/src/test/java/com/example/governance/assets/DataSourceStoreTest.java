@@ -29,10 +29,12 @@ class DataSourceStoreTest {
         var store = new DataSourceStore(jdbc, new CredentialCipher(Base64.getEncoder().encodeToString(new byte[32])));
         var definition = new DataSourceDefinition("db", "MYSQL:8.x", "localhost", 3306, "db", "reader");
         long source = store.create(definition, "secret");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (8,'job','SQL',2)");
-        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (8,1,?),(8,2,?)", "{\"sourceId\":" + source + ",\"sql\":\"select 1\",\"parameters\":[]}", "{\"sourceId\":999,\"sql\":\"select 1\",\"parameters\":[]}");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (8,'job','ORCH',2)");
+        jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (8,1,?),(8,2,?)",
+                com.example.governance.workflow.OrchFixtures.dml(source, "UPDATE t SET x=1"), com.example.governance.workflow.OrchFixtures.dml(999, "UPDATE t SET x=1"));
         assertThrows(IllegalStateException.class, () -> tx.executeWithoutResult(x -> store.deleteUnused(source)));
-        jdbc.update("UPDATE processing_task_versions SET configuration='{}' WHERE task_id=8 AND version=1");
+        // 损坏的历史版本（非 JSON 对象）仍 fail-safe 拒绝删除
+        jdbc.update("UPDATE processing_task_versions SET configuration='[]' WHERE task_id=8 AND version=1");
         assertThrows(IllegalStateException.class, () -> tx.executeWithoutResult(x -> store.deleteUnused(source)));
         jdbc.update("DELETE FROM processing_task_versions WHERE task_id=8");
         assertTrue(Boolean.TRUE.equals(tx.execute(x -> store.deleteUnused(source))));
@@ -44,14 +46,14 @@ class DataSourceStoreTest {
         var manager = new org.springframework.jdbc.datasource.DataSourceTransactionManager(db);
         var store = new DataSourceStore(jdbc, new CredentialCipher(Base64.getEncoder().encodeToString(new byte[32])));
         long source = store.create(new DataSourceDefinition("db", "MYSQL:8.x", "localhost", 3306, "db", "reader"), "secret");
-        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (8,'job','SQL',1)");
+        jdbc.update("INSERT INTO processing_tasks(id,name,task_type,current_version) VALUES (8,'job','ORCH',1)");
         var locked = new java.util.concurrent.CountDownLatch(1); var release = new java.util.concurrent.CountDownLatch(1);
         var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
         try {
             var creator = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(manager).executeWithoutResult(x -> {
                 assertTrue(store.lockSources(java.util.List.of(source))); locked.countDown();
                 try { if (!release.await(3, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
-                jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (8,1,?)", "{\"sourceId\":" + source + "}");
+                jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration) VALUES (8,1,?)", com.example.governance.workflow.OrchFixtures.dml(source, "UPDATE t SET x=1"));
             }));
             assertTrue(locked.await(3, java.util.concurrent.TimeUnit.SECONDS));
             var deletion = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(manager).execute(x -> store.deleteUnused(source)));

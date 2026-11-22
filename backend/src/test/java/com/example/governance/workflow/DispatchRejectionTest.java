@@ -20,7 +20,7 @@ class DispatchRejectionTest {
     @Test void taskQueueRejectionPersistsInterruptedAfterOuterCommit() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""); Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db); var tasks = new TaskVersionStore(jdbc, tx);
-        long task = tasks.create("task", "SQL", "{}");
+        long task = OrchFixtures.published(tasks, "task", "{}");
         var executor = mock(ThreadPoolTaskExecutor.class); doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(any(Runnable.class));
         var service = new TaskRunService(jdbc, tasks, mock(CamelTaskRunner.class), executor, mock(AuditLog.class));
         long id = new TransactionTemplate(tx).execute(status -> service.start(task, 1, LocalDate.now(), null));
@@ -29,7 +29,7 @@ class DispatchRejectionTest {
     @Test void workflowQueueRejectionPersistsInterruptedAfterOuterCommit() {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""); Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db); var tasks = new TaskVersionStore(jdbc, tx);
-        long task = tasks.create("task", "SQL", "{}"); var defs = new WorkflowDefinitionStore(jdbc, tx);
+        long task = OrchFixtures.published(tasks, "task", "{}"); var defs = new WorkflowDefinitionStore(jdbc, tx);
         long workflow = defs.create("flow", List.of(new WorkflowDefinitionStore.Node("n", task, 1)), List.of());
         var runs = new WorkflowRunStore(jdbc, tx, defs);
         var dispatcher = new WorkflowDispatcher(runs, mock(WorkflowWorker.class), runnable -> { throw new java.util.concurrent.RejectedExecutionException(); });
@@ -43,7 +43,7 @@ class DispatchRejectionTest {
     @Test void taskClaimFailureMarksInstanceInterrupted() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""); Flyway.configure().dataSource(db).load().migrate();
         var jdbc = new JdbcTemplate(db); var tx = new DataSourceTransactionManager(db); var tasks = new TaskVersionStore(jdbc, tx);
-        long task = tasks.create("task", "SQL", "{}");
+        long task = OrchFixtures.published(tasks, "task", "{}");
         var executor = mock(ThreadPoolTaskExecutor.class); var submitted = new java.util.concurrent.atomic.AtomicReference<Runnable>();
         doAnswer(invocation -> { submitted.set(invocation.getArgument(0)); return null; }).when(executor).execute(any(Runnable.class));
         var failingJdbc = spy(jdbc);
