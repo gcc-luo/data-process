@@ -10,7 +10,7 @@ const SqlMonaco = defineAsyncComponent(() => import('./SqlMonaco.vue'))
 
 const props = defineProps({
   node: Object, component: Object, sources: Array, variables: Array,
-  readonly: Boolean, nodeLogs: Array, nodeState: String, sourceFields: Array, tables: Array
+  readonly: Boolean, nodeLogs: Array, nodeState: String, sourceFields: Array, targetFields: Array, tables: Array
 })
 const emit = defineEmits(['test-connection', 'new-datasource', 'load-tables', 'load-fields', 'close'])
 const tab = ref('basic')
@@ -94,8 +94,8 @@ const stateLabel = { RUNNING: '运行中', SUCCEEDED: '成功', FAILED: '失败'
           <svg viewBox="0 0 24 24"><path v-for="(d, i) in iconPaths(component.icon)" :key="i" :d="d" /></svg>
         </span>
         <div class="head-titles">
-          <strong>{{ component.name }}</strong>
-          <span class="head-tag">{{ CATEGORY_LABELS[component.category] }}</span>
+          <input class="head-name" v-model="node.name" maxlength="80" :disabled="readonly" placeholder="节点名称" />
+          <span class="head-tag">{{ component.name }} · {{ CATEGORY_LABELS[component.category] }}</span>
         </div>
         <el-tag :type="configured ? 'success' : 'warning'" size="small" effect="light">{{ configured ? '已配置' : '待配置' }}</el-tag>
         <button type="button" class="inspector-close" title="关闭配置" @click="emit('close')">×</button>
@@ -103,14 +103,6 @@ const stateLabel = { RUNNING: '运行中', SUCCEEDED: '成功', FAILED: '失败'
       <el-tabs v-model="tab" class="inspector-tabs">
         <el-tab-pane label="基础配置" name="basic">
           <el-form label-position="top" size="small" :disabled="readonly" class="inspector-form">
-            <div class="form-section-cap">节点信息</div>
-            <el-form-item label="节点名称" required><el-input v-model="node.name" maxlength="80" placeholder="业务可读名称" /></el-form-item>
-            <el-form-item label="节点描述"><el-input v-model="node.description" type="textarea" :rows="2" maxlength="500" placeholder="选填" /></el-form-item>
-            <div class="form-row">
-              <el-form-item label="启用状态"><el-switch v-model="node.enabled" /></el-form-item>
-              <el-form-item label="超时时间（秒）"><el-input-number v-model="node.timeoutSeconds" :min="1" :max="86400" controls-position="right" /></el-form-item>
-            </div>
-            <div class="form-section-cap component-cap">组件配置</div>
             <template v-for="f in basicFields" :key="f.key">
               <el-form-item :label="f.label" :required="f.required">
                 <div v-if="f.type === 'source'" class="source-field">
@@ -133,7 +125,7 @@ const stateLabel = { RUNNING: '运行中', SUCCEEDED: '成功', FAILED: '失败'
                 <el-select v-else-if="f.type === 'select'" v-model="node.config[f.key]"><el-option v-for="o in f.options" :key="o.value" :label="o.label" :value="o.value" /></el-select>
                 <el-switch v-else-if="f.type === 'switch'" v-model="node.config[f.key]" />
                 <el-input v-else-if="f.type === 'columns'" :model-value="columnsText(f.key)" placeholder="逗号分隔" @update:model-value="setColumns(f.key, $event)" />
-                <FieldMappingTable v-else-if="f.type === 'mappings'" v-model="node.config[f.key]" :source-fields="sourceFields" :readonly="readonly" @load-fields="emit('load-fields')" />
+                <FieldMappingTable v-else-if="f.type === 'mappings'" v-model="node.config[f.key]" :source-fields="sourceFields" :target-fields="targetFields" :readonly="readonly" @load-fields="emit('load-fields')" />
                 <ParameterTable v-else-if="f.type === 'params'" :variables="variables" :names="placeholderNames" :readonly="readonly" />
                 <div v-else-if="f.type === 'operations'" class="list-editor">
                   <div v-for="(op, i) in node.config.operations || []" :key="i" class="list-row">
@@ -175,6 +167,13 @@ const stateLabel = { RUNNING: '运行中', SUCCEEDED: '成功', FAILED: '失败'
         </el-tab-pane>
         <el-tab-pane label="高级参数" name="advanced">
           <el-form label-position="top" size="small" :disabled="readonly" class="inspector-form">
+            <div class="form-section-cap">节点属性</div>
+            <div class="form-row">
+              <el-form-item label="启用状态"><el-switch v-model="node.enabled" /></el-form-item>
+              <el-form-item label="超时时间（秒）"><el-input-number v-model="node.timeoutSeconds" :min="1" :max="86400" controls-position="right" /></el-form-item>
+            </div>
+            <el-form-item label="节点描述"><el-input v-model="node.description" type="textarea" :rows="2" maxlength="500" placeholder="选填，悬浮画布节点可见" /></el-form-item>
+            <div v-if="advancedFields.length" class="form-section-cap component-cap">组件参数</div>
             <template v-for="f in advancedFields" :key="f.key">
               <el-form-item :label="f.label" :required="f.required">
                 <el-input-number v-if="f.type === 'number'" v-model="node.config[f.key]" :min="f.min ?? 1" :max="f.max ?? 100000" controls-position="right" />
@@ -270,7 +269,10 @@ const stateLabel = { RUNNING: '运行中', SUCCEEDED: '成功', FAILED: '失败'
 .ic-blue svg{stroke:#2f7fd1}.ic-purple svg{stroke:#8250df}.ic-green svg{stroke:#2f9e57}.ic-orange svg{stroke:#d98a2b}
 .head-icon.ic-blue{background:#eaf3fc}.head-icon.ic-purple{background:#f1ebfc}.head-icon.ic-green{background:#e9f7ee}.head-icon.ic-orange{background:#fdf3e0}
 .head-titles{flex:1;min-width:0;display:flex;flex-direction:column}
-.head-titles strong{font-size:14px;color:#24344d}
+.head-name{border:0;background:transparent;font-size:14px;font-weight:600;color:#24344d;padding:2px 4px;margin-left:-4px;border-radius:5px;width:100%;min-width:0}
+.head-name:hover:not(:disabled){background:#f5f7fa}
+.head-name:focus{outline:none;background:#f0f7ff;box-shadow:0 0 0 1px #b3d4fc}
+.head-name:disabled{color:#24344d;cursor:default}
 .head-tag{font-size:11px;color:#8a94a6}
 .inspector-tabs{flex:1;min-height:0;display:flex;flex-direction:column}
 .inspector-tabs :deep(.el-tabs__item){font-size:13px;height:38px;line-height:38px;font-weight:500}

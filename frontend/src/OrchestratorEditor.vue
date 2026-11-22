@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
@@ -12,6 +12,7 @@ import OrchNode from './OrchNode.vue'
 import OrchInspector from './OrchInspector.vue'
 import OrchConsole from './OrchConsole.vue'
 import * as api from './orch-api.js'
+import { startOrchGuide, guideDismissed } from './orch-guide.js'
 import { indexComponents, newNode, normalizeNode, canConnect, edgeKind, newEdgeId, autoLayout, toVueNodes, toVueEdges, createHistory, clientValidate, configSummary } from './orch-graph.js'
 
 const props = defineProps({ taskId: [Number, String], sources: Array })
@@ -71,7 +72,7 @@ const nodeNameMap = computed(() => Object.fromEntries(definition.nodes.map(n => 
 const selectedComponent = computed(() => selectedNode.value ? byType.value.get(selectedNode.value.component) : null)
 const selectedNodeLogs = computed(() => consoleLogs.value.filter(l => l.nodeKey === selectedId.value))
 const selectedNodeState = computed(() => nodeStatesMap.value.get(selectedId.value) || null)
-const sourceFields = ref([]), tables = ref([])
+const sourceFields = ref([]), targetFields = ref([]), tables = ref([])
 
 const vueNodes = computed(() => toVueNodes(definition, byType.value, { nodeStates: nodeStatesMap.value, selectedId: selectedId.value, issueIds: issueIds.value, running: readonly.value }))
 const vueEdges = computed(() => toVueEdges(definition, { selectedEdgeId: selectedEdgeId.value }))
@@ -87,6 +88,7 @@ function markDirty() { if (!readonly.value) dirty.value = true }
 function pushHistory() { history.push(snapshot()) }
 
 // ---- load ----
+let guideStarted = false
 async function load() {
   loading.value = true
   try {
@@ -106,7 +108,10 @@ async function load() {
     definition.layout = def.layout || { zoom: 1, viewport: { x: 0, y: 0 } }
     dirty.value = false
     setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 80)
-  } catch (e) { ElMessage.error(e.message) } finally { loading.value = false }
+  } catch (e) { ElMessage.error(e.message) } finally {
+    loading.value = false
+    if (!guideStarted && !guideDismissed()) { guideStarted = true; nextTick(() => setTimeout(() => startOrchGuide(), 500)) }
+  }
 }
 
 // ---- canvas interactions ----
@@ -307,18 +312,45 @@ async function loadTables(sourceId) {
   try { const rows = await api.fetchTables(sourceId); tables.value = rows.map(t => t.name || t.tableName || t).filter(Boolean) }
   catch (e) { ElMessage.error(e.message) }
 }
+function varValues() {
+  const values = { business_date: new Date().toLocaleDateString('sv-SE') }
+  for (const v of definition.variables || []) values[v.name] = v.defaultValue ?? ''
+  return values
+}
+function varTypes() {
+  const types = { business_date: 'DATE' }
+  for (const v of definition.variables || []) types[v.name] = v.type
+  return types
+}
+const upstreamOf = id => { const e = definition.edges.find(e => e.to === id && e.kind === 'DATA'); return e ? definition.nodes.find(n => n.id === e.from) : null }
+const downstreamOf = id => { const e = definition.edges.find(e => e.from === id); return e ? definition.nodes.find(n => n.id === e.to) : null }
+async function resolveSourceSchema(node, depth = 0) {
+  if (!node || depth > 6) return []
+  const c = node.config || {}
+  if (node.component.startsWith('source.') && c.sourceId) {
+    const sql = c.readMode === 'SQL' ? c.sql : (c.table ? `SELECT * FROM ${c.table}` : '')
+    if (!sql) return []
+    return await api.fetchSchema({ sourceId: c.sourceId, sql, values: varValues(), types: varTypes() })
+  }
+  return resolveSourceSchema(upstreamOf(node.id), depth + 1)
+}
+async function resolveTargetSchema(node, depth = 0) {
+  if (!node || depth > 6) return []
+  const c = node.config || {}
+  if (node.component.startsWith('sink.') && c.sourceId && c.table) {
+    return await api.fetchSchema({ sourceId: c.sourceId, sql: `SELECT * FROM ${c.table}` })
+  }
+  return resolveTargetSchema(downstreamOf(node.id), depth + 1)
+}
 async function loadFields() {
   const node = selectedNode.value
   if (!node) return
-  const upstream = definition.edges.find(e => e.to === node.id && e.kind === 'DATA')
-  if (!upstream) { ElMessage.warning('没有上游数据节点'); return }
-  const upNode = definition.nodes.find(n => n.id === upstream.from)
-  const sid = upNode?.config?.sourceId
-  const table = upNode?.config?.table
-  if (sid && table) {
-    try { const cols = await api.fetchColumns(sid, table); sourceFields.value = cols.map(c => c.name || c.columnName).filter(Boolean) } catch (e) { ElMessage.error(e.message) }
-  } else ElMessage.warning('上游节点未配置表，无法加载字段')
+  sourceFields.value = []; targetFields.value = []
+  try { sourceFields.value = await resolveSourceSchema(upstreamOf(node.id)) } catch { /* 上游不可解析时留空 */ }
+  try { targetFields.value = await resolveTargetSchema(downstreamOf(node.id)) } catch { /* 下游不可解析时留空 */ }
+  if (!sourceFields.value.length && !targetFields.value.length) ElMessage.warning('未能从上下游加载字段，请检查来源/目标配置')
 }
+watch(selectedNode, n => { if (n && n.component === 'transform.field-map') loadFields() })
 
 // ---- schedule ----
 function openInfo() { infoForm.name = name.value; infoForm.directoryId = taskDirectoryId.value; infoForm.description = taskDescription.value; infoOpen.value = true }
@@ -433,6 +465,7 @@ onBeforeUnmount(() => {
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.publish') || readonly" @click="publishOpen = true">发布</el-button>
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.execute')" :loading="runBusy" @click="runTest">运行测试</el-button>
         <el-button size="small" type="primary" :disabled="!can('workflow.task.execute') || readonly" @click="openRun">运行</el-button>
+        <el-button size="small" class="ghost" @click="startOrchGuide()">引导</el-button>
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.read')" @click="openVersions">版本历史</el-button>
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.update')" @click="openSchedule">定时</el-button>
       </div>
@@ -494,17 +527,19 @@ onBeforeUnmount(() => {
     <Transition name="orch-drawer">
       <aside v-if="selectedNode" class="orch-drawer">
         <OrchInspector :node="selectedNode" :component="selectedComponent" :sources="sources" :variables="definition.variables"
-                       :readonly="!canEdit" :node-logs="selectedNodeLogs" :node-state="selectedNodeState" :source-fields="sourceFields" :tables="tables"
+                       :readonly="!canEdit" :node-logs="selectedNodeLogs" :node-state="selectedNodeState" :source-fields="sourceFields" :target-fields="targetFields" :tables="tables"
                        @close="selectedId = null" @test-connection="testConnection" @new-datasource="ElMessage.info('请在数据资产模块新建数据源')" @load-tables="loadTables" @load-fields="loadFields" />
       </aside>
     </Transition>
 
     <!-- console -->
-    <OrchConsole v-if="!consoleCollapsed" :mode="mode" :run="runDetail" :logs="consoleLogs" :node-states="consoleNodeStates"
-                 :previews="consolePreviews" :run-id="activeRunId" :node-names="nodeNameMap" :busy="runBusy" :can-execute="can('workflow.task.execute')" :can-retry="can('workflow.task.retry')"
-                 @stop="stopRun" @refresh="refreshRun" @retry="retryRun" @locate="locateNode" @download="downloadLogs" @update:collapsed="consoleCollapsed = $event" />
-    <div v-else class="console-collapsed" @click="consoleCollapsed = false">
-      <svg viewBox="0 0 24 24"><path d="M4 17l6-5-6-5M12 19h8" /></svg> 运行调试面板（点击展开）
+    <div class="console-area">
+      <OrchConsole v-if="!consoleCollapsed" :mode="mode" :run="runDetail" :logs="consoleLogs" :node-states="consoleNodeStates"
+                   :previews="consolePreviews" :run-id="activeRunId" :node-names="nodeNameMap" :busy="runBusy" :can-execute="can('workflow.task.execute')" :can-retry="can('workflow.task.retry')"
+                   @stop="stopRun" @refresh="refreshRun" @retry="retryRun" @locate="locateNode" @download="downloadLogs" @update:collapsed="consoleCollapsed = $event" />
+      <div v-else class="console-collapsed" @click="consoleCollapsed = false">
+        <svg viewBox="0 0 24 24"><path d="M4 17l6-5-6-5M12 19h8" /></svg> 运行调试面板（点击展开）
+      </div>
     </div>
 
     <!-- publish dialog -->
@@ -561,7 +596,7 @@ onBeforeUnmount(() => {
           <div v-if="previewSelectedNode" class="version-inspector">
             <OrchInspector :node="previewSelectedNode" :component="previewSelectedComponent" :sources="sources"
                            :variables="previewDef?.variables || []" :readonly="true" :node-logs="[]" :node-state="null"
-                           :source-fields="[]" :tables="[]" @close="previewSelectedId = null" />
+                           :source-fields="[]" :target-fields="[]" :tables="[]" @close="previewSelectedId = null" />
           </div>
         </div>
         <el-table :data="previewNodeSummary" size="small" max-height="200" empty-text="无节点" style="margin-top:12px">
@@ -640,10 +675,27 @@ onBeforeUnmount(() => {
 .zoom{font-size:12px;color:#8a94a6;min-width:42px;text-align:center}
 .canvas{flex:1;min-height:0;position:relative;background:#f8fafc}
 .canvas-empty{position:absolute;top:45%;left:0;right:0;text-align:center;color:#9aa4b2;pointer-events:none;font-size:13px}
+.console-area{display:flex;flex-direction:column;min-height:0}
 .console-collapsed{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--el-border-color-lighter);border-radius:8px;padding:8px 14px;color:#5a6b82;font-size:12px;cursor:pointer}
 .console-collapsed svg{width:16px;height:16px;fill:none;stroke:#2f7fd1;stroke-width:1.6}
 .orch-drawer{position:fixed;top:0;right:0;height:100vh;height:100dvh;width:460px;max-width:92vw;background:#fff;z-index:1500;box-shadow:-8px 0 28px rgba(20,40,70,.18);display:flex;flex-direction:column}
 .orch-drawer-enter-from,.orch-drawer-leave-to{transform:translateX(100%)}
 .orch-drawer-enter-active,.orch-drawer-leave-active{transition:transform .25s ease}
 @media(max-width:900px){.editor-body{flex-direction:column;overflow:auto}.metrics{gap:14px}.canvas-wrap{min-height:420px}}
+</style>
+
+<style>
+/* 步骤引导（driver.js 挂载到 body，需全局样式） */
+.orch-guide-popover{font-family:"PingFang SC","Microsoft YaHei",sans-serif;border-radius:10px;box-shadow:0 12px 40px rgba(20,40,70,.22);max-width:340px}
+.orch-guide-popover .driver-popover-title{font-size:15px;font-weight:600;color:#24344d}
+.orch-guide-popover .driver-popover-description{font-size:13px;color:#5a6b82;line-height:1.7;margin-top:6px}
+.orch-guide-popover .driver-popover-footer{display:flex;align-items:center;gap:10px;margin-top:14px}
+.orch-guide-popover .driver-popover-progress-text{font-size:12px;color:#9aa4b2}
+.orch-guide-popover .driver-popover-navigation-btns{gap:6px}
+.orch-guide-popover .driver-popover-navigation-btns button{border-radius:6px;font-size:13px;padding:5px 12px;text-shadow:none}
+.orch-guide-popover .driver-popover-prev-btn{background:#fff;border:1px solid #dce4ed;color:#5a6b82}
+.orch-guide-popover .driver-popover-next-btn{background:#2f7fd1;border:1px solid #2f7fd1;color:#fff}
+.orch-guide-popover .driver-popover-close-btn{color:#9aa4b2}
+.orch-guide-optout{display:flex;align-items:center;gap:5px;font-size:12px;color:#8a94a6;cursor:pointer;margin-right:auto;user-select:none}
+.orch-guide-optout input{accent-color:#2f7fd1;cursor:pointer;margin:0}
 </style>

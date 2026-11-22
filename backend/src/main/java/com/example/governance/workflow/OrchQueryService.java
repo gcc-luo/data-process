@@ -19,6 +19,31 @@ public class OrchQueryService {
 
     public OrchQueryService(ExecutionDataSourceProvider provider) { this.provider = provider; }
 
+    public record ColumnInfo(String name, String type) {}
+
+    /** Column metadata (name + SQL type) for a table or SELECT, read from ResultSetMetaData without fetching rows. */
+    public List<ColumnInfo> schema(long sourceId, String sql, Map<String, Object> values, Map<String, String> types) throws Exception {
+        if (sql == null || sql.isBlank()) throw new IllegalArgumentException("SQL 不能为空");
+        if (SqlParameters.hasMultipleStatements(sql)) throw new IllegalArgumentException("不允许多语句 SQL");
+        var parsed = SqlParameters.parse(sql);
+        DataSource ds = provider.get(sourceId);
+        try (Connection connection = ds.getConnection()) {
+            connection.setReadOnly(true);
+            try (PreparedStatement statement = connection.prepareStatement(parsed.jdbcSql())) {
+                statement.setQueryTimeout(15);
+                statement.setMaxRows(1);
+                statement.setFetchSize(1);
+                SqlParameters.bind(statement, parsed, values == null ? Map.of() : values, types == null ? Map.of() : types);
+                try (ResultSet rows = statement.executeQuery()) {
+                    var meta = rows.getMetaData();
+                    var columns = new ArrayList<ColumnInfo>();
+                    for (int i = 1; i <= meta.getColumnCount(); i++) columns.add(new ColumnInfo(meta.getColumnLabel(i), meta.getColumnTypeName(i)));
+                    return columns;
+                }
+            }
+        }
+    }
+
     public Result preview(long sourceId, String sql, Map<String, Object> values, Map<String, String> types, int limit) throws Exception {
         if (sql == null || sql.isBlank()) throw new IllegalArgumentException("SQL 不能为空");
         if (SqlParameters.hasMultipleStatements(sql)) throw new IllegalArgumentException("不允许多语句 SQL");

@@ -42,7 +42,7 @@ const status = computed(() => {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path v-for="(d, i) in iconPaths(component?.icon)" :key="i" :d="d" /></svg>
       </span>
       <div class="node-titles">
-        <strong class="node-name" :title="node.name">{{ node.name }}</strong>
+        <strong class="node-name" :title="node.description ? node.name + ' — ' + node.description : node.name">{{ node.name }}</strong>
         <span class="node-type">{{ meta.label }}</span>
       </div>
       <span class="node-status" :class="status.cls" :title="status.text">

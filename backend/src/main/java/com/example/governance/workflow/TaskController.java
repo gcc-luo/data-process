@@ -248,6 +248,21 @@ public class TaskController {
     @GetMapping("/api/orch/components")
     List<OrchComponents.Component> components() { return OrchComponents.all(); }
 
+    record SchemaRequest(Long sourceId, String sql, JsonNode values, JsonNode types) {}
+    @PostMapping("/api/orch/schema")
+    ResponseEntity<?> schema(@RequestBody SchemaRequest request) {
+        if (request.sourceId() == null || request.sourceId() < 1) return ResponseEntity.badRequest().body(Map.of("error", "请先选择数据源"));
+        try {
+            Map<String, Object> values = request.values() == null || request.values().isNull() ? Map.of() : mapper.convertValue(request.values(), Map.class);
+            Map<String, String> types = request.types() == null || request.types().isNull() ? Map.of() : mapper.convertValue(request.types(), Map.class);
+            return ResponseEntity.ok(queryService.schema(request.sourceId(), request.sql(), values, types));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", "获取字段失败: " + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage())));
+        }
+    }
+
     record QueryPreviewRequest(Long sourceId, String sql, JsonNode values, JsonNode types, Integer limit) {}
     @PostMapping("/api/orch/query-preview")
     ResponseEntity<?> queryPreview(@RequestBody QueryPreviewRequest request) {

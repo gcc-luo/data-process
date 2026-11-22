@@ -52,6 +52,7 @@ export const fetchRunLogs = (runId, { nodeKey = '', level = '', afterId = 0, lim
 export const fetchRunNodePreview = (runId, nodeKey) => read(`/api/task-runs/${runId}/nodes/${encodeURIComponent(nodeKey)}/preview`)
 export const testRun = body => write('/api/orch/test-run', 'POST', body)
 export const queryPreview = body => write('/api/orch/query-preview', 'POST', body)
+export const fetchSchema = body => write('/api/orch/schema', 'POST', body)
 export const fetchSchedule = id => read(`/api/tasks/${id}/schedule`)
 export const saveSchedule = (id, body) => write(`/api/tasks/${id}/schedule`, 'PUT', body)
 export const deleteSchedule = id => write(`/api/tasks/${id}/schedule`, 'DELETE')

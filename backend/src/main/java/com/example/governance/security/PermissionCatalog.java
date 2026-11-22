@@ -234,6 +234,7 @@ public final class PermissionCatalog {
         route(routes, "DELETE", "/api/tasks/*/schedule", "workflow.task.update");
         route(routes, "POST", "/api/orch/test-run", "workflow.task.execute");
         route(routes, "POST", "/api/orch/query-preview", "workflow.task.execute");
+        route(routes, "POST", "/api/orch/schema", "workflow.task.read");
         route(routes, "POST", "/api/orch/validate", "workflow.task.update");
         route(routes, "GET", "/api/task-runs/*/logs", "workflow.task.read");
         route(routes, "GET", "/api/task-runs/*/nodes/*/preview", "workflow.task.read");
