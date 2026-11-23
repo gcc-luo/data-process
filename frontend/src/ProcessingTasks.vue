@@ -9,7 +9,7 @@ import OrchestratorEditor from './OrchestratorEditor.vue'
 import OrchRunsDialog from './OrchRunsDialog.vue'
 import RefreshIcon from './RefreshIcon.vue'
 const can = inject('canPermission', () => false)
-const directories = ref([]), tasks = ref([]), sources = ref([]), error = ref(''), message = ref('')
+const directories = ref([]), tasks = ref([]), sources = ref([]), error = ref('')
 const tree = ref(null), currentDirectory = ref(0), directoryMenu = ref(null)
 const view = ref('list'), editorTaskId = ref(null), editorRef = ref(null)
 const nameSearch = ref(''), nameFilter = ref(''), stateSearch = ref(''), stateFilter = ref('')
@@ -53,7 +53,9 @@ async function loadTasks() {
 }
 function applyBatchParts(results) {
   const { okText, failText } = batchParts(results)
-  message.value = okText || (failText ? '' : '没有可操作的任务')
+  // 成功反馈用顶部居中 toast，不再占用列表上方布局（视觉伴侣方案 A）
+  if (okText) ElMessage.success(okText)
+  else if (!failText) ElMessage.warning('没有可操作的任务')
   if (failText) error.value = failText
 }
 function applyQuery() { nameFilter.value = nameSearch.value.trim(); stateFilter.value = stateSearch.value; paging.page.value = 1 }
@@ -94,16 +96,16 @@ async function submitSort() {
   } catch (e) { await loadAll(); error.value = e.message }
 }
 async function addDirectory(parent) {
-  error.value = ''; message.value = ''
+  error.value = ''
   try {
     const { value } = await ElMessageBox.prompt('请输入目录名称', parent ? '新增子目录' : '新增目录', { confirmButtonText: '保存', cancelButtonText: '取消', inputPattern: /\S+/, inputErrorMessage: '名称不能为空' })
     const response = await authorizedRequest('/api/task-directories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: value, parentId: parent?.id ?? null }) })
     if (!response.ok) throw new Error('目录创建失败')
-    message.value = '目录已创建'; await loadAll()
+    ElMessage.success('目录已创建'); await loadAll()
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 async function renameDirectory(node) {
-  error.value = ''; message.value = ''
+  error.value = ''
   try {
     const { value } = await ElMessageBox.prompt('请输入新名称', '重命名目录', { confirmButtonText: '保存', cancelButtonText: '取消', inputValue: node.name, inputPattern: /\S+/, inputErrorMessage: '名称不能为空' })
     const response = await authorizedRequest(`/api/task-directories/${node.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: value }) })
@@ -112,13 +114,13 @@ async function renameDirectory(node) {
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 async function deleteDirectory(node) {
-  error.value = ''; message.value = ''
+  error.value = ''
   try {
     await ElMessageBox.confirm(`确定删除目录“${node.name}”？含任务或子目录时无法删除。`, '删除目录', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' })
     const response = await authorizedRequest(`/api/task-directories/${node.id}`, { method: 'DELETE' })
     if (!response.ok) throw new Error(response.status === 409 ? '目录包含子目录或任务，不能删除' : '目录删除失败')
     if (currentDirectory.value === node.id) currentDirectory.value = 0
-    message.value = '目录已删除'; await loadAll()
+    ElMessage.success('目录已删除'); await loadAll()
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 // ---- task CRUD ----
@@ -134,7 +136,7 @@ async function confirmCreate() {
     await loadAll()
   } catch (e) { ElMessage.error(e.message) } finally { createBusy.value = false }
 }
-function openEdit(row) { error.value = ''; message.value = ''; editorTaskId.value = row.id; view.value = 'editor' }
+function openEdit(row) { error.value = ''; editorTaskId.value = row.id; view.value = 'editor' }
 async function openCopy(row) {
   try {
     const res = await api.copyTask(row.id, { name: `${row.name}-副本`, directoryId: row.directoryId })
@@ -147,7 +149,7 @@ function openRuns(row) { runsTask.value = row; runsOpen.value = true }
 function openStart(targets) { startTargets.value = targets; startDate.value = new Date().toLocaleDateString('sv-SE'); startOpen.value = true }
 async function confirmStart() {
   if (batchBusy.value) return
-  batchBusy.value = true; error.value = ''; message.value = ''
+  batchBusy.value = true; error.value = ''
   const targets = startTargets.value.map(t => tasks.value.find(x => x.id === t.id)).filter(Boolean)
   const results = []
   for (const target of targets) {
@@ -160,12 +162,12 @@ async function confirmStart() {
   await loadAll(); applyBatchParts(results)
 }
 async function stopOne(row) {
-  error.value = ''; message.value = ''
-  try { await api.stopTask(row.id); message.value = `已停止 ${row.name}`; await loadAll() } catch (e) { error.value = e.message }
+  error.value = ''
+  try { await api.stopTask(row.id); ElMessage.success(`已停止 ${row.name}`); await loadAll() } catch (e) { error.value = e.message }
 }
 async function stopBatch() {
   try { await ElMessageBox.confirm(`确定停止选中的 ${selected.value.length} 个任务？停止会中断运行，可能已写入部分数据。`, '批量停止', { confirmButtonText: '停止', cancelButtonText: '取消', type: 'warning' }) } catch { return }
-  error.value = ''; message.value = ''; batchBusy.value = true
+  error.value = ''; batchBusy.value = true
   const targets = selected.value.map(t => tasks.value.find(x => x.id === t.id)).filter(Boolean)
   const results = []
   try {
@@ -177,8 +179,8 @@ async function stopBatch() {
   await loadAll(); applyBatchParts(results)
 }
 async function removeTask(row) {
-  error.value = ''; message.value = ''
-  try { await api.deleteTask(row.id); message.value = `已删除 ${row.name}`; await loadAll() } catch (e) { error.value = e.message }
+  error.value = ''
+  try { await api.deleteTask(row.id); ElMessage.success(`已删除 ${row.name}`); await loadAll() } catch (e) { error.value = e.message }
 }
 let pollTimer = null
 watch(tasks, rows => {
@@ -208,7 +210,6 @@ onBeforeUnmount(() => {
 <template>
   <section class="processing" :class="{ 'processing-has-directory': view === 'list' }">
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
-    <el-alert v-if="message" :title="message" type="success" :closable="false" show-icon/>
     <template v-if="view === 'list'">
       <el-select v-model="currentDirectory" class="directory-select" aria-label="任务目录"><el-option v-for="o in directoryOptions" :key="o.id" :label="o.label" :value="o.id"/></el-select>
       <div class="processing-layout">
