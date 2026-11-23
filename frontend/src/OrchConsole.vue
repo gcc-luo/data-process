@@ -52,12 +52,24 @@ const previewData = computed(() => {
   const columns = (base.columns || []).map(c => ({ ...c, numeric: rows.length > 0 && rows.every(r => r[c.prop] == null || typeof r[c.prop] === 'number') }))
   return { columns, rows }
 })
+// 数据预览默认选中第一个有样本的节点；切换运行/模式时重置，手动选择在其仍有效时保留
+watch([previewOptions, () => props.runId, () => props.mode], ([opts, runId, mode], old) => {
+  if (!opts.length) { previewNode.value = ''; return }
+  if (runId !== old?.[1] || mode !== old?.[2] || !opts.some(o => o.key === previewNode.value)) previewNode.value = opts[0].key
+}, { immediate: true })
+// immediate：默认选中在 setup 期间已完成，非 immediate 会漏掉首次挂载的取数（运行记录弹框首开无样本的根因）
+let previewSeq = 0
 watch([previewNode, () => props.mode, () => props.runId], async ([node, mode, runId]) => {
+  const seq = ++previewSeq
   runPreview.value = null
   if (mode !== 'run' || !node || !runId) return
   previewLoading.value = true
-  try { runPreview.value = await api.fetchRunNodePreview(runId, node) } catch { runPreview.value = null } finally { previewLoading.value = false }
-})
+  try {
+    const data = await api.fetchRunNodePreview(runId, node)
+    if (seq === previewSeq) runPreview.value = data
+  } catch { if (seq === previewSeq) runPreview.value = null }
+  finally { if (seq === previewSeq) previewLoading.value = false }
+}, { immediate: true })
 function fmtTime(v) { return v ? String(v).replace('T', ' ').slice(0, 19) : '—' }
 function downloadLogs() {
   const text = filteredLogs.value.map(l => `${fmtTime(l.createdAt)} [${l.level}] ${l.nodeKey || ''} ${l.message}`).join('\n')
