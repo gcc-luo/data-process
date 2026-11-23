@@ -14,7 +14,7 @@ export function startOrchGuide() {
     { element: '.orch-editor .canvas-wrap', popover: { title: '② 编排画布', description: '拖动节点调整位置；从节点右侧连接点拖到下一节点左侧建立连线。工具栏支持缩放、适应、自动布局、小地图与撤销重做。', side: 'over', align: 'center' } },
     { element: '.orch-editor .canvas', popover: { title: '③ 节点配置', description: '点击任意节点，右侧弹出配置抽屉（基础配置 / 高级参数 / 重试策略 / 执行日志）。SQL 节点可点「运行查询」预览数据。', side: 'over', align: 'center' } },
     { element: '.orch-editor .header-actions', popover: { title: '④ 保存与发布', description: '保存草稿（Ctrl+S）→ 校验 → 发布生成不可变版本；「版本历史」可查看与回滚。「运行测试」不写目标，「运行」执行已发布版本。', side: 'bottom', align: 'center' } },
-    { element: '.orch-editor .console-area', popover: { title: '⑤ 运行调试面板', description: '点击展开查看运行日志、节点状态与数据预览；发起运行或运行测试时会自动展开。', side: 'top', align: 'start' } }
+    { element: '.orch-editor .console-btn', popover: { title: '⑤ 运行控制台', description: '点击「运行控制台」在弹框中查看运行日志、节点状态与数据预览；发起运行或运行测试时自动打开。按钮上的状态点实时反映最近一次运行：蓝=运行中、绿=成功、红=失败、紫=试运行。', side: 'bottom', align: 'center' } }
   ]
   const instance = driver({
     showProgress: true,

@@ -67,7 +67,15 @@ const optionLabel = f => f.type ? `${f.name} · ${f.type}` : f.name
       </div>
     </div>
 
-    <div v-if="!rows.length" class="fm-empty">暂无映射。点「加载字段」从来源/目标读取字段，再「自动映射」同名生成，或「+ 添加」手动配置。</div>
+    <div v-if="!rows.length" class="fm-empty">
+      <!-- 加载成功后即使还没有映射行，也展示读到的字段，避免「点了没反应」 -->
+      <template v-if="srcOptions.length || tgtOptions.length">
+        <div class="fm-loaded"><b>来源字段（{{ srcOptions.length }}）</b>{{ srcOptions.map(f => f.name).join('、') || '无' }}</div>
+        <div class="fm-loaded"><b>目标字段（{{ tgtOptions.length }}）</b>{{ tgtOptions.map(f => f.name).join('、') || '无' }}</div>
+        <div>点「自动映射」按同名生成映射，或「+ 添加」手动配置。</div>
+      </template>
+      <template v-else>暂无映射。点「加载字段」从来源/目标读取字段，再「自动映射」同名生成，或「+ 添加」手动配置。</template>
+    </div>
 
     <div v-else class="fm-table">
       <div class="fm-head">
@@ -124,6 +132,8 @@ const optionLabel = f => f.type ? `${f.name} · ${f.type}` : f.name
 .fm-actions{display:flex;gap:2px}
 .fm-actions :deep(.el-button){padding:0 5px;font-size:12px!important;height:24px;margin-left:0}
 .fm-empty{color:#9aa4b2;font-size:12px;line-height:1.7;padding:14px;border:1px dashed #e2e8f0;border-radius:8px;text-align:center}
+.fm-loaded{max-height:120px;overflow:auto;word-break:break-all;text-align:left;margin-bottom:6px;color:#5a6b82}
+.fm-loaded b{display:block;font-size:11px;color:#8a94a6;margin-bottom:2px}
 .fm-table{border:1px solid #e8edf3;border-radius:8px;overflow:hidden}
 .fm-head{display:flex;background:#f8fafc;border-bottom:1px solid #e8edf3;font-size:11px;font-weight:600;color:#8a94a6}
 .fm-h-left{flex:1;padding:7px 10px 7px 30px}

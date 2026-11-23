@@ -30,7 +30,7 @@ const issues = ref([])
 const showIssues = ref(false)
 const history = createHistory(30)
 const gridOn = ref(true), minimapOn = ref(false), canvasFullscreen = ref(false)
-const consoleCollapsed = ref(true)
+const consoleOpen = ref(false)
 const nodeTypes = { orchNode: OrchNode }
 
 // ---- runtime state ----
@@ -72,13 +72,22 @@ const nodeNameMap = computed(() => Object.fromEntries(definition.nodes.map(n => 
 const selectedComponent = computed(() => selectedNode.value ? byType.value.get(selectedNode.value.component) : null)
 const selectedNodeLogs = computed(() => consoleLogs.value.filter(l => l.nodeKey === selectedId.value))
 const selectedNodeState = computed(() => nodeStatesMap.value.get(selectedId.value) || null)
-const sourceFields = ref([]), targetFields = ref([]), tables = ref([])
+const sourceFields = ref([]), targetFields = ref([]), tables = ref([]), tablesLoading = ref(false), tablesSourceId = ref(null)
 
 const vueNodes = computed(() => toVueNodes(definition, byType.value, { nodeStates: nodeStatesMap.value, selectedId: selectedId.value, issueIds: issueIds.value, running: readonly.value }))
 const vueEdges = computed(() => toVueEdges(definition, { selectedEdgeId: selectedEdgeId.value }))
 const zoomPercent = ref(100)
 const metricState = computed(() => runDetail.value ? ({ SUCCEEDED: '成功', FAILED: '失败', RUNNING: '运行中', INTERRUPTED: '已中断', PENDING: '排队' }[runDetail.value.state] || runDetail.value.state) : (publishedVersion.value > 0 ? '已发布' : '草稿'))
 const metricLastRun = computed(() => runDetail.value?.finishedAt ? String(runDetail.value.finishedAt).replace('T', ' ').slice(5, 16) : '暂无执行')
+// 控制台入口状态点：弹框关闭时也能感知最近一次运行状态
+const consoleDot = computed(() => {
+  const s = mode.value === 'test' ? 'TEST' : (runDetail.value?.state || '')
+  if (s === 'RUNNING' || s === 'PENDING') return 'running'
+  if (s === 'SUCCEEDED') return 'success'
+  if (s === 'FAILED' || s === 'INTERRUPTED' || s === 'CANCELED') return 'danger'
+  if (s === 'TEST') return 'test'
+  return 'idle'
+})
 
 const { onConnect, onNodeClick, onEdgeClick, onPaneClick, onNodesChange, onEdgesChange, onViewportChange, screenToFlowCoordinate, fitView, zoomIn, zoomOut } = useVueFlow(FLOW_ID)
 
@@ -107,7 +116,8 @@ async function load() {
     definition.edges = def.edges || []
     definition.layout = def.layout || { zoom: 1, viewport: { x: 0, y: 0 } }
     dirty.value = false
-    setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 80)
+    // 默认 100% 展示：仅在有节点时适应画布，且放大不超过 100%
+    if (definition.nodes.length) setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 200 }), 80)
   } catch (e) { ElMessage.error(e.message) } finally {
     loading.value = false
     if (!guideStarted && !guideDismissed()) { guideStarted = true; nextTick(() => setTimeout(() => startOrchGuide(), 500)) }
@@ -179,11 +189,13 @@ function removeSelected() {
 }
 function doUndo() { const snap = history.undo(snapshot()); if (snap) { restore(snap); markDirty() } }
 function doRedo() { const snap = history.redo(snapshot()); if (snap) { restore(snap); markDirty() } }
-function doAutoLayout() { pushHistory(); autoLayout(definition); markDirty(); setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 60) }
+function doAutoLayout() { pushHistory(); autoLayout(definition); markDirty(); setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 300 }), 60) }
 function locateNode(id) {
   selectedId.value = id
   fitView({ nodes: [id], maxZoom: 1.2, padding: 0.4, duration: 300 })
 }
+// 控制台里点节点定位：先关弹框回到画布，避免遮住定位结果
+function onConsoleLocate(id) { consoleOpen.value = false; locateNode(id) }
 
 // ---- persistence ----
 async function save() {
@@ -245,7 +257,7 @@ async function confirmRun() {
     runOpen.value = false
     activeRunId.value = res.id
     mode.value = 'run'
-    consoleCollapsed.value = false
+    consoleOpen.value = true
     runLogs.value = []; lastLogId = 0
     await refreshRun()
     startPolling()
@@ -259,7 +271,7 @@ async function runTest() {
     for (const v of definition.variables) if (v.valueSource !== 'WATERMARK') variables[v.name] = v.defaultValue ?? ''
     testResult.value = await api.testRun({ definition, businessDate: runBusinessDate.value, variables })
     mode.value = 'test'
-    consoleCollapsed.value = false
+    consoleOpen.value = true
     ElMessage.success('运行测试完成（未写入目标）')
   } catch (e) {
     if (e.status === 422) { issues.value = e.payload?.validation?.errors || []; showIssues.value = true; ElMessage.error('校验未通过') }
@@ -309,8 +321,16 @@ async function testConnection(sourceId) {
   } catch (e) { ElMessage.error(e.message) }
 }
 async function loadTables(sourceId) {
-  try { const rows = await api.fetchTables(sourceId); tables.value = rows.map(t => t.name || t.tableName || t).filter(Boolean) }
-  catch (e) { ElMessage.error(e.message) }
+  if (!sourceId || tablesLoading.value) return
+  tablesLoading.value = true
+  // 切换数据源后先清掉旧表列表，避免下拉短暂展示别的库的表
+  if (tablesSourceId.value !== sourceId) tables.value = []
+  try {
+    const rows = await api.fetchTables(sourceId)
+    tables.value = rows.map(t => t.name || t.tableName || t).filter(Boolean)
+    tablesSourceId.value = sourceId
+  } catch (e) { tables.value = []; tablesSourceId.value = null; ElMessage.error(e.message) }
+  finally { tablesLoading.value = false }
 }
 function varValues() {
   const values = { business_date: new Date().toLocaleDateString('sv-SE') }
@@ -342,15 +362,20 @@ async function resolveTargetSchema(node, depth = 0) {
   }
   return resolveTargetSchema(downstreamOf(node.id), depth + 1)
 }
-async function loadFields() {
+async function loadFields(feedback = true) {
   const node = selectedNode.value
   if (!node) return
   sourceFields.value = []; targetFields.value = []
-  try { sourceFields.value = await resolveSourceSchema(upstreamOf(node.id)) } catch { /* 上游不可解析时留空 */ }
-  try { targetFields.value = await resolveTargetSchema(downstreamOf(node.id)) } catch { /* 下游不可解析时留空 */ }
-  if (!sourceFields.value.length && !targetFields.value.length) ElMessage.warning('未能从上下游加载字段，请检查来源/目标配置')
+  const errors = []
+  try { sourceFields.value = await resolveSourceSchema(upstreamOf(node.id)) } catch (e) { errors.push(`来源字段：${e.message}`) }
+  try { targetFields.value = await resolveTargetSchema(downstreamOf(node.id)) } catch (e) { errors.push(`目标字段：${e.message}`) }
+  if (!feedback) return
+  if (errors.length) ElMessage.error(errors.join('；'))
+  else if (!sourceFields.value.length && !targetFields.value.length) ElMessage.warning('未能从上下游加载字段，请检查来源/目标配置')
+  else ElMessage.success(`已加载来源字段 ${sourceFields.value.length} 个、目标字段 ${targetFields.value.length} 个`)
 }
-watch(selectedNode, n => { if (n && n.component === 'transform.field-map') loadFields() })
+// 选中映射节点时静默预加载，避免每次点节点都弹提示；手动「加载字段」才给反馈
+watch(selectedNode, n => { if (n && n.component === 'transform.field-map') loadFields(false) })
 
 // ---- schedule ----
 function openInfo() { infoForm.name = name.value; infoForm.directoryId = taskDirectoryId.value; infoForm.description = taskDescription.value; infoOpen.value = true }
@@ -397,7 +422,7 @@ async function restoreVersion(row) {
     dirty.value = true
     versionsOpen.value = false
     ElMessage.success(`已载入 v${row.version} 为草稿，保存并发布后生效`)
-    setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 80)
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1, duration: 200 }), 80)
   } catch (e) { ElMessage.error(e.message) }
 }
 async function openSchedule() {
@@ -465,6 +490,7 @@ onBeforeUnmount(() => {
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.publish') || readonly" @click="publishOpen = true">发布</el-button>
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.execute')" :loading="runBusy" @click="runTest">运行测试</el-button>
         <el-button size="small" type="primary" :disabled="!can('workflow.task.execute') || readonly" @click="openRun">运行</el-button>
+        <el-button size="small" class="ghost console-btn" title="运行日志 / 节点状态 / 数据预览" @click="consoleOpen = true"><span class="console-dot" :class="consoleDot"></span>运行控制台</el-button>
         <el-button size="small" class="ghost" @click="startOrchGuide()">引导</el-button>
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.read')" @click="openVersions">版本历史</el-button>
         <el-button size="small" class="ghost" :disabled="!can('workflow.task.update')" @click="openSchedule">定时</el-button>
@@ -495,7 +521,7 @@ onBeforeUnmount(() => {
       <div class="canvas-wrap" :class="{ 'canvas-full': canvasFullscreen }">
         <div class="canvas-toolbar">
           <div class="tb-group">
-            <button type="button" title="适应画布" @click="fitView({ padding: 0.2, duration: 200 })">⤢ 适应</button>
+            <button type="button" title="适应画布" @click="fitView({ padding: 0.2, maxZoom: 1, duration: 200 })">⤢ 适应</button>
             <button type="button" title="放大" @click="zoomIn()">＋</button>
             <span class="zoom">{{ zoomPercent }}%</span>
             <button type="button" title="缩小" @click="zoomOut()">－</button>
@@ -512,9 +538,10 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div ref="canvasEl" class="canvas" @drop="onDrop" @dragover.prevent>
-          <VueFlow :id="FLOW_ID" :nodes="vueNodes" :edges="vueEdges" :node-types="nodeTypes" :default-viewport="{ zoom: 0.9 }"
+          <!-- 不使用 fit-view-on-init：它会在首个节点落入画布时自动 fitView 改变缩放；默认视口即 100% -->
+          <VueFlow :id="FLOW_ID" :nodes="vueNodes" :edges="vueEdges" :node-types="nodeTypes" :default-viewport="{ zoom: 1 }"
                    :min-zoom="0.4" :max-zoom="1.5" :nodes-draggable="canEdit" :nodes-connectable="canEdit" :edges-updatable="canEdit"
-                   :delete-key-code="null" fit-view-on-init>
+                   :delete-key-code="null">
             <Background v-if="gridOn" :gap="20" :size="1" pattern-color="#d6e0ea" />
             <MiniMap v-if="minimapOn" position="bottom-right" :pannable="true" :zoomable="true" />
             <div v-if="!vueNodes.length" class="canvas-empty">从左侧组件库拖拽或点击组件开始编排</div>
@@ -527,20 +554,18 @@ onBeforeUnmount(() => {
     <Transition name="orch-drawer">
       <aside v-if="selectedNode" class="orch-drawer">
         <OrchInspector :node="selectedNode" :component="selectedComponent" :sources="sources" :variables="definition.variables"
-                       :readonly="!canEdit" :node-logs="selectedNodeLogs" :node-state="selectedNodeState" :source-fields="sourceFields" :target-fields="targetFields" :tables="tables"
+                       :readonly="!canEdit" :node-logs="selectedNodeLogs" :node-state="selectedNodeState" :source-fields="sourceFields" :target-fields="targetFields" :tables="tables" :tables-loading="tablesLoading"
                        @close="selectedId = null" @test-connection="testConnection" @new-datasource="ElMessage.info('请在数据资产模块新建数据源')" @load-tables="loadTables" @load-fields="loadFields" />
       </aside>
     </Transition>
 
-    <!-- console -->
-    <div class="console-area">
-      <OrchConsole v-if="!consoleCollapsed" :mode="mode" :run="runDetail" :logs="consoleLogs" :node-states="consoleNodeStates"
+    <!-- 运行控制台：按需弹框，不再常驻底部挤压画布 -->
+    <el-dialog v-model="consoleOpen" title="运行控制台" width="min(1080px,92vw)"
+               class="orch-console-dialog" append-to-body :close-on-click-modal="false">
+      <OrchConsole :mode="mode" :run="runDetail" :logs="consoleLogs" :node-states="consoleNodeStates"
                    :previews="consolePreviews" :run-id="activeRunId" :node-names="nodeNameMap" :busy="runBusy" :can-execute="can('workflow.task.execute')" :can-retry="can('workflow.task.retry')"
-                   @stop="stopRun" @refresh="refreshRun" @retry="retryRun" @locate="locateNode" @download="downloadLogs" @update:collapsed="consoleCollapsed = $event" />
-      <div v-else class="console-collapsed" @click="consoleCollapsed = false">
-        <svg viewBox="0 0 24 24"><path d="M4 17l6-5-6-5M12 19h8" /></svg> 运行调试面板（点击展开）
-      </div>
-    </div>
+                   @stop="stopRun" @refresh="refreshRun" @retry="retryRun" @locate="onConsoleLocate" @download="downloadLogs" />
+    </el-dialog>
 
     <!-- publish dialog -->
     <el-dialog v-model="publishOpen" title="发布版本" width="min(480px,95vw)">
@@ -665,7 +690,8 @@ onBeforeUnmount(() => {
 .issue-msg{color:#5a6b82}
 .editor-body{flex:1;display:flex;gap:12px;min-height:0}
 .canvas-wrap{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;background:#fff;border:1px solid var(--el-border-color-lighter);border-radius:8px;overflow:hidden}
-.canvas-wrap.canvas-full{position:fixed;inset:16px;z-index:2800;box-shadow:0 12px 48px rgba(0,0,0,.25)}
+/* 低于 Element Plus 弹层基准(2000+)，保证全屏画布上仍能打开控制台弹框/确认框 */
+.canvas-wrap.canvas-full{position:fixed;inset:16px;z-index:1900;box-shadow:0 12px 48px rgba(0,0,0,.25)}
 .canvas-toolbar{display:flex;align-items:center;gap:14px;padding:6px 10px;border-bottom:1px solid var(--el-border-color-lighter);flex-wrap:wrap}
 .tb-group{display:flex;align-items:center;gap:4px}
 .tb-group button{border:1px solid var(--el-border-color-lighter);background:#fff;border-radius:5px;padding:3px 9px;font-size:12px;color:#5a6b82;cursor:pointer}
@@ -675,9 +701,13 @@ onBeforeUnmount(() => {
 .zoom{font-size:12px;color:#8a94a6;min-width:42px;text-align:center}
 .canvas{flex:1;min-height:0;position:relative;background:#f8fafc}
 .canvas-empty{position:absolute;top:45%;left:0;right:0;text-align:center;color:#9aa4b2;pointer-events:none;font-size:13px}
-.console-area{display:flex;flex-direction:column;min-height:0}
-.console-collapsed{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--el-border-color-lighter);border-radius:8px;padding:8px 14px;color:#5a6b82;font-size:12px;cursor:pointer}
-.console-collapsed svg{width:16px;height:16px;fill:none;stroke:#2f7fd1;stroke-width:1.6}
+.console-dot{width:7px;height:7px;border-radius:50%;flex:none;background:#c3c9d1;margin-right:6px}
+.console-dot.running{background:#2f7fd1;animation:console-pulse 1.2s ease-in-out infinite}
+.console-dot.success{background:#2f9e57}
+.console-dot.danger{background:#e05656}
+.console-dot.test{background:#8250df}
+@keyframes console-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){.console-dot.running{animation:none}}
 .orch-drawer{position:fixed;top:0;right:0;height:100vh;height:100dvh;width:460px;max-width:92vw;background:#fff;z-index:1500;box-shadow:-8px 0 28px rgba(20,40,70,.18);display:flex;flex-direction:column}
 .orch-drawer-enter-from,.orch-drawer-leave-to{transform:translateX(100%)}
 .orch-drawer-enter-active,.orch-drawer-leave-active{transition:transform .25s ease}
@@ -685,6 +715,11 @@ onBeforeUnmount(() => {
 </style>
 
 <style>
+/* 运行控制台弹框（append-to-body，需全局样式）：body 定高，控制台内部滚动 */
+.orch-console-dialog .el-dialog__body{height:min(66vh,720px);padding:10px 16px 14px;overflow:hidden;display:flex;flex-direction:column}
+.orch-console-dialog .el-dialog__body > .console{flex:1;min-height:0}
+.orch-console-dialog .el-dialog__header{padding:14px 16px;margin-right:0;border-bottom:1px solid var(--el-border-color-lighter)}
+.orch-console-dialog .el-dialog__title{font-size:15px;font-weight:600;color:#24344d}
 /* 步骤引导（driver.js 挂载到 body，需全局样式） */
 .orch-guide-popover{font-family:"PingFang SC","Microsoft YaHei",sans-serif;border-radius:10px;box-shadow:0 12px 40px rgba(20,40,70,.22);max-width:340px}
 .orch-guide-popover .driver-popover-title{font-size:15px;font-weight:600;color:#24344d}

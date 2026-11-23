@@ -10,7 +10,8 @@ const SqlMonaco = defineAsyncComponent(() => import('./SqlMonaco.vue'))
 
 const props = defineProps({
   node: Object, component: Object, sources: Array, variables: Array,
-  readonly: Boolean, nodeLogs: Array, nodeState: String, sourceFields: Array, targetFields: Array, tables: Array
+  readonly: Boolean, nodeLogs: Array, nodeState: String, sourceFields: Array, targetFields: Array, tables: Array,
+  tablesLoading: Boolean
 })
 const emit = defineEmits(['test-connection', 'new-datasource', 'load-tables', 'load-fields', 'close'])
 const tab = ref('basic')
@@ -113,7 +114,9 @@ const stateLabel = { RUNNING: '运行中', SUCCEEDED: '成功', FAILED: '失败'
                   <el-button text type="primary" @click="emit('new-datasource')">新建</el-button>
                 </div>
                 <div v-else-if="f.type === 'table'" class="source-field">
-                  <el-select v-model="node.config[f.key]" filterable allow-create default-first-option placeholder="表名（可 schema.table）" class="grow">
+                  <!-- 展开下拉即自动加载表列表，无需先点「浏览」 -->
+                  <el-select v-model="node.config[f.key]" filterable allow-create default-first-option placeholder="表名（可 schema.table）" class="grow"
+                             :loading="tablesLoading" @visible-change="v => v && node.config.sourceId && emit('load-tables', node.config.sourceId)">
                     <el-option v-for="t in tables || []" :key="t" :label="t" :value="t" />
                   </el-select>
                   <el-button text type="primary" :disabled="!node.config.sourceId" @click="emit('load-tables', node.config.sourceId)">浏览</el-button>

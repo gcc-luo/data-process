@@ -1,3 +1,6 @@
 backend/target/
 frontend/node_modules/
 frontend/dist/
+
+# 头脑风暴视觉伴侣原型（本地会话产物）
+.superpowers/
