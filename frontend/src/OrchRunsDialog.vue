@@ -80,16 +80,15 @@ watch(() => props.open, open => { if (open) { detail.value = null; logs.value = 
 </script>
 
 <template>
-  <el-dialog :model-value="open" :title="`${task?.name || ''} · 运行记录`" width="min(1000px,96vw)" @update:model-value="emit('update:open', $event)">
+  <el-dialog class="orch-runs-dialog" :model-value="open" :title="`${task?.name || ''} · 运行记录`" width="min(1000px,96vw)" @update:model-value="emit('update:open', $event)">
     <div class="runs-toolbar"><el-button class="refresh-button" title="刷新" @click="load"><RefreshIcon /></el-button></div>
     <el-table :data="runs" size="small" v-loading="loading" empty-text="暂无运行记录" max-height="280" highlight-current-row @row-click="showDetail">
-      <el-table-column prop="id" label="实例" width="70" />
-      <el-table-column prop="taskVersion" label="版本" width="60" />
-      <el-table-column prop="businessDate" label="业务日期" width="110" />
+      <el-table-column prop="id" label="实例" width="70" class-name="run-num" />
+      <el-table-column prop="taskVersion" label="版本" width="60" class-name="run-num" />
       <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag size="small" :type="TYPE[row.state] || 'info'">{{ STATE[row.state] || row.state }}</el-tag></template></el-table-column>
-      <el-table-column label="开始" min-width="150"><template #default="{ row }">{{ fmt(row.startedAt) }}</template></el-table-column>
-      <el-table-column label="结束" min-width="150"><template #default="{ row }">{{ fmt(row.finishedAt) }}</template></el-table-column>
-      <el-table-column label="尝试" min-width="140"><template #default="{ row }"><span v-for="a in row.attempts" :key="a.attempt" class="attempt">第{{ a.attempt }}次 {{ STATE[a.state] || a.state }} </span></template></el-table-column>
+      <el-table-column label="开始" min-width="160" class-name="run-time"><template #default="{ row }">{{ fmt(row.startedAt) }}</template></el-table-column>
+      <el-table-column label="结束" min-width="160" class-name="run-time"><template #default="{ row }">{{ fmt(row.finishedAt) }}</template></el-table-column>
+      <el-table-column label="尝试" min-width="150"><template #default="{ row }"><span v-for="a in row.attempts" :key="a.attempt" class="attempt">第 {{ a.attempt }} 次 · {{ STATE[a.state] || a.state }}</span></template></el-table-column>
       <el-table-column label="操作" width="130"><template #default="{ row }">
         <el-button text type="primary" size="small" @click.stop="showDetail(row)">详情</el-button>
         <el-button v-if="can('workflow.task.retry') && ['FAILED', 'INTERRUPTED'].includes(row.state)" text type="warning" size="small" @click.stop="retry(row)">重试</el-button>
@@ -158,7 +157,8 @@ watch(() => props.open, open => { if (open) { detail.value = null; logs.value = 
 
 <style scoped>
 .runs-toolbar{display:flex;justify-content:flex-end;margin-bottom:8px}
-.attempt{font-size:12px;color:#5a6b82;margin-right:6px}
+.attempt{font-size:12px;color:#5a6b82}
+.attempt + .attempt{margin-left:8px}
 .run-detail{margin-top:14px;border-top:1px solid var(--el-border-color-lighter);padding-top:12px}
 .run-detail :deep(.el-tabs__content .el-tab-pane){min-height:0;padding:0;border:0;border-radius:0;box-shadow:none;background:transparent}
 .detail-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
@@ -176,4 +176,14 @@ watch(() => props.open, open => { if (open) { detail.value = null; logs.value = 
 .log-node{color:#2f7fd1;flex:none}
 .log-msg{word-break:break-all}
 .log-empty{color:#9aa4b2;text-align:center;padding:16px}
+</style>
+
+<style>
+/* 运行记录弹框排版统一（视觉伴侣方案 A）：覆盖全局表格居中/控制字号，仅作用于本弹框 */
+.orch-runs-dialog.el-dialog .el-table th .cell,.orch-runs-dialog.el-dialog .el-table td .cell{text-align:left}
+.orch-runs-dialog.el-dialog .el-table th.el-table__cell{height:36px;background:#f8fafc;color:#8a94a6;font-size:11px;font-weight:600}
+.orch-runs-dialog.el-dialog .el-table td.el-table__cell{height:38px}
+.orch-runs-dialog.el-dialog .el-table .cell{font-size:12px;color:#5a6b82}
+.orch-runs-dialog .run-num,.orch-runs-dialog .run-time{font-family:ui-monospace,Menlo,Consolas,monospace}
+.orch-runs-dialog .run-time{white-space:nowrap}
 </style>
