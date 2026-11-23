@@ -9,7 +9,7 @@ export const dismissGuide = () => { try { localStorage.setItem(KEY, '1') } catch
 export function startOrchGuide() {
   let dontShow = false
   const steps = [
-    { popover: { title: '欢迎使用数据处理任务编排', description: '通过拖拽组件搭建数据处理流程：来源 → 处理 → 目的。下面带你快速认识各个区域。', side: 'over', align: 'center' } },
+    { popover: { title: '欢迎使用处理任务编排', description: '通过拖拽组件搭建数据处理流程：来源 → 处理 → 目的。下面带你快速认识各个区域。', side: 'over', align: 'center' } },
     { element: '.orch-editor .palette', popover: { title: '① 组件库', description: '按来源 / 处理 / 目的 / 控制分组，可搜索。拖拽或点击组件加入画布；标「待支持」的组件暂未开放。', side: 'right', align: 'start' } },
     { element: '.orch-editor .canvas-wrap', popover: { title: '② 编排画布', description: '拖动节点调整位置；从节点右侧连接点拖到下一节点左侧建立连线。工具栏支持缩放、适应、自动布局、小地图与撤销重做。', side: 'over', align: 'center' } },
     { element: '.orch-editor .canvas', popover: { title: '③ 节点配置', description: '点击任意节点，右侧弹出配置抽屉（基础配置 / 高级参数 / 重试策略 / 执行日志）。SQL 节点可点「运行查询」预览数据。', side: 'over', align: 'center' } },

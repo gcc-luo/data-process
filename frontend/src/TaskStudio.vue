@@ -122,7 +122,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnOnUnload))
 <template>
 <section>
   <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/><el-alert v-if="message" :title="message" type="success" :closable="false" show-icon/>
-  <el-alert type="info" :closable="false" show-icon title="任务（组件编排）请在“数据处理 · 数据处理任务”中创建与发布；此处管理工作流依赖、定时与补跑。" style="margin-bottom:12px"/>
+  <el-alert type="info" :closable="false" show-icon title="任务（组件编排）请在“数据处理 · 处理任务”中创建与发布；此处管理工作流依赖、定时与补跑。" style="margin-bottom:12px"/>
   <el-tabs>
     <el-tab-pane v-if="can('workflow.workflow.read') || can('workflow.workflow.create')" label="工作流">
       <template v-if="!workflowDetail"><div class="toolbar list-query-toolbar"><div class="list-query-controls"><el-input v-model="workflowSearch" clearable placeholder="搜索工作流名称或版本" @keyup.enter="applyWorkflowQuery"/><el-button type="primary" @click="applyWorkflowQuery">查询</el-button><small>已加载 {{ workflowPaging.total.value }} 条</small></div><div class="list-query-actions"><el-button v-if="can('workflow.schedule.backfill') && can('workflow.workflow.read')" @click="error = ''; backfillDialog = true">按日期补跑</el-button><el-button v-if="can('workflow.workflow.create') && can('workflow.task.read')" type="primary" @click="openWorkflowCreate">新增</el-button><el-button class="refresh-button" title="刷新" aria-label="刷新" @click="reload"><RefreshIcon /></el-button></div></div>

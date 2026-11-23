@@ -239,7 +239,7 @@ onBeforeUnmount(() => {
             <el-table-column type="selection" width="42"/>
             <el-table-column type="index" label="序号" width="60"/>
             <el-table-column prop="name" label="任务名称" min-width="160"/>
-            <el-table-column label="类型" width="120"><template #default>数据处理任务</template></el-table-column>
+            <el-table-column label="类型" width="120"><template #default>处理任务</template></el-table-column>
             <el-table-column label="状态" width="130"><template #default="scope"><el-tag size="small" :type="scope.row.version > 0 ? 'success' : 'info'">{{ scope.row.version > 0 ? `已发布 v${scope.row.version}` : '草稿' }}</el-tag></template></el-table-column>
             <el-table-column label="目录" min-width="110"><template #default="scope">{{ directories.find(d => d.id === scope.row.directoryId)?.name ?? '未分类' }}</template></el-table-column>
             <el-table-column label="运行状态" width="90"><template #default="scope"><el-tag :type="scope.row.runState === 'RUNNING' ? 'success' : 'info'" size="small">{{ scope.row.runState === 'RUNNING' ? '运行中' : '停止' }}</el-tag></template></el-table-column>
