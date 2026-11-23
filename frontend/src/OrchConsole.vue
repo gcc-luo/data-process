@@ -63,6 +63,11 @@ function downloadLogs() {
   const text = filteredLogs.value.map(l => `${fmtTime(l.createdAt)} [${l.level}] ${l.nodeKey || ''} ${l.message}`).join('\n')
   emit('download', text)
 }
+// 供无画布场景（运行记录弹框）复用：点节点行跳该节点的数据预览
+function focusNode(key) {
+  if (previewOptions.value.some(o => o.key === key)) { tab.value = 'preview'; previewNode.value = key }
+}
+defineExpose({ focusNode })
 </script>
 
 <template>

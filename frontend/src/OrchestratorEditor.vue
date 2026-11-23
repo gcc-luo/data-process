@@ -715,11 +715,6 @@ onBeforeUnmount(() => {
 </style>
 
 <style>
-/* 运行控制台弹框（append-to-body，需全局样式）：body 定高，控制台内部滚动 */
-.orch-console-dialog .el-dialog__body{height:min(66vh,720px);padding:10px 16px 14px;overflow:hidden;display:flex;flex-direction:column}
-.orch-console-dialog .el-dialog__body > .console{flex:1;min-height:0}
-.orch-console-dialog .el-dialog__header{padding:14px 16px;margin-right:0;border-bottom:1px solid var(--el-border-color-lighter)}
-.orch-console-dialog .el-dialog__title{font-size:15px;font-weight:600;color:#24344d}
 /* 步骤引导（driver.js 挂载到 body，需全局样式） */
 .orch-guide-popover{font-family:"PingFang SC","Microsoft YaHei",sans-serif;border-radius:10px;box-shadow:0 12px 40px rgba(20,40,70,.22);max-width:340px}
 .orch-guide-popover .driver-popover-title{font-size:15px;font-weight:600;color:#24344d}

@@ -1,66 +1,52 @@
 <script setup>
-import { ref, computed, watch, inject } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as api from './orch-api.js'
-import { previewTable } from './orch-graph.js'
+import { usePagination } from './pagination.js'
+import OrchConsole from './OrchConsole.vue'
 import RefreshIcon from './RefreshIcon.vue'
 
 const props = defineProps({ open: Boolean, task: Object })
 const emit = defineEmits(['update:open', 'changed'])
 const can = inject('canPermission', () => false)
 const runs = ref([]), loading = ref(false)
-const detail = ref(null), detailLoading = ref(false), detailTab = ref('nodes')
-const logs = ref([]), logNode = ref(''), logLevel = ref(''), logSearch = ref('')
-const previewNode = ref(''), runPreview = ref(null), previewLoading = ref(false)
-const previewKeys = computed(() => (detail.value?.nodes || []).filter(n => n.hasSample).map(n => n.nodeKey))
-const previewOptions = computed(() => (detail.value?.nodes || []).filter(n => n.hasSample).map(n => ({ key: n.nodeKey, name: n.nodeName || n.nodeKey })))
-const previewData = computed(() => previewTable(runPreview.value))
-watch(previewNode, async node => {
-  runPreview.value = null
-  if (!node || !detail.value) return
-  previewLoading.value = true
-  try { runPreview.value = await api.fetchRunNodePreview(detail.value.id, node) } catch { runPreview.value = null } finally { previewLoading.value = false }
-})
+const paging = usePagination(runs)
+// 详情复用画布控制台组件（视觉伴侣方案 A：双层弹框钻取）
+const detail = ref(null), detailLoading = ref(false), consoleOpen = ref(false), consoleRef = ref(null)
+const logs = ref([])
+let lastLogId = 0
+const nodeNames = computed(() => Object.fromEntries((detail.value?.nodes || []).map(n => [n.nodeKey, n.nodeName || n.nodeKey])))
 const STATE = { PENDING: '排队', RUNNING: '运行中', SUCCEEDED: '成功', FAILED: '失败', INTERRUPTED: '已中断', SKIPPED: '跳过', CANCELED: '已取消' }
 const TYPE = { SUCCEEDED: 'success', FAILED: 'danger', INTERRUPTED: 'warning', RUNNING: 'primary', PENDING: 'info', SKIPPED: 'info' }
 const fmt = v => v ? String(v).replace('T', ' ').slice(0, 19) : '—'
-const duration = computed(() => {
-  const d = detail.value
-  if (!d?.startedAt) return '—'
-  const end = d.finishedAt ? new Date(d.finishedAt) : new Date()
-  const ms = end - new Date(d.startedAt)
-  return ms >= 0 ? (ms / 1000).toFixed(1) + ' s' : '—'
-})
-const nodeOptions = computed(() => (detail.value?.nodes || []).map(n => ({ key: n.nodeKey, name: n.nodeName || n.nodeKey })))
-const filteredLogs = computed(() => {
-  const kw = logSearch.value.trim().toLowerCase()
-  return logs.value.filter(l =>
-    (!logNode.value || l.nodeKey === logNode.value) &&
-    (!logLevel.value || l.level === logLevel.value) &&
-    (!kw || String(l.message || '').toLowerCase().includes(kw)))
-})
 
 async function load() {
   if (!props.task) return
   loading.value = true
   try { runs.value = await api.fetchRuns(props.task.id) } catch (e) { ElMessage.error(e.message) } finally { loading.value = false }
 }
-async function loadLogs(runId) {
-  try { logs.value = await api.fetchRunLogs(runId, { afterId: 0, limit: 1000 }) } catch { logs.value = [] }
+async function loadLogsIncremental() {
+  try {
+    const rows = await api.fetchRunLogs(detail.value.id, { afterId: lastLogId, limit: 1000 })
+    if (rows.length) { logs.value.push(...rows); lastLogId = rows[rows.length - 1].id }
+  } catch { /* 轮询瞬时失败忽略 */ }
 }
 async function showDetail(row) {
   detailLoading.value = true
-  logNode.value = ''; logLevel.value = ''; logSearch.value = ''; previewNode.value = ''; runPreview.value = null
+  logs.value = []; lastLogId = 0
   try {
     detail.value = await api.fetchRunDetail(row.id)
-    await loadLogs(row.id)
+    await loadLogsIncremental()
+    consoleOpen.value = true
   } catch (e) { ElMessage.error(e.message) } finally { detailLoading.value = false }
 }
 async function refreshDetail() {
-  if (!detail.value) return
+  if (!detail.value || detailLoading.value) return
   detailLoading.value = true
-  try { detail.value = await api.fetchRunDetail(detail.value.id); await loadLogs(detail.value.id) } catch (e) { ElMessage.error(e.message) } finally { detailLoading.value = false }
+  try { detail.value = await api.fetchRunDetail(detail.value.id); await loadLogsIncremental() } catch { /* 瞬时 */ } finally { detailLoading.value = false }
 }
+// 控制台内点节点行：跳该节点的数据预览（无画布可定位）
+function consoleLocate(key) { consoleRef.value?.focusNode(key) }
 async function retry(row) {
   try { await ElMessageBox.confirm('重试可能重复写入，确认已检查幂等策略？', '重试', { type: 'warning' }) } catch { return }
   try { await api.retryRun(props.task.id, row.id); ElMessage.success('已发起重试'); await load(); if (detail.value?.id === row.id) await refreshDetail(); emit('changed') } catch (e) { ElMessage.error(e.message) }
@@ -69,20 +55,30 @@ async function stop() {
   try { await ElMessageBox.confirm('终止会中断运行，可能已写入部分数据。确定终止？', '终止执行', { type: 'warning' }) } catch { return }
   try { await api.stopTask(props.task.id); ElMessage.success('已请求终止'); await load(); await refreshDetail(); emit('changed') } catch (e) { ElMessage.error(e.message) }
 }
-function downloadLogs() {
-  const text = filteredLogs.value.map(l => `${fmt(l.createdAt)} [${l.level}] ${l.nodeKey || ''} ${l.message}`).join('\n')
+function downloadLogs(text) {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url; a.download = `run-${detail.value?.id}-logs.txt`; a.click()
   URL.revokeObjectURL(url)
 }
-watch(() => props.open, open => { if (open) { detail.value = null; logs.value = []; load() } })
+watch(() => props.open, open => {
+  if (open) { detail.value = null; logs.value = []; lastLogId = 0; consoleOpen.value = false; paging.page.value = 1; load() }
+  else consoleOpen.value = false
+})
+// 运行中增量轮询，与画布控制台同节奏（2s）
+let pollTimer = null
+function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null } }
+watch([consoleOpen, () => detail.value?.state], ([open, state]) => {
+  stopPoll()
+  if (open && (state === 'RUNNING' || state === 'PENDING')) pollTimer = setInterval(refreshDetail, 2000)
+})
+onBeforeUnmount(stopPoll)
 </script>
 
 <template>
   <el-dialog class="orch-runs-dialog" :model-value="open" :title="`${task?.name || ''} · 运行记录`" width="min(1000px,96vw)" @update:model-value="emit('update:open', $event)">
     <div class="runs-toolbar"><el-button class="refresh-button" title="刷新" @click="load"><RefreshIcon /></el-button></div>
-    <el-table :data="runs" size="small" v-loading="loading" empty-text="暂无运行记录" max-height="280" highlight-current-row @row-click="showDetail">
+    <el-table :data="paging.visible.value" size="small" v-loading="loading" empty-text="暂无运行记录" max-height="280" highlight-current-row @row-click="showDetail">
       <el-table-column prop="id" label="实例" width="70" class-name="run-num" />
       <el-table-column prop="taskVersion" label="版本" width="60" class-name="run-num" />
       <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag size="small" :type="TYPE[row.state] || 'info'">{{ STATE[row.state] || row.state }}</el-tag></template></el-table-column>
@@ -94,96 +90,37 @@ watch(() => props.open, open => { if (open) { detail.value = null; logs.value = 
         <el-button v-if="can('workflow.task.retry') && ['FAILED', 'INTERRUPTED'].includes(row.state)" text type="warning" size="small" @click.stop="retry(row)">重试</el-button>
       </template></el-table-column>
     </el-table>
+    <div class="runs-pagination"><el-pagination v-model:current-page="paging.page.value" v-model:page-size="paging.pageSize.value" :total="paging.total.value" :page-sizes="[10,20,50]" layout="total, sizes, prev, pager, next"/></div>
+  </el-dialog>
 
-    <div v-if="detail" class="run-detail" v-loading="detailLoading">
-      <div class="detail-head">
-        <div class="detail-summary">
-          <strong>实例 #{{ detail.id }}</strong>
-          <el-tag size="small" :type="TYPE[detail.state] || 'info'">{{ STATE[detail.state] || detail.state }}</el-tag>
-          <span>业务日期 {{ detail.businessDate }}</span>
-          <span>耗时 {{ duration }}</span>
-          <span>开始 {{ fmt(detail.startedAt) }}</span>
-        </div>
-        <div class="detail-actions">
-          <el-button v-if="detail.state === 'RUNNING' && can('workflow.task.execute')" size="small" type="warning" @click="stop">终止</el-button>
-          <el-button v-if="['FAILED', 'INTERRUPTED'].includes(detail.state) && can('workflow.task.retry')" size="small" type="warning" @click="retry(detail)">重试</el-button>
-          <el-button size="small" @click="refreshDetail">刷新</el-button>
-        </div>
-      </div>
-      <el-tabs v-model="detailTab">
-        <el-tab-pane label="节点状态" name="nodes">
-          <el-table :data="detail.nodes" size="small" max-height="240" empty-text="无节点状态">
-            <el-table-column label="节点" min-width="120"><template #default="{ row }">{{ row.nodeName || row.nodeKey }}</template></el-table-column>
-            <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag size="small" :type="TYPE[row.state] || 'info'">{{ STATE[row.state] || row.state }}</el-tag></template></el-table-column>
-            <el-table-column prop="attempt" label="尝试" width="60" />
-            <el-table-column prop="rowsIn" label="入行数" width="80" />
-            <el-table-column prop="rowsOut" label="出行数" width="80" />
-            <el-table-column label="耗时" width="90"><template #default="{ row }">{{ row.durationMs != null ? row.durationMs + ' ms' : '—' }}</template></el-table-column>
-            <el-table-column prop="errorMessage" label="错误" min-width="160" show-overflow-tooltip />
-          </el-table>
-        </el-tab-pane>
-        <el-tab-pane label="运行日志" name="logs">
-          <div class="log-filters">
-            <el-select v-model="logNode" size="small" clearable placeholder="全部节点" style="width:150px"><el-option v-for="n in nodeOptions" :key="n.key" :label="n.name" :value="n.key" /></el-select>
-            <el-select v-model="logLevel" size="small" clearable placeholder="级别" style="width:100px"><el-option label="INFO" value="INFO" /><el-option label="WARN" value="WARN" /><el-option label="ERROR" value="ERROR" /></el-select>
-            <el-input v-model="logSearch" size="small" clearable placeholder="搜索日志" style="width:180px" />
-            <el-button size="small" text :disabled="!filteredLogs.length" @click="downloadLogs">下载</el-button>
-            <span class="log-count">{{ filteredLogs.length }} 条</span>
-          </div>
-          <div class="log-body">
-            <div v-if="!filteredLogs.length" class="log-empty">无日志</div>
-            <div v-for="l in filteredLogs" :key="l.id" class="log-line" :class="(l.level || 'INFO').toLowerCase()">
-              <span class="log-time">{{ fmt(l.createdAt) }}</span>
-              <span class="log-level">[{{ l.level }}]</span>
-              <span v-if="l.nodeKey" class="log-node">{{ l.nodeKey }}</span>
-              <span class="log-msg">{{ l.message }}</span>
-            </div>
-          </div>
-        </el-tab-pane>
-        <el-tab-pane label="数据预览" name="preview">
-          <div class="log-filters">
-            <el-select v-model="previewNode" size="small" placeholder="选择节点" style="width:200px"><el-option v-for="o in previewOptions" :key="o.key" :label="o.name" :value="o.key" /></el-select>
-            <span class="log-count">每节点最多采样前 100 行</span>
-          </div>
-          <el-table v-if="previewNode" v-loading="previewLoading" :data="previewData.rows" size="small" max-height="260" empty-text="无样本">
-            <el-table-column v-for="c in previewData.columns" :key="c.prop" :prop="c.prop" :label="c.label" min-width="120" show-overflow-tooltip />
-          </el-table>
-          <div v-else class="log-empty">{{ previewKeys.length ? '选择一个节点查看数据样本。' : '该运行暂无可预览的节点样本。' }}</div>
-        </el-tab-pane>
-      </el-tabs>
-    </div>
+  <!-- 第二层：复用画布运行控制台（深色终端日志/节点卡片/数据预览） -->
+  <el-dialog v-model="consoleOpen" :title="`运行 #${detail?.id ?? ''} · 运行控制台`" width="min(1080px,92vw)"
+             class="orch-console-dialog" append-to-body :close-on-click-modal="false">
+    <OrchConsole v-if="detail" ref="consoleRef" mode="run" :run="detail" :logs="logs" :node-states="detail.nodes || []"
+                 :previews="{}" :run-id="detail.id" :node-names="nodeNames" :busy="detailLoading"
+                 :can-execute="can('workflow.task.execute')" :can-retry="can('workflow.task.retry')"
+                 @stop="stop" @refresh="refreshDetail" @retry="retry(detail)" @locate="consoleLocate" @download="downloadLogs" />
   </el-dialog>
 </template>
 
 <style scoped>
 .runs-toolbar{display:flex;justify-content:flex-end;margin-bottom:8px}
+.runs-pagination{display:flex;justify-content:flex-end;margin-top:10px}
 .attempt{font-size:12px;color:#5a6b82}
 .attempt + .attempt{margin-left:8px}
-.run-detail{margin-top:14px;border-top:1px solid var(--el-border-color-lighter);padding-top:12px}
-.run-detail :deep(.el-tabs__content .el-tab-pane){min-height:0;padding:0;border:0;border-radius:0;box-shadow:none;background:transparent}
-.detail-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
-.detail-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:#5a6b82}
-.detail-summary strong{font-size:13px;color:#24344d}
-.detail-actions{display:flex;gap:6px}
-.log-filters{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
-.log-count{font-size:12px;color:#9aa4b2;margin-left:auto}
-.log-body{font-family:ui-monospace,Menlo,monospace;font-size:12px;max-height:260px;overflow:auto;background:#fafbfc;border:1px solid var(--el-border-color-lighter);border-radius:6px;padding:8px}
-.log-line{display:flex;gap:6px;padding:1px 0;color:#5a6b82}
-.log-line.error{color:#e05656}
-.log-line.warn{color:#d98a2b}
-.log-time{color:#9aa4b2;flex:none}
-.log-level{flex:none;width:52px}
-.log-node{color:#2f7fd1;flex:none}
-.log-msg{word-break:break-all}
-.log-empty{color:#9aa4b2;text-align:center;padding:16px}
 </style>
 
 <style>
-/* 运行记录弹框排版统一（视觉伴侣方案 A）：覆盖全局表格居中/控制字号，仅作用于本弹框 */
+/* 运行记录弹框排版统一：覆盖全局表格居中/控制字号，仅作用于本弹框 */
 .orch-runs-dialog.el-dialog .el-table th .cell,.orch-runs-dialog.el-dialog .el-table td .cell{text-align:left}
 .orch-runs-dialog.el-dialog .el-table th.el-table__cell{height:36px;background:#f8fafc;color:#8a94a6;font-size:11px;font-weight:600}
 .orch-runs-dialog.el-dialog .el-table td.el-table__cell{height:38px}
 .orch-runs-dialog.el-dialog .el-table .cell{font-size:12px;color:#5a6b82}
 .orch-runs-dialog .run-num,.orch-runs-dialog .run-time{font-family:ui-monospace,Menlo,Consolas,monospace}
 .orch-runs-dialog .run-time{white-space:nowrap}
+/* 运行控制台弹框外壳（画布与运行记录共用，随 OrchConsole 加载） */
+.orch-console-dialog .el-dialog__body{height:min(66vh,720px);padding:10px 16px 14px;overflow:hidden;display:flex;flex-direction:column}
+.orch-console-dialog .el-dialog__body > .console{flex:1;min-height:0}
+.orch-console-dialog .el-dialog__header{padding:14px 16px;margin-right:0;border-bottom:1px solid var(--el-border-color-lighter)}
+.orch-console-dialog .el-dialog__title{font-size:15px;font-weight:600;color:#24344d}
 </style>
