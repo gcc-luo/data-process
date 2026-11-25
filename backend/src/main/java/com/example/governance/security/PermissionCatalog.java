@@ -32,6 +32,7 @@ public final class PermissionCatalog {
             case "assets", "assets/sources" -> "datasource.source";
             case "assets/datasets" -> "datasource.dataset";
             case "assets/drivers" -> "datasource.driver";
+            case "assets/dictionary" -> "datasource.dictionary";
             case "query" -> "datasource.query";
             case "processing/tasks" -> "workflow.task";
             case "tasks" -> "workflow.workflow";
@@ -44,7 +45,7 @@ public final class PermissionCatalog {
 
     public static Set<String> modulesForComponent(String component) {
         return switch (component == null ? "" : component) {
-            case "assets" -> Set.of("datasource.source", "datasource.dataset", "datasource.driver");
+            case "assets" -> Set.of("datasource.source", "datasource.dataset", "datasource.driver", "datasource.dictionary");
             case "tasks" -> Set.of("workflow.task", "workflow.workflow", "workflow.schedule");
             case "services" -> Set.of("service.service", "service.caller");
             case "reports" -> Set.of("report.report", "report.dashboard");
@@ -94,6 +95,11 @@ public final class PermissionCatalog {
         add(values, "datasource.driver", "驱动管理", "上传", "上传 JDBC 驱动 jar");
         add(values, "datasource.driver", "驱动管理", "删除", "删除上传的 JDBC 驱动");
         add(values, "datasource.dataset", "数据集管理", "查看", "读取已登记数据集");
+        add(values, "datasource.dictionary", "数据字典", "查看", "查看数据字典");
+        add(values, "datasource.dictionary", "数据字典", "新增", "新增目录和字典");
+        add(values, "datasource.dictionary", "数据字典", "修改", "修改目录和字典");
+        add(values, "datasource.dictionary", "数据字典", "删除", "删除目录和字典");
+        add(values, "datasource.dictionary", "数据字典", "导入", "导入数据字典");
         add(values, "datasource.dataset", "数据集管理", "新增", "登记数据集");
         add(values, "datasource.dataset", "数据集管理", "删除", "删除数据集登记");
         add(values, "datasource.dataset", "数据集管理", "刷新", "刷新数据集元数据");
@@ -145,7 +151,7 @@ public final class PermissionCatalog {
         String actionCode = switch (action) {
             case "查看" -> "read"; case "新增" -> "create"; case "修改" -> "update"; case "删除" -> "delete";
             case "配置权限" -> "assign_permissions"; case "分配角色" -> "assign_roles"; case "启停账号" -> "set_status"; case "重置密码" -> "reset_password";
-            case "测试连接" -> "test"; case "上传" -> "upload"; case "刷新" -> "refresh"; case "配置数据范围" -> "manage_policy"; case "查询" -> "read";
+            case "测试连接" -> "test"; case "上传" -> "upload"; case "导入" -> "import"; case "刷新" -> "refresh"; case "配置数据范围" -> "manage_policy"; case "查询" -> "read";
             case "执行", "运行" -> "execute"; case "重试" -> "retry"; case "校验" -> "validate"; case "发布" -> "publish";
             case "补跑" -> "backfill"; case "启动" -> "start"; case "停止" -> "stop";
             case "提交与撤回" -> "submit"; case "审批" -> "approve"; case "管理授权" -> "manage_grant"; case "停用" -> "disable";
@@ -194,6 +200,11 @@ public final class PermissionCatalog {
         route(routes, "PUT", "/api/data-sources/*", "datasource.source.update");
         route(routes, "DELETE", "/api/data-sources/*", "datasource.source.delete");
         route(routes, "GET", "/api/drivers", "datasource.driver.read");
+        route(routes, "GET", "/api/dictionary/**", "datasource.dictionary.read");
+        route(routes, "POST", "/api/dictionary/import", "datasource.dictionary.import");
+        route(routes, "POST", "/api/dictionary/**", "datasource.dictionary.create");
+        route(routes, "PUT", "/api/dictionary/**", "datasource.dictionary.update");
+        route(routes, "DELETE", "/api/dictionary/**", "datasource.dictionary.delete");
         route(routes, "POST", "/api/drivers", "datasource.driver.upload");
         route(routes, "DELETE", "/api/drivers/*", "datasource.driver.delete");
         route(routes, "GET", "/api/datasets/*/policies", "datasource.dataset.manage_policy");

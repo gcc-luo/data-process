@@ -33,10 +33,19 @@ public class AuditLog {
         success(authentication, action, objectType, Long.toString(objectId));
     }
     public void success(Authentication authentication, String action, String objectType, String objectId) {
+        success(authentication, action, objectType, objectId, "");
+    }
+    public void success(Authentication authentication, String action, String objectType, String objectId, String message) {
         if (!(authentication.getPrincipal() instanceof AccountPrincipal user)) throw new IllegalStateException("Authenticated account required");
         if (objectId == null || objectId.isBlank() || objectId.length() > 160) throw new IllegalArgumentException("Invalid audit object");
         String[] context = requestContext();
-        jdbc.update("INSERT INTO audit_events(actor_id,occurred_at,action,object_type,object_id,result,ip,user_agent,message) VALUES (?,CURRENT_TIMESTAMP,?,?,?,'SUCCESS',?,?, '')", user.id(), action, objectType, objectId, context[0], context[1]);
+        jdbc.update("INSERT INTO audit_events(actor_id,occurred_at,action,object_type,object_id,result,ip,user_agent,message) VALUES (?,CURRENT_TIMESTAMP,?,?,?,'SUCCESS',?,?,?)", user.id(), action, objectType, objectId, context[0], context[1], truncate(message == null ? "" : message, 255));
+    }
+
+    public void failure(Authentication authentication, String action, String objectType, String objectId, String message) {
+        if (!(authentication.getPrincipal() instanceof AccountPrincipal user)) throw new IllegalStateException("Authenticated account required");
+        String[] context = requestContext();
+        jdbc.update("INSERT INTO audit_events(actor_id,occurred_at,action,object_type,object_id,result,ip,user_agent,message) VALUES (?,CURRENT_TIMESTAMP,?,?,?,'FAILURE',?,?,?)", user.id(), action, objectType, objectId, context[0], context[1], truncate(message == null ? "" : message, 255));
     }
 
     private static String[] requestContext() {
