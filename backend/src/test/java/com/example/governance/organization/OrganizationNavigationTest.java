@@ -42,8 +42,8 @@ class OrganizationNavigationTest {
         var roots = rows.stream().filter(menu -> menu.parentId() == null).map(OrganizationService.Menu::component).toList();
         assertEquals(List.of("assets", "processing", "system"), roots);
         var components = components(f, "admin");
-        assertEquals(12, components.size());
-        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/drivers", "processing", "processing/tasks", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
+        assertEquals(14, components.size());
+        assertTrue(components.containsAll(List.of("assets", "assets/sources", "assets/drivers", "assets/dictionary", "assets/objects", "processing", "processing/tasks", "system/departments", "system/roles", "system/users", "system/menus", "system/permissions", "system/audit")));
         assertFalse(components.contains("assets/datasets"));
     }
 

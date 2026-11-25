@@ -26,4 +26,18 @@ class DictionaryStoreTest {
     @Test void rejectsInvalidPrecision() {
         assertThrows(IllegalArgumentException.class,()->store.validate(new DictionaryStore.Input(1L,"amount","金额","交易金额","decimal",4,5,"")));
     }
+    @Test void sortsAndMovesTreeAndRejectsCyclesAndStalePayload() {
+        long a=store.createDirectory("排序字典A",null),b=store.createDirectory("排序字典B",null),child=store.createDirectory("字典子目录",a);
+        var sorted=store.directories().stream().map(d->new com.example.governance.common.DirectorySorter.Item(d.id(),d.id()==child?Long.valueOf(b):d.parentId(),d.id()==b?0:1)).toList();
+        store.sortDirectories(sorted);assertEquals(b,store.directories().stream().filter(d->d.id()==child).findFirst().orElseThrow().parentId());
+        var cyclic=store.directories().stream().map(d->new com.example.governance.common.DirectorySorter.Item(d.id(),d.id()==b?Long.valueOf(child):d.parentId(),d.sortOrder())).toList();
+        assertThrows(IllegalStateException.class,()->store.sortDirectories(cyclic));assertThrows(IllegalStateException.class,()->store.sortDirectories(java.util.List.of()));
+        assertEquals(b,store.directories().stream().filter(d->d.id()==child).findFirst().orElseThrow().parentId());
+    }
+    @Test void directorySortRequiresUpdatePermissions() {
+        assertEquals("datasource.dictionary.update",com.example.governance.security.PermissionCatalog.permissionFor(org.springframework.http.HttpMethod.POST,"/api/dictionary/directories/sort"));
+        assertEquals("datasource.object_directory.update",com.example.governance.security.PermissionCatalog.permissionFor(org.springframework.http.HttpMethod.POST,"/api/object-directories/sort"));
+        assertEquals("字典目录排序",com.example.governance.security.AuditCatalog.actionLabel("dictionary.directory.sort"));
+        assertEquals("数据对象目录排序",com.example.governance.security.AuditCatalog.actionLabel("object.directory.sort"));
+    }
 }

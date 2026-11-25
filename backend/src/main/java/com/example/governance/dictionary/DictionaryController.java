@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class DictionaryController {
     private static final String[] HEADERS={"目录路径","字典标识","字典名","字典含义","类型","长度","精度","描述"};
     record DirectoryInput(String name, Long parentId) {}
+    record SortRequest(List<com.example.governance.common.DirectorySorter.Item> items) {}
     record ImportError(int row,String reason) {}
     record ImportResult(int success,int failed,List<ImportError> errors) {}
     private final DictionaryStore store; private final AuditLog audit;
@@ -23,6 +24,7 @@ public class DictionaryController {
     @GetMapping("/directories") public List<DictionaryStore.Directory> directories(){return store.directories();}
     @GetMapping("/entries") public DictionaryStore.Page entries(@RequestParam(required=false) Long directoryId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="10") int size){return store.page(directoryId,search,page,size);}
     @PostMapping("/directories") public Map<String,Long> createDirectory(@RequestBody DirectoryInput input,Authentication auth){long id=store.createDirectory(input.name(),input.parentId());audit.success(auth,"dictionary.directory.create","dictionary_directory",id);return Map.of("id",id);}
+    @PostMapping("/directories/sort") public void sortDirectories(@RequestBody SortRequest input,Authentication auth){try{store.sortDirectories(input.items());audit.success(auth,"dictionary.directory.sort","dictionary_directory","tree");}catch(IllegalArgumentException|IllegalStateException e){audit.failure(auth,"dictionary.directory.sort","dictionary_directory","tree",e.getMessage());throw e;}}
     @PutMapping("/directories/{id}") public void renameDirectory(@PathVariable long id,@RequestBody DirectoryInput input,Authentication auth){store.renameDirectory(id,input.name());audit.success(auth,"dictionary.directory.update","dictionary_directory",id);}
     @DeleteMapping("/directories/{id}") public void deleteDirectory(@PathVariable long id,Authentication auth){store.deleteDirectory(id);audit.success(auth,"dictionary.directory.delete","dictionary_directory",id);}
     @PostMapping("/entries") public Map<String,Long> create(@RequestBody DictionaryStore.Input input,Authentication auth){long id=store.create(input);audit.success(auth,"dictionary.create","dictionary",id);return Map.of("id",id);}
@@ -64,6 +66,7 @@ public class DictionaryController {
         }catch(IllegalArgumentException ex){throw ex;}catch(Exception ex){throw new IllegalArgumentException("无法解析 Excel 文件");}
         audit.success(auth,"dictionary.import","dictionary","import","成功 "+success+" 条，失败 "+errors.size()+" 条");return new ImportResult(success,errors.size(),errors);
     }
+    @ExceptionHandler(IllegalStateException.class) public ResponseEntity<Map<String,String>> conflict(IllegalStateException e){return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error",e.getMessage()));}
     private Integer number(String s){if(s.isEmpty())return null;try{return Integer.valueOf(s);}catch(NumberFormatException e){throw new IllegalArgumentException("长度或精度必须为整数");}}
-    @ExceptionHandler(IllegalArgumentException.class) public ResponseEntity<Map<String,String>> invalid(IllegalArgumentException e, jakarta.servlet.http.HttpServletRequest request, Authentication auth){String method=request.getMethod(),path=request.getRequestURI();if(auth!=null && !"GET".equals(method)){String operation="POST".equals(method)?"create":"PUT".equals(method)?"update":"delete";String action=path.endsWith("/import")?"dictionary.import":path.contains("/directories")?"dictionary.directory."+operation:"dictionary."+operation;String objectType=path.contains("/directories")?"dictionary_directory":"dictionary";audit.failure(auth,action,objectType,"request",e.getMessage());}return ResponseEntity.badRequest().body(Map.of("error",e.getMessage()));}
+    @ExceptionHandler(IllegalArgumentException.class) public ResponseEntity<Map<String,String>> invalid(IllegalArgumentException e, jakarta.servlet.http.HttpServletRequest request, Authentication auth){String method=request.getMethod(),path=request.getRequestURI();if(auth!=null && !"GET".equals(method) && !path.endsWith("/directories/sort")){String operation="POST".equals(method)?"create":"PUT".equals(method)?"update":"delete";String action=path.endsWith("/import")?"dictionary.import":path.contains("/directories")?"dictionary.directory."+operation:"dictionary."+operation;String objectType=path.contains("/directories")?"dictionary_directory":"dictionary";audit.failure(auth,action,objectType,"request",e.getMessage());}return ResponseEntity.badRequest().body(Map.of("error",e.getMessage()));}
 }

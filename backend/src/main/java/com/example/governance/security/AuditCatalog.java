@@ -16,7 +16,8 @@ public final class AuditCatalog {
             Map.entry("menu.create", "新增菜单"), Map.entry("menu.update", "修改菜单"), Map.entry("menu.delete", "删除菜单"), Map.entry("menu.reorder", "菜单排序"),
             Map.entry("datasource.create", "新增数据源"), Map.entry("datasource.update", "修改数据源"), Map.entry("datasource.delete", "删除数据源"),
             Map.entry("driver.upload", "上传驱动"), Map.entry("driver.delete", "删除驱动"),
-            Map.entry("dictionary.directory.create", "新增字典目录"), Map.entry("dictionary.directory.update", "修改字典目录"), Map.entry("dictionary.directory.delete", "删除字典目录"),
+            Map.entry("object.directory.sort", "数据对象目录排序"), Map.entry("object.directory.create", "新增数据对象目录"), Map.entry("object.directory.update", "修改数据对象目录"), Map.entry("object.directory.delete", "删除数据对象目录"), Map.entry("object.register", "注册数据对象"), Map.entry("object.create_table", "创建数据对象物理表"), Map.entry("object.publish_schema", "发布数据对象结构"), Map.entry("object.update", "修改数据对象"), Map.entry("object.delete", "删除数据对象登记"), Map.entry("object.preview", "预览数据对象"), Map.entry("object.export", "导出数据对象"),
+            Map.entry("dictionary.directory.sort", "字典目录排序"), Map.entry("dictionary.directory.create", "新增字典目录"), Map.entry("dictionary.directory.update", "修改字典目录"), Map.entry("dictionary.directory.delete", "删除字典目录"),
             Map.entry("dictionary.create", "新增数据字典"), Map.entry("dictionary.update", "修改数据字典"), Map.entry("dictionary.delete", "删除数据字典"), Map.entry("dictionary.import", "导入数据字典"),
             Map.entry("dataset.create", "登记数据集"), Map.entry("dataset.delete", "删除数据集"), Map.entry("dataset.refresh", "刷新数据集"), Map.entry("dataset.policy", "配置数据范围"), Map.entry("dataset.policy.revoke", "撤销数据范围"),
             Map.entry("task.create", "新增任务"), Map.entry("task.update", "修改任务信息"), Map.entry("task.draft", "保存任务草稿"), Map.entry("task.publish", "发布任务"), Map.entry("task.version", "保存任务版本"), Map.entry("task.copy", "复制任务"), Map.entry("task.delete", "删除任务"), Map.entry("task.run", "执行任务"), Map.entry("task.stop", "停止任务"), Map.entry("task.retry", "重试任务"), Map.entry("task.schedule", "配置任务定时"), Map.entry("task.schedule.delete", "删除任务定时"), Map.entry("task.schedule.fire", "任务调度触发"),
@@ -30,7 +31,7 @@ public final class AuditCatalog {
             Map.entry("audit.purge", "审计清理"));
 
     private static final Map<String, String> OBJECT_TYPES = Map.ofEntries(
-            Map.entry("user", "用户"), Map.entry("account", "账号"), Map.entry("department", "部门"), Map.entry("role", "角色"), Map.entry("menu", "菜单"), Map.entry("dictionary", "数据字典"), Map.entry("dictionary_directory", "字典目录"),
+            Map.entry("user", "用户"), Map.entry("account", "账号"), Map.entry("department", "部门"), Map.entry("role", "角色"), Map.entry("menu", "菜单"), Map.entry("dictionary", "数据字典"), Map.entry("dictionary_directory", "字典目录"), Map.entry("data_object", "数据对象"), Map.entry("object_directory", "数据对象目录"),
             Map.entry("datasource", "数据源"), Map.entry("driver", "JDBC 驱动"), Map.entry("dataset", "数据集"), Map.entry("task", "任务"), Map.entry("task_directory", "任务目录"), Map.entry("task_run", "任务运行"), Map.entry("workflow", "工作流"), Map.entry("run", "运行实例"),
             Map.entry("schedule", "调度"), Map.entry("realtime", "实时同步"), Map.entry("service", "数据服务"), Map.entry("caller", "调用方"), Map.entry("report", "报表"), Map.entry("dashboard", "看板"));
 
