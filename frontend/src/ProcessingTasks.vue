@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { authorizedRequest } from './auth.js'
 import { usePagination } from './pagination.js'
@@ -8,9 +8,13 @@ import * as api from './orch-api.js'
 import OrchestratorEditor from './OrchestratorEditor.vue'
 import OrchRunsDialog from './OrchRunsDialog.vue'
 import RefreshIcon from './RefreshIcon.vue'
+import DirectoryPanelHeader from './DirectoryPanelHeader.vue'
 const can = inject('canPermission', () => false)
 const directories = ref([]), tasks = ref([]), sources = ref([]), error = ref('')
 const tree = ref(null), currentDirectory = ref(0), directoryMenu = ref(null)
+const directorySearch = ref('')
+watch([directorySearch, directories, tree], async () => { await nextTick(); tree.value?.filter(directorySearch.value.trim()) })
+function filterDirectory(value, data) { return !value || data.name.toLowerCase().includes(value.toLowerCase()) }
 const view = ref('list'), editorTaskId = ref(null), editorRef = ref(null)
 const nameSearch = ref(''), nameFilter = ref(''), stateSearch = ref(''), stateFilter = ref('')
 const selected = ref([]), runsOpen = ref(false), runsTask = ref(null)
@@ -211,10 +215,11 @@ onBeforeUnmount(() => {
   <section class="processing" :class="{ 'processing-has-directory': view === 'list' }">
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon/>
     <template v-if="view === 'list'">
-      <el-select v-model="currentDirectory" class="directory-select" aria-label="任务目录"><el-option v-for="o in directoryOptions" :key="o.id" :label="o.label" :value="o.id"/></el-select>
+      <el-select v-model="currentDirectory" filterable class="directory-select" aria-label="任务目录"><el-option v-for="o in directoryOptions" :key="o.id" :label="o.label" :value="o.id"/></el-select>
       <div class="processing-layout">
-        <aside class="directory-pane">
-          <el-tree class="directory-tree" ref="tree" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all :draggable="can('workflow.task.update')" :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-contextmenu="openDirectoryMenu" @node-drop="submitSort">
+        <aside class="directory-pane catalog-panel">
+          <DirectoryPanelHeader v-model="directorySearch" title="任务目录"/>
+          <el-tree class="directory-tree" ref="tree" :filter-node-method="filterDirectory" highlight-current :current-node-key="currentDirectory" :data="treeData" node-key="id" :props="{ label: 'name', children: 'children' }" default-expand-all :draggable="can('workflow.task.update')" :allow-drag="node => node.data.id !== 0" :allow-drop="(draggingNode, dropNode, type) => dropNode.data.id !== 0 || type === 'inner'" @node-click="selectDirectory" @node-contextmenu="openDirectoryMenu" @node-drop="submitSort">
             <template #default="{ data }">
               <span class="tree-node">
                 <svg v-if="data.id !== 0" class="directory-folder-icon" viewBox="0 0 16 14" aria-hidden="true"><path d="M1 2.5c0-.8.7-1.5 1.5-1.5h3l1.6 1.7h6.4c.8 0 1.5.7 1.5 1.5v7.1c0 .9-.7 1.6-1.6 1.6H2.6c-.9 0-1.6-.7-1.6-1.6Z"/><path class="folder-highlight" d="M1.4 4.1h13"/></svg>
@@ -300,8 +305,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .processing-has-directory{display:flex;flex-direction:column;min-height:100%}
 .processing-layout{display:flex;flex:1;gap:14px;align-items:stretch;min-height:0}
-.directory-pane{display:flex;flex:0 0 clamp(180px,15%,210px);flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:#fff;border:1px solid var(--el-border-color-lighter);border-radius:4px;padding:12px}
-.directory-tree{flex:1;min-height:0;overflow:auto}
+.directory-pane{flex:0 0 clamp(180px,15%,210px)}
+.directory-tree{flex:1;min-height:0;overflow:auto;padding:10px 8px}
 .list-pane{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0}
 .list-pane :deep(.task-table){flex:1;min-height:0;background:#fff}
 .tree-node{display:flex;align-items:center;gap:6px;flex:1;min-width:0}

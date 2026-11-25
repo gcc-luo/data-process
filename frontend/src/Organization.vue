@@ -5,6 +5,7 @@ import { authorizedRequest, sessionExpired } from './auth.js'
 import { allowedDepartmentParents, departmentName } from './organization.js'
 import { menuIconOptions, menuIconPath } from './menu-icons.js'
 import RefreshIcon from './RefreshIcon.vue'
+import DirectoryPanelHeader from './DirectoryPanelHeader.vue'
 
 const props = defineProps({ view: { type: String, default: 'departments' } })
 const emit = defineEmits(['navigation-updated'])
@@ -20,6 +21,9 @@ const appliedSearch = ref('')
 const appliedEnabledFilter = ref('')
 const appliedDepartmentFilter = ref('')
 const deptTree = ref(null)
+const departmentTreeSearch = ref('')
+watch([departmentTreeSearch, deptTree, () => data.value.departmentOptions], async () => { await nextTick(); deptTree.value?.filter(departmentTreeSearch.value.trim()) })
+function filterDepartmentTree(value, node) { return !value || node.name.toLowerCase().includes(value.toLowerCase()) }
 const departmentTreeRows = computed(() => nested(data.value.departmentOptions))
 const departmentDescendants = computed(() => {
   const selected = appliedDepartmentFilter.value
@@ -410,10 +414,10 @@ onMounted(load)
 
     <template v-else-if="props.view === 'users'">
       <div class="users-layout">
-        <div class="dept-tree-card">
-          <div class="dept-tree-header"><span>组织机构</span><span class="dept-tree-tools"><el-button link :disabled="departmentFilter === '' || departmentFilter == null" @click="clearDepartmentFilter">清除</el-button></span></div>
+        <div class="dept-tree-card catalog-panel">
+          <DirectoryPanelHeader v-model="departmentTreeSearch" title="组织机构" placeholder="搜索组织机构"><span class="dept-tree-tools"><el-button link :disabled="departmentFilter === '' || departmentFilter == null" @click="clearDepartmentFilter">清除</el-button></span></DirectoryPanelHeader>
           <div class="dept-tree-scroll">
-            <el-tree ref="deptTree" :data="departmentTreeRows" node-key="id" highlight-current default-expand-all :expand-on-click-node="false" :props="{ label: 'name', children: 'children' }" @node-click="selectDepartment">
+            <el-tree ref="deptTree" :filter-node-method="filterDepartmentTree" :data="departmentTreeRows" node-key="id" highlight-current default-expand-all :expand-on-click-node="false" :props="{ label: 'name', children: 'children' }" @node-click="selectDepartment">
               <template #default="{ data: node }"><span class="dept-node" :class="{ 'dept-disabled': !node.enabled }"><span class="dept-node-name">{{ node.name }}</span><span v-if="!node.enabled" class="dept-disabled-tag">停用</span></span></template>
             </el-tree>
             <div v-if="!departmentTreeRows.length" class="dept-tree-empty">暂无部门数据</div>
@@ -645,13 +649,13 @@ onMounted(load)
 .organization-users-page{display:flex;flex-direction:column;min-height:100%}
 .organization-users-page .users-layout{flex:1;min-height:0}
 .users-layout{display:flex;gap:12px;align-items:stretch}
-.dept-tree-card{width:15%;flex:none;display:flex;flex-direction:column;background:#fff;border:1px solid #e5eaf0;border-radius:4px;overflow:hidden}
+.dept-tree-card{width:clamp(180px,15%,210px);flex:none}
 .dept-tree-header{display:flex;align-items:center;justify-content:space-between;padding:8px 8px;border-bottom:1px solid #edf1f6;font-weight:650;color:#4f627b;font-size:12px}
 .dept-tree-tools{display:flex;gap:2px}
 .dept-tree-tools .el-button{font-size:12px;padding:0 4px}
-.dept-tree-scroll{flex:1;min-height:0;overflow:auto;padding:6px 4px}
-.dept-tree-scroll :deep(.el-tree-node__content){height:32px;border-radius:4px}
-.dept-tree-scroll :deep(.el-tree-node.is-current > .el-tree-node__content){background:#ecf5ff;color:#409eff}
+.dept-tree-scroll{flex:1;min-height:0;overflow:auto;padding:10px 8px}
+.dept-tree-scroll :deep(.el-tree-node__content){height:36px;border-radius:4px}
+.dept-tree-scroll :deep(.el-tree-node.is-current > .el-tree-node__content){background:#eaf3fc;color:#246cae;box-shadow:inset 3px 0 #438fd6}
 .dept-node{display:flex;align-items:center;gap:4px;min-width:0;flex:1;font-size:12px}
 .dept-node-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dept-disabled{color:#a8abb2}
