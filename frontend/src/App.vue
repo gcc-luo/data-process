@@ -5,6 +5,7 @@ import { login, authorizedRequest } from './auth.js'
 import DataSources from './DataSources.vue'
 import DataDictionary from './DataDictionary.vue'
 import DataObjects from './DataObjects.vue'
+import MasterData from './MasterData.vue'
 import TaskStudio from './TaskStudio.vue'
 import ProcessingTasks from './ProcessingTasks.vue'
 import Organization from './Organization.vue'
@@ -238,7 +239,7 @@ onMounted(async () => {
           <button class="logout-button" type="button" @click="signOut"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4.8A1.8 1.8 0 0 0 3 5.8v8.4A1.8 1.8 0 0 0 4.8 16H8m3-9 4 3-4 3m4-3H7" /></svg><span>退出</span></button>
         </div>
       </header>
-      <div v-if="section === 'assets'" class="content"><DataDictionary v-if="groupPages.assets === 'dictionary'" /><DataObjects v-else-if="groupPages.assets === 'objects'" /><DataSources v-else :view="groupPages.assets || 'sources'" /></div>
+      <div v-if="section === 'assets'" class="content"><DataDictionary v-if="groupPages.assets === 'dictionary'" /><DataObjects v-else-if="groupPages.assets === 'objects'" /><MasterData v-else-if="groupPages.assets === 'master-data'" /><DataSources v-else :view="groupPages.assets || 'sources'" /></div>
       <div v-else-if="section === 'processing'" class="content"><ProcessingTasks ref="processingTasks" :view="groupPages.processing || 'tasks'" /></div>
       <div v-else-if="section === 'tasks'" class="content"><TaskStudio ref="taskStudio" /></div>
       <div v-else-if="section === 'system'" class="content"><Organization :view="groupPages.system || 'departments'" @navigation-updated="loadSession" /></div>
