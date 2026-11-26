@@ -18,7 +18,7 @@ function filterDirectory(value, data) { return !value || data.name.toLowerCase()
 const view = ref('list'), editorTaskId = ref(null), editorRef = ref(null)
 const nameSearch = ref(''), nameFilter = ref(''), stateSearch = ref(''), stateFilter = ref('')
 const selected = ref([]), runsOpen = ref(false), runsTask = ref(null)
-const createOpen = ref(false), createBusy = ref(false), createForm = ref({ name: '', directoryId: null, description: '', template: 'BLANK' })
+const createOpen = ref(false), createBusy = ref(false), createForm = ref({ name: '', directoryId: null, description: '' })
 const startOpen = ref(false), startTargets = ref([]), startDate = ref(new Date().toLocaleDateString('sv-SE')), batchBusy = ref(false)
 const filtered = computed(() => filterTasks(tasks.value, { directories: directories.value, directoryId: currentDirectory.value === 0 ? null : currentDirectory.value, name: nameFilter.value, runState: stateFilter.value }))
 const paging = usePagination(filtered)
@@ -128,12 +128,12 @@ async function deleteDirectory(node) {
   } catch (e) { if (e !== 'cancel' && e?.message !== 'cancel') error.value = e.message || String(e) }
 }
 // ---- task CRUD ----
-function openCreate() { createForm.value = { name: '', directoryId: currentDirectory.value === 0 ? null : currentDirectory.value, description: '', template: 'BLANK' }; createOpen.value = true }
+function openCreate() { createForm.value = { name: '', directoryId: currentDirectory.value === 0 ? null : currentDirectory.value, description: '' }; createOpen.value = true }
 async function confirmCreate() {
   if (!createForm.value.name.trim()) { ElMessage.warning('请填写任务名称'); return }
   createBusy.value = true
   try {
-    const res = await api.createTask({ name: createForm.value.name.trim(), directoryId: createForm.value.directoryId, description: createForm.value.description, template: createForm.value.template })
+    const res = await api.createTask({ name: createForm.value.name.trim(), directoryId: createForm.value.directoryId, description: createForm.value.description, template: 'BLANK' })
     createOpen.value = false
     editorTaskId.value = res.id
     view.value = 'editor'
@@ -245,7 +245,6 @@ onBeforeUnmount(() => {
             <el-table-column type="selection" width="42"/>
             <el-table-column type="index" label="序号" width="60"/>
             <el-table-column prop="name" label="任务名称" min-width="160"/>
-            <el-table-column label="类型" width="120"><template #default>处理任务</template></el-table-column>
             <el-table-column label="状态" width="130"><template #default="scope"><el-tag size="small" :type="scope.row.version > 0 ? 'success' : 'info'">{{ scope.row.version > 0 ? `已发布 v${scope.row.version}` : '草稿' }}</el-tag></template></el-table-column>
             <el-table-column label="目录" min-width="110"><template #default="scope">{{ directories.find(d => d.id === scope.row.directoryId)?.name ?? '未分类' }}</template></el-table-column>
             <el-table-column label="运行状态" width="90"><template #default="scope"><el-tag :type="scope.row.runState === 'RUNNING' ? 'success' : 'info'" size="small">{{ scope.row.runState === 'RUNNING' ? '运行中' : '停止' }}</el-tag></template></el-table-column>
@@ -266,7 +265,6 @@ onBeforeUnmount(() => {
       <el-dialog v-model="createOpen" title="新增编排任务" width="min(520px,95vw)">
         <el-form label-position="top">
           <el-form-item label="任务名称" required><el-input v-model="createForm.name" maxlength="160" placeholder="例如：订单增量同步"/></el-form-item>
-          <el-form-item label="起始模板"><el-radio-group v-model="createForm.template"><el-radio value="BLANK">空白画布</el-radio><el-radio value="SQL">SQL 加工</el-radio><el-radio value="SYNC">数据库同步</el-radio></el-radio-group></el-form-item>
           <el-form-item label="所属目录"><el-select v-model="createForm.directoryId" clearable placeholder="未分类"><el-option v-for="o in directoryOptions.filter(x => x.id !== 0)" :key="o.id" :label="o.label" :value="o.id"/></el-select></el-form-item>
           <el-form-item label="描述"><el-input v-model="createForm.description" type="textarea" :rows="2" maxlength="500"/></el-form-item>
         </el-form>

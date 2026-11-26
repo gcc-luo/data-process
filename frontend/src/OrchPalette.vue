@@ -69,6 +69,12 @@ function onClick(c) {
 .palette-search{margin-bottom:8px}
 .search-icon{width:14px;height:14px;fill:none;stroke:#9aa4b2;stroke-width:1.6}
 .palette-groups{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:4px;padding-right:2px}
+.palette-groups{scrollbar-width:thin;scrollbar-color:#aebfd0 transparent}
+.palette-groups::-webkit-scrollbar{width:4px}
+.palette-groups::-webkit-scrollbar-track{background:transparent}
+.palette-groups::-webkit-scrollbar-thumb{background:#aebfd0;border-radius:999px}
+.palette-groups::-webkit-scrollbar-thumb:hover{background:#839eb8}
+.palette-groups::-webkit-scrollbar-button{display:none}
 .palette-group{display:flex;flex-direction:column}
 .group-head{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:transparent;padding:5px 4px;cursor:pointer;color:#5a6b82;font-size:12px;font-weight:600}
 .group-title{display:flex;align-items:center;gap:6px}
