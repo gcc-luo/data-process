@@ -172,7 +172,7 @@ public final class PermissionCatalog {
 
     private static void add(List<Entry> values, String module, String moduleName, String action, String description) {
         String actionCode = switch (action) {
-            case "查看" -> "read"; case "新增" -> "create"; case "修改" -> "update"; case "删除" -> "delete";
+            case "查看" -> "read"; case "查看版本" -> "history"; case "新增" -> "create"; case "修改" -> "update"; case "删除" -> "delete";
             case "配置权限" -> "assign_permissions"; case "分配角色" -> "assign_roles"; case "启停账号" -> "set_status"; case "重置密码" -> "reset_password";
             case "测试连接" -> "test"; case "上传" -> "upload"; case "导入" -> "import"; case "导出" -> "export"; case "注册" -> "register"; case "建表" -> "create_table"; case "发布结构" -> "publish_schema"; case "预览" -> "preview"; case "刷新" -> "refresh"; case "配置数据范围" -> "manage_policy"; case "查询" -> "read";
             case "执行", "运行" -> "execute"; case "重试" -> "retry"; case "校验" -> "validate"; case "发布" -> "publish";
