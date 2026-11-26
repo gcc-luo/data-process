@@ -49,6 +49,10 @@ public class ObjectStore {
         long total=Objects.requireNonNull(jdbc.queryForObject("SELECT COUNT(*) FROM data_objects"+where,Long.class,args.toArray()));List<Object> ps=new ArrayList<>(args);ps.add(size);ps.add((page-1)*size);
         var rows=jdbc.query("SELECT id,directory_id,source_id,catalog_name,schema_name,table_name,object_type,display_name,description,dataset_id,version,updated_at FROM data_objects"+where+" ORDER BY id DESC LIMIT ? OFFSET ?",(r,n)->new Item(r.getLong(1),r.getLong(2),new Identity(r.getLong(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7)),r.getString(8),r.getString(9),r.getObject(10,Long.class),r.getLong(11),r.getString(12)),ps.toArray());return new Page(rows,total);
     }
+    public List<Item> all() {
+        return jdbc.query("SELECT id,directory_id,source_id,catalog_name,schema_name,table_name,object_type,display_name,description,dataset_id,version,updated_at FROM data_objects ORDER BY directory_id,id",
+                (r,n)->new Item(r.getLong(1),r.getLong(2),new Identity(r.getLong(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7)),r.getString(8),r.getString(9),r.getObject(10,Long.class),r.getLong(11),r.getString(12)));
+    }
     private static String pattern(String value){return "%"+value.trim().toLowerCase(Locale.ROOT).replace("!","!!").replace("%","!%").replace("_","!_")+"%";}
     public Item find(long id) {
         return jdbc.query("SELECT id,directory_id,source_id,catalog_name,schema_name,table_name,object_type,display_name,description,dataset_id,version,updated_at FROM data_objects WHERE id=?",(r,n)->new Item(r.getLong(1),r.getLong(2),new Identity(r.getLong(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7)),r.getString(8),r.getString(9),r.getObject(10,Long.class),r.getLong(11),r.getString(12)),id).stream().findFirst().orElseThrow(()->new IllegalArgumentException("数据对象不存在"));

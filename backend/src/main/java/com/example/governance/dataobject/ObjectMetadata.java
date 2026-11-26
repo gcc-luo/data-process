@@ -15,6 +15,7 @@ public class ObjectMetadata {
     private final ExecutionDataSourceProvider connections;
     public ObjectMetadata(DataSourceStore sources, ExecutionDataSourceProvider connections) { this.sources=sources; this.connections=connections; }
     public record Table(String catalog,String schema,String name,String type) {}
+    public record Column(int ordinal,String name,String type,int jdbcType,Integer length,Integer scale,String nullable,String primaryKey,String autoIncrement,String generated,String defaultValue,String remarks) {}
     private record Scope(String catalog,String schema) {}
     private static String normalized(String s){return s==null||s.isBlank()?null:s;}
     private Scope scope(Connection c,long sourceId,String catalog,String schema) throws SQLException {
@@ -40,13 +41,25 @@ public class ObjectMetadata {
             return List.copyOf(result);
         }
     }
-    public List<ObjectStore.Field> fields(ObjectStore.Identity identity) throws SQLException,GeneralSecurityException {
+    public List<Column> columns(ObjectStore.Identity identity) throws SQLException,GeneralSecurityException {
         ObjectStore.identityHash(identity);
         try(var connection=connections.get(identity.sourceId()).getConnection()){var md=connection.getMetaData();var scope=scope(connection,identity.sourceId(),identity.catalog(),identity.schema());String escape=md.getSearchStringEscape();
             List<Table> found=tables(identity.sourceId(),identity.catalog(),identity.schema()).stream().filter(t->Objects.equals(t.name(),identity.table())&&Objects.equals(t.type(),identity.type())&&Objects.equals(normalized(t.catalog()),normalized(identity.catalog()))&&Objects.equals(normalized(t.schema()),normalized(identity.schema()))).toList();if(found.size()!=1)throw new IllegalArgumentException("物理对象不存在或身份不明确");
             Set<String> keys=new HashSet<>();boolean keysKnown=true;try(var rs=md.getPrimaryKeys(scope.catalog(),scope.schema(),identity.table())){while(rs.next()){if(!Objects.equals(rs.getString("TABLE_NAME"),identity.table())||!same(scope.catalog(),rs.getString("TABLE_CAT"))||!same(scope.schema(),rs.getString("TABLE_SCHEM")))throw new SQLException("主键元数据身份不一致");keys.add(rs.getString("COLUMN_NAME"));}}catch(SQLFeatureNotSupportedException e){keysKnown=false;}
-            var result=new ArrayList<ObjectStore.Field>();try(var rs=md.getColumns(scope.catalog(),pattern(scope.schema(),escape),pattern(identity.table(),escape),"%")){while(rs.next()){if(result.size()>=MAX_FIELDS)throw new SQLException("字段数量超出限制");if(!Objects.equals(rs.getString("TABLE_NAME"),identity.table())||!same(scope.catalog(),rs.getString("TABLE_CAT"))||!same(scope.schema(),rs.getString("TABLE_SCHEM")))throw new SQLException("字段元数据身份不一致");String name=rs.getString("COLUMN_NAME"), type=rs.getString("TYPE_NAME");int size=rs.getInt("COLUMN_SIZE");Integer length=rs.wasNull()?null:size;int decimals=rs.getInt("DECIMAL_DIGITS");Integer scale=rs.wasNull()?null:decimals;int nullable=rs.getInt("NULLABLE");String nullState=rs.wasNull()?"UNKNOWN":nullable==DatabaseMetaData.columnNoNulls?"NO":nullable==DatabaseMetaData.columnNullable?"YES":"UNKNOWN";int ordinal=rs.getInt("ORDINAL_POSITION");if(rs.wasNull()||ordinal<1)throw new SQLException("字段顺序未知");result.add(new ObjectStore.Field(ordinal,name,type,length,scale,nullState,keysKnown?(keys.contains(name)?"YES":"NO"):"UNKNOWN",rs.getString("REMARKS")));}}
+            var result=new ArrayList<Column>();try(var rs=md.getColumns(scope.catalog(),pattern(scope.schema(),escape),pattern(identity.table(),escape),"%")){var labels=columnLabels(rs.getMetaData());while(rs.next()){if(result.size()>=MAX_FIELDS)throw new SQLException("字段数量超出限制");if(!Objects.equals(rs.getString("TABLE_NAME"),identity.table())||!same(scope.catalog(),rs.getString("TABLE_CAT"))||!same(scope.schema(),rs.getString("TABLE_SCHEM")))throw new SQLException("字段元数据身份不一致");String name=rs.getString("COLUMN_NAME"), type=rs.getString("TYPE_NAME");if(name==null||type==null)throw new SQLException("字段元数据不完整");int size=rs.getInt("COLUMN_SIZE");Integer length=rs.wasNull()?null:size;int decimals=rs.getInt("DECIMAL_DIGITS");Integer scale=rs.wasNull()?null:decimals;int nullable=rs.getInt("NULLABLE");String nullState=rs.wasNull()?"UNKNOWN":nullable==DatabaseMetaData.columnNoNulls?"NO":nullable==DatabaseMetaData.columnNullable?"YES":"UNKNOWN";int ordinal=rs.getInt("ORDINAL_POSITION");if(rs.wasNull()||ordinal<1)throw new SQLException("字段顺序未知");int jdbcType=rs.getInt("DATA_TYPE");if(rs.wasNull())throw new SQLException("字段类型未知");result.add(new Column(ordinal,name,type,jdbcType,length,scale,nullState,keysKnown?(keys.contains(name)?"YES":"NO"):"UNKNOWN",metadataFlag(rs,labels,"IS_AUTOINCREMENT"),metadataFlag(rs,labels,"IS_GENERATEDCOLUMN"),metadataValue(rs,labels,"COLUMN_DEF"),metadataValue(rs,labels,"REMARKS")));}}
             if(result.isEmpty())throw new IllegalArgumentException("未能读取字段信息");return List.copyOf(result);
         }
+    }
+    public List<ObjectStore.Field> fields(ObjectStore.Identity identity) throws SQLException,GeneralSecurityException {
+        return columns(identity).stream().map(c->new ObjectStore.Field(c.ordinal(),c.name(),c.type(),c.length(),c.scale(),c.nullable(),c.primaryKey(),c.remarks())).toList();
+    }
+    private static Set<String> columnLabels(ResultSetMetaData metadata) throws SQLException {
+        Set<String> names=new HashSet<>();for(int i=1;i<=metadata.getColumnCount();i++){names.add(metadata.getColumnLabel(i).toUpperCase(Locale.ROOT));names.add(metadata.getColumnName(i).toUpperCase(Locale.ROOT));}return names;
+    }
+    private static String metadataFlag(ResultSet rows,Set<String> labels,String column) throws SQLException {
+        if(!labels.contains(column))return "UNKNOWN";String value=rows.getString(column);return value!=null&&Set.of("YES","NO").contains(value.toUpperCase(Locale.ROOT))?value.toUpperCase(Locale.ROOT):"UNKNOWN";
+    }
+    private static String metadataValue(ResultSet rows,Set<String> labels,String column) throws SQLException {
+        return labels.contains(column)?rows.getString(column):null;
     }
 }

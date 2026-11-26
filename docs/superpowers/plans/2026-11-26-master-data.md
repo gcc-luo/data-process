@@ -189,7 +189,7 @@ route(routes, "DELETE", "/api/master-data/objects/*/records", "datasource.master
 ## 任务进度
 
 - [x] 任务 1：权限、审计标签、菜单迁移
-- [ ] 任务 2：全局目录和物理字段元数据
+- [x] 任务 2：全局目录和物理字段元数据
 - [ ] 任务 3：动态分页查询与 CRUD
 - [ ] 任务 4：版本历史与 Excel
 - [ ] 任务 5：Vue 页面、目录树和导航
