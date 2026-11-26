@@ -105,7 +105,7 @@ function removeFilter(index) { filters.value.splice(index, 1); if (!filters.valu
 function operatorsFor(filter) {
   const field = detail.value?.fields?.find(item => item.name === filter.field)
   const text = field && [1, 12, -1, -9, -10, -16, 2005, 2011].includes(field.jdbcType)
-  return filterOperators.filter(operator => !operator.text || text)
+  return filterOperators.filter(operator => !operator.text || !filter.field || text)
 }
 function chooseField(filter, field) {
   filter.field = field
