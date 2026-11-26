@@ -3,9 +3,9 @@
 .catalog-title { color:#263d56; font-size:14px; font-weight:600; }
 .catalog-subtitle { margin-top:5px; color:#8a9bad; font-size:11px; }
 .catalog-search { flex:none; padding:12px 12px 0; }
-.catalog-panel .catalog-search .el-input__inner { font-size:13px; }
+.catalog-panel .catalog-search .el-input__inner { font-size:var(--ui-common-size); }
 .catalog-search-icon { width:15px; height:15px; fill:none; stroke:#8ba0b4; stroke-width:1.5; stroke-linecap:round; }
-.catalog-panel .el-tree { color:#536b84; font-size:13px; }
+.catalog-panel .el-tree { color:#536b84; font-size:var(--ui-common-size); }
 .catalog-panel .el-tree-node__content { height:36px; border-radius:4px; }
 .catalog-panel .el-tree-node__content:hover { background:#f0f6fc; }
 .catalog-panel .el-tree-node.is-current > .el-tree-node__content { background:#eaf3fc; color:#246cae; box-shadow:inset 3px 0 #438fd6; font-weight:600; }

@@ -656,7 +656,7 @@ onMounted(load)
 .dept-tree-scroll{flex:1;min-height:0;overflow:auto;padding:10px 8px}
 .dept-tree-scroll :deep(.el-tree-node__content){height:36px;border-radius:4px}
 .dept-tree-scroll :deep(.el-tree-node.is-current > .el-tree-node__content){background:#eaf3fc;color:#246cae;box-shadow:inset 3px 0 #438fd6}
-.dept-node{display:flex;align-items:center;gap:4px;min-width:0;flex:1;font-size:13px}
+.dept-node{display:flex;align-items:center;gap:4px;min-width:0;flex:1;font-size:var(--ui-common-size)}
 .dept-node-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dept-disabled{color:#a8abb2}
 .dept-disabled-tag{font-size:10px;color:#a8abb2;border:1px solid #e4e7ed;border-radius:3px;padding:0 3px}

@@ -378,4 +378,11 @@ body{color:var(--ui-text-primary)}
 }
 @media(max-width:420px){.workspace>header{align-items:flex-start;flex-direction:column}.header-leading{width:100%;min-width:0}.header-actions{width:100%;justify-content:flex-end;flex:0 0 auto}.breadcrumbs{padding-top:0}}
 @media(prefers-reduced-motion:reduce){.sidebar{transition:none}}
+/* 与二级菜单保持一致的业务文字字号。 */
+:root{--ui-common-size:clamp(12px,.62vw,14px);--ui-control-size:var(--ui-common-size);--el-font-size-base:var(--ui-common-size)}
+@media(max-width:650px){:root{--ui-common-size:clamp(12px,3.3vw,14px)}}
+.shell .content .el-table,.shell .content .el-table .cell,.shell .content .el-table .el-button,.shell .content .toolbar .el-button,.shell .content .toolbar .el-input__inner,.shell .content .toolbar .el-select__wrapper,.shell .content .toolbar .el-select__placeholder,.shell .content .toolbar .el-select__selected-item{font-size:var(--ui-common-size)}
+.shell .content .toolbar{--ui-toolbar-height:calc(var(--ui-common-size) + 19px)}
+.shell .content .el-input__inner,.shell .content .el-select__placeholder,.shell .content .el-select__selected-item,.shell .content .el-button,.shell .content .el-form-item__label,.shell .content .el-pagination,.el-dialog .el-input__inner,.el-dialog .el-textarea__inner,.el-dialog .el-select__placeholder,.el-dialog .el-select__selected-item,.el-dialog .el-button,.el-dialog .el-form-item__label,.el-dialog .el-table,.el-dialog .el-table .cell,.el-dialog .el-pagination,.el-select-dropdown__item{font-size:var(--ui-common-size)}
+.el-dialog .el-dialog__title{font-size:16px}
 </style>
