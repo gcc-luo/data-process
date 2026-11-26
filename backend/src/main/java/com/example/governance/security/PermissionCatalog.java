@@ -252,16 +252,16 @@ public final class PermissionCatalog {
         route(routes, "DELETE", "/api/data-object-operations/*", "datasource.object.create_table");
 
         route(routes, "GET", "/api/master-data/tree", "datasource.master_data.read");
-        route(routes, "GET", "/api/master-data/objects/*", "datasource.master_data.read");
-        route(routes, "POST", "/api/master-data/objects/*/query", "datasource.master_data.read");
-        route(routes, "POST", "/api/master-data/objects/*/records", "datasource.master_data.create");
-        route(routes, "PUT", "/api/master-data/objects/*/records", "datasource.master_data.update");
-        route(routes, "DELETE", "/api/master-data/objects/*/records", "datasource.master_data.delete");
         route(routes, "GET", "/api/master-data/objects/*/template", "datasource.master_data.import");
         route(routes, "POST", "/api/master-data/objects/*/import", "datasource.master_data.import");
         route(routes, "GET", "/api/master-data/objects/*/export", "datasource.master_data.export");
         route(routes, "GET", "/api/master-data/objects/*/history", "datasource.master_data.history");
         route(routes, "GET", "/api/master-data/history/*", "datasource.master_data.history");
+        route(routes, "POST", "/api/master-data/objects/*/query", "datasource.master_data.read");
+        route(routes, "POST", "/api/master-data/objects/*/records", "datasource.master_data.create");
+        route(routes, "PUT", "/api/master-data/objects/*/records", "datasource.master_data.update");
+        route(routes, "DELETE", "/api/master-data/objects/*/records", "datasource.master_data.delete");
+        route(routes, "GET", "/api/master-data/objects/*", "datasource.master_data.read");
         route(routes, "GET", "/api/dictionary/**", "datasource.dictionary.read");
         route(routes, "POST", "/api/dictionary/directories/sort", "datasource.dictionary.update");
         route(routes, "POST", "/api/dictionary/import", "datasource.dictionary.import");

@@ -78,8 +78,10 @@ public class MasterDataService {
         for (ObjectMetadata.Column actual : physical) {
             ObjectStore.Field stored = expected.get(actual.name());
             if (stored == null || !stored.type().equalsIgnoreCase(actual.type())
+                    || stored.ordinal() != actual.ordinal()
                     || !Objects.equals(stored.length(), actual.length())
                     || !Objects.equals(stored.scale(), actual.scale())
+                    || !Objects.equals(stored.nullable(), actual.nullable())
                     || !Objects.equals(stored.primaryKey(), actual.primaryKey())) return false;
         }
         return true;

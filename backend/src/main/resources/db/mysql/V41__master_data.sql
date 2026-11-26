@@ -10,6 +10,7 @@ CREATE TABLE master_data_history (
     operation_type VARCHAR(24) NOT NULL,
     operation_status VARCHAR(16) NOT NULL DEFAULT 'SUCCESS',
     record_key_json LONGTEXT NOT NULL,
+    record_key_hash CHAR(64) NOT NULL,
     before_json LONGTEXT,
     after_json LONGTEXT,
     actor_id BIGINT,
@@ -17,7 +18,8 @@ CREATE TABLE master_data_history (
     error_message VARCHAR(1000),
     occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX master_data_history_object_idx (object_id, id),
-    INDEX master_data_history_identity_idx (identity_hash, id)
+    INDEX master_data_history_identity_idx (identity_hash, id),
+    INDEX master_data_history_key_idx (object_id, record_key_hash, id)
 );
 
 INSERT INTO permission_catalog(permission_code,module_code,module_name,action_code,action_name,description,sort_order) VALUES
@@ -50,6 +52,8 @@ FROM role_permissions rp
 JOIN permission_catalog pc ON pc.permission_code=rp.permission
 JOIN menus m ON m.component='assets/master-data'
 WHERE pc.module_code='datasource.master_data'
+  AND pc.permission_code='datasource.master_data.read'
+  AND rp.permission='datasource.master_data.read'
   AND NOT EXISTS (
       SELECT 1 FROM role_menus rm
       WHERE rm.role_id=rp.role_id AND rm.menu_id=m.id
