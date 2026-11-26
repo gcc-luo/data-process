@@ -34,6 +34,7 @@ public final class PermissionCatalog {
             case "assets/drivers" -> "datasource.driver";
             case "assets/dictionary" -> "datasource.dictionary";
             case "assets/objects" -> "datasource.object";
+            case "assets/master-data" -> "datasource.master_data";
             case "query" -> "datasource.query";
             case "processing/tasks" -> "workflow.task";
             case "tasks" -> "workflow.workflow";
@@ -46,8 +47,9 @@ public final class PermissionCatalog {
 
     public static Set<String> modulesForComponent(String component) {
         return switch (component == null ? "" : component) {
-            case "assets" -> Set.of("datasource.source", "datasource.dataset", "datasource.driver", "datasource.dictionary", "datasource.object", "datasource.object_directory");
+            case "assets" -> Set.of("datasource.source", "datasource.dataset", "datasource.driver", "datasource.dictionary", "datasource.object", "datasource.object_directory", "datasource.master_data");
             case "assets/objects" -> Set.of("datasource.object", "datasource.object_directory");
+            case "assets/master-data" -> Set.of("datasource.master_data");
             case "tasks" -> Set.of("workflow.task", "workflow.workflow", "workflow.schedule");
             case "services" -> Set.of("service.service", "service.caller");
             case "reports" -> Set.of("report.report", "report.dashboard");
@@ -114,6 +116,13 @@ public final class PermissionCatalog {
         add(values, "datasource.object", "数据对象", "删除", "删除对象登记");
         add(values, "datasource.object", "数据对象", "预览", "预览对象数据");
         add(values, "datasource.object", "数据对象", "导出", "导出对象元数据");
+        add(values, "datasource.master_data", "主数据", "查看", "查看所有已登记数据对象的记录");
+        add(values, "datasource.master_data", "主数据", "新增", "新增主数据记录");
+        add(values, "datasource.master_data", "主数据", "修改", "修改主数据记录");
+        add(values, "datasource.master_data", "主数据", "删除", "删除主数据记录");
+        add(values, "datasource.master_data", "主数据", "导入", "导入主数据记录");
+        add(values, "datasource.master_data", "主数据", "导出", "导出主数据记录");
+        add(values, "datasource.master_data", "主数据", "查看版本", "查看主数据记录版本历史");
         add(values, "datasource.dataset", "数据集管理", "新增", "登记数据集");
         add(values, "datasource.dataset", "数据集管理", "删除", "删除数据集登记");
         add(values, "datasource.dataset", "数据集管理", "刷新", "刷新数据集元数据");
@@ -241,6 +250,18 @@ public final class PermissionCatalog {
         route(routes, "POST", "/api/data-object-operations/*/recover", "datasource.object.create_table");
         route(routes, "POST", "/api/data-object-operations/*/resolve-absent", "datasource.object.create_table");
         route(routes, "DELETE", "/api/data-object-operations/*", "datasource.object.create_table");
+
+        route(routes, "GET", "/api/master-data/tree", "datasource.master_data.read");
+        route(routes, "GET", "/api/master-data/objects/*", "datasource.master_data.read");
+        route(routes, "POST", "/api/master-data/objects/*/query", "datasource.master_data.read");
+        route(routes, "POST", "/api/master-data/objects/*/records", "datasource.master_data.create");
+        route(routes, "PUT", "/api/master-data/objects/*/records", "datasource.master_data.update");
+        route(routes, "DELETE", "/api/master-data/objects/*/records", "datasource.master_data.delete");
+        route(routes, "GET", "/api/master-data/objects/*/template", "datasource.master_data.import");
+        route(routes, "POST", "/api/master-data/objects/*/import", "datasource.master_data.import");
+        route(routes, "GET", "/api/master-data/objects/*/export", "datasource.master_data.export");
+        route(routes, "GET", "/api/master-data/objects/*/history", "datasource.master_data.history");
+        route(routes, "GET", "/api/master-data/history/*", "datasource.master_data.history");
         route(routes, "GET", "/api/dictionary/**", "datasource.dictionary.read");
         route(routes, "POST", "/api/dictionary/directories/sort", "datasource.dictionary.update");
         route(routes, "POST", "/api/dictionary/import", "datasource.dictionary.import");
