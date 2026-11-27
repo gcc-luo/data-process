@@ -51,7 +51,7 @@ public final class OrchDraftStore {
             if (jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, taskId).isEmpty())
                 throw new IllegalArgumentException("任务不存在");
             var rows = jdbc.query("SELECT revision FROM task_drafts WHERE task_id=? FOR UPDATE", (rs, row) -> rs.getLong(1), taskId);
-            long current = rows.isEmpty() ? 0 : rows.getFirst();
+            long current = rows.isEmpty() ? 0 : rows.get(0);
             if (current != expectedRevision) throw new RevisionConflictException(current);
             jdbc.update("UPDATE task_drafts SET revision=?,definition=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE task_id=?",
                     current + 1, json, actor, taskId);
@@ -69,9 +69,9 @@ public final class OrchDraftStore {
             var rows = jdbc.query("SELECT revision,definition FROM task_drafts WHERE task_id=? FOR UPDATE",
                     (rs, row) -> new Object[]{rs.getLong(1), rs.getString(2)}, taskId);
             if (rows.isEmpty()) throw new IllegalArgumentException("任务没有草稿");
-            long current = (Long) rows.getFirst()[0];
+            long current = (Long) rows.get(0)[0];
             if (current != expectedRevision) throw new RevisionConflictException(current);
-            return tasks.addVersion(taskId, (String) rows.getFirst()[1], comment, actor);
+            return tasks.addVersion(taskId, (String) rows.get(0)[1], comment, actor);
         });
         if (version == null) throw new IllegalStateException("发布失败");
         return version;

@@ -1,0 +1,327 @@
+{
+  "scope": "静态重放 CREATE、DROP TABLE 及单条 ADD/MODIFY/DROP COLUMN；基础类型和可空性；不执行 SQL、不覆盖默认值、长度、索引及约束；解析局限需人工审核",
+  "unsupported": [],
+  "results": [
+    {
+      "table": "audit_events",
+      "expected_columns": 10,
+      "local_columns": 10,
+      "differences": []
+    },
+    {
+      "table": "dashboard_reports",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "dashboards",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "data_object_drafts",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "data_object_fields",
+      "expected_columns": 10,
+      "local_columns": 10,
+      "differences": []
+    },
+    {
+      "table": "data_object_operation_steps",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "data_object_operations",
+      "expected_columns": 12,
+      "local_columns": 12,
+      "differences": []
+    },
+    {
+      "table": "data_objects",
+      "expected_columns": 14,
+      "local_columns": 14,
+      "differences": []
+    },
+    {
+      "table": "data_services",
+      "expected_columns": 8,
+      "local_columns": 8,
+      "differences": []
+    },
+    {
+      "table": "data_sources",
+      "expected_columns": 11,
+      "local_columns": 11,
+      "differences": []
+    },
+    {
+      "table": "dataset_fields",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "dataset_role_fields",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "dataset_role_rules",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "datasets",
+      "expected_columns": 7,
+      "local_columns": 7,
+      "differences": []
+    },
+    {
+      "table": "departments",
+      "expected_columns": 8,
+      "local_columns": 8,
+      "differences": []
+    },
+    {
+      "table": "dictionary_directories",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "dictionary_entries",
+      "expected_columns": 11,
+      "local_columns": 11,
+      "differences": []
+    },
+    {
+      "table": "execution_logs",
+      "expected_columns": 9,
+      "local_columns": 9,
+      "differences": []
+    },
+    {
+      "table": "jdbc_drivers",
+      "expected_columns": 12,
+      "local_columns": 12,
+      "differences": []
+    },
+    {
+      "table": "master_data_history",
+      "expected_columns": 17,
+      "local_columns": 17,
+      "differences": []
+    },
+    {
+      "table": "menus",
+      "expected_columns": 11,
+      "local_columns": 11,
+      "differences": []
+    },
+    {
+      "table": "object_directories",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "permission_catalog",
+      "expected_columns": 7,
+      "local_columns": 7,
+      "differences": []
+    },
+    {
+      "table": "platform_settings",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "processing_task_versions",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "processing_tasks",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "realtime_jobs",
+      "expected_columns": 13,
+      "local_columns": 13,
+      "differences": []
+    },
+    {
+      "table": "reports",
+      "expected_columns": 8,
+      "local_columns": 8,
+      "differences": []
+    },
+    {
+      "table": "role_menus",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "role_permissions",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "roles",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "service_callers",
+      "expected_columns": 9,
+      "local_columns": 9,
+      "differences": []
+    },
+    {
+      "table": "service_grants",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "service_invocations",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "task_directories",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "task_drafts",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "task_node_runs",
+      "expected_columns": 12,
+      "local_columns": 12,
+      "differences": []
+    },
+    {
+      "table": "task_run_attempts",
+      "expected_columns": 7,
+      "local_columns": 7,
+      "differences": []
+    },
+    {
+      "table": "task_runs",
+      "expected_columns": 11,
+      "local_columns": 11,
+      "differences": []
+    },
+    {
+      "table": "task_schedules",
+      "expected_columns": 7,
+      "local_columns": 7,
+      "differences": []
+    },
+    {
+      "table": "task_watermarks",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "user_roles",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "users",
+      "expected_columns": 15,
+      "local_columns": 16,
+      "differences": [
+        {
+          "column": "security_version",
+          "migration": null,
+          "local": [
+            "VARCHAR",
+            "NO"
+          ]
+        }
+      ]
+    },
+    {
+      "table": "workflow_definitions",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "workflow_edges",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "workflow_node_attempts",
+      "expected_columns": 8,
+      "local_columns": 8,
+      "differences": []
+    },
+    {
+      "table": "workflow_nodes",
+      "expected_columns": 8,
+      "local_columns": 8,
+      "differences": []
+    },
+    {
+      "table": "workflow_run_nodes",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "workflow_runs",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "workflow_schedules",
+      "expected_columns": 7,
+      "local_columns": 7,
+      "differences": []
+    },
+    {
+      "table": "workflow_versions",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    }
+  ],
+  "review": {
+    "difference": "users.security_version",
+    "resolution": "MySQL Java migration V3__security_version adds VARCHAR(36) and modifies it NOT NULL; local metadata VARCHAR NOT NULL. SQL-only replay intentionally does not parse Java migrations.",
+    "source": "backend/src/main/java/db/mysql/V3__security_version.java",
+    "status": "源码静态核对，未检查迁移实际执行历史"
+  }
+}

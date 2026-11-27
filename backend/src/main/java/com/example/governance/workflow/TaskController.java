@@ -341,7 +341,8 @@ public class TaskController {
             @Override public void failure(String nodeKey, int attempt, String error, long durationMs) {}
             @Override public void skipped(String nodeKey) {}
         };
-        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
             var future = executor.submit(() -> {
                 cancel.worker(Thread.currentThread());
                 if (cancel.isCancelled()) throw new InterruptedException("试运行已取消");
@@ -365,6 +366,8 @@ public class TaskController {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "试运行被中断");
+        } finally {
+            executor.shutdown();
         }
     }
 }

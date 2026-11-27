@@ -32,10 +32,10 @@ public final class DatasetPolicyStore {
         tx.executeWithoutResult(status -> {
             var datasets = jdbc.query("SELECT department_field FROM datasets WHERE id=? FOR UPDATE", (rs, row) -> java.util.Optional.ofNullable(rs.getString(1)), datasetId);
             if (datasets.isEmpty()) throw new IllegalArgumentException("Unknown dataset");
-            String previousField = datasets.getFirst().orElse(null);
+            String previousField = datasets.get(0).orElse(null);
             if (previousField != null && !previousField.equals(departmentField) && !jdbc.queryForList("SELECT role_id FROM dataset_role_rules WHERE dataset_id=? AND role_id<>?", Long.class, datasetId, roleId).isEmpty()) throw new IllegalStateException("Other roles depend on the department field");
             var types = jdbc.queryForList("SELECT data_type FROM dataset_fields WHERE dataset_id=? AND field_name=?", String.class, datasetId, departmentField);
-            if (types.isEmpty() || !types.getFirst().toUpperCase(java.util.Locale.ROOT).matches("(.*INT.*|NUMERIC|DECIMAL|NUMBER)")) throw new IllegalArgumentException("Department field must contain numeric department IDs");
+            if (types.isEmpty() || !types.get(0).toUpperCase(java.util.Locale.ROOT).matches("(.*INT.*|NUMERIC|DECIMAL|NUMBER)")) throw new IllegalArgumentException("Department field must contain numeric department IDs");
             var existing = new HashSet<>(jdbc.queryForList("SELECT field_name FROM dataset_fields WHERE dataset_id=?", String.class, datasetId));
             if (!existing.containsAll(fields.keySet())) throw new IllegalArgumentException("Unknown dataset field");
             if (jdbc.queryForList("SELECT id FROM roles WHERE id=?", Long.class, roleId).isEmpty()) throw new IllegalArgumentException("Unknown role");
@@ -59,7 +59,7 @@ public final class DatasetPolicyStore {
                 jdbc.query("SELECT field_name,access_mode FROM dataset_role_fields WHERE dataset_id=? AND role_id=? ORDER BY field_name", (org.springframework.jdbc.core.RowCallbackHandler) rs -> fields.put(rs.getString(1), DatasetAccess.Field.valueOf(rs.getString(2))), datasetId, rule.role());
                 result.add(new RolePolicy(rule.role(), rule.scope(), Map.copyOf(fields)));
             }
-            return new PolicyView(datasets.getFirst().orElse(null), List.copyOf(result));
+            return new PolicyView(datasets.get(0).orElse(null), List.copyOf(result));
         });
     }
     public boolean revoke(long datasetId, long roleId) {
@@ -91,14 +91,14 @@ public final class DatasetPolicyStore {
     private Resolved resolveSnapshot(long userId, long datasetId) {
         var datasets = jdbc.query("SELECT source_id,catalog_name,schema_name,table_name,department_field FROM datasets WHERE id=?", (rs, row) -> new DatasetRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)), datasetId);
         var users = jdbc.query("SELECT department_id,enabled FROM users WHERE id=?", (rs, row) -> new UserRow(rs.getLong(1), rs.getBoolean(2)), userId);
-        if (datasets.isEmpty() || users.isEmpty() || !users.getFirst().enabled() || datasets.getFirst().departmentField() == null) throw new SecurityException("Dataset access denied");
+        if (datasets.isEmpty() || users.isEmpty() || !users.get(0).enabled() || datasets.get(0).departmentField() == null) throw new SecurityException("Dataset access denied");
         var rules = jdbc.query("SELECT DISTINCT r.role_id,r.scope FROM dataset_role_rules r JOIN user_roles ur ON ur.role_id=r.role_id JOIN role_permissions p ON p.role_id=r.role_id AND p.permission='datasource.query.read' WHERE r.dataset_id=? AND ur.user_id=?", (rs, row) -> new Rule(rs.getLong(1), AccessPolicy.Scope.valueOf(rs.getString(2))), datasetId, userId);
         if (rules.isEmpty()) throw new SecurityException("Dataset access denied");
         var departments = jdbc.query("SELECT id,parent_id FROM departments", (rs, row) -> new long[]{rs.getLong(1), rs.getLong(2), rs.wasNull() ? 0 : 1});
         Set<String> ids = new HashSet<>(); Map<String, String> parents = new HashMap<>();
         for (long[] item : departments) { ids.add(Long.toString(item[0])); if (item[2] == 1) parents.put(Long.toString(item[0]), Long.toString(item[1])); }
         var policy = new AccessPolicy(ids, parents, Map.of());
-        var user = new AccessPolicy.User(Long.toString(userId), Long.toString(users.getFirst().department()), Set.of(), true);
+        var user = new AccessPolicy.User(Long.toString(userId), Long.toString(users.get(0).department()), Set.of(), true);
         Set<Long> allowedDepartments = new HashSet<>(); Map<String, DatasetAccess.Field> allowedFields = new HashMap<>(); Map<String, Map<Long, DatasetAccess.Field>> grants = new HashMap<>();
         for (var rule : rules) {
             Set<Long> ruleDepartments = new HashSet<>();
@@ -112,7 +112,7 @@ public final class DatasetPolicyStore {
             }
         }
         if (allowedDepartments.isEmpty() || allowedFields.isEmpty()) throw new SecurityException("Dataset access denied");
-        var dataset = datasets.getFirst();
+        var dataset = datasets.get(0);
         var fieldNames = Set.copyOf(jdbc.queryForList("SELECT field_name FROM dataset_fields WHERE dataset_id=?", String.class, datasetId));
         return new Resolved(dataset.sourceId(), new DatasetQueryEngine.Dataset(dataset.catalog(), dataset.schema(), dataset.table(), dataset.departmentField(), fieldNames), new DatasetQueryEngine.Policy(allowedDepartments, allowedFields, grants));
     }

@@ -24,9 +24,9 @@ class MySqlMigrationTest {
             long run = runs.create(workflow, 1, java.time.LocalDate.of(2026, 11, 16));
             assertEquals(java.util.List.of("a"), runs.claimReady(run)); runs.finish(run, "a", true); assertEquals("SUCCEEDED", runs.status(run));
             assertTrue(runs.dueRetries(java.time.Instant.now(), 5).isEmpty());
-            assertEquals(run, runs.list(workflow, "SUCCEEDED", java.time.LocalDate.of(2026, 11, 16), null, 10).getFirst().id());
+            assertEquals(run, runs.list(workflow, "SUCCEEDED", java.time.LocalDate.of(2026, 11, 16), null, 10).get(0).id());
             jdbc.update("INSERT INTO audit_events(actor_id,occurred_at,action,object_type,object_id,result) VALUES (NULL,CURRENT_TIMESTAMP,'test.event','test','1','SUCCESS')");
-            assertEquals("test.event", new com.example.governance.security.AuditLog(jdbc).list("test.event", null, 10).getFirst().action());
+            assertEquals("test.event", new com.example.governance.security.AuditLog(jdbc).list("test.event", null, 10).get(0).action());
 
         }
     }

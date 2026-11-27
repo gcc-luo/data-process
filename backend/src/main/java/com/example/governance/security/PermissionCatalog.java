@@ -235,7 +235,7 @@ public final class PermissionCatalog {
         route(routes, "GET", "/api/data-objects/export", "datasource.object.export");
         route(routes, "GET", "/api/data-objects/*", "datasource.object.read");
         route(routes, "PUT", "/api/data-objects/*/dataset", "datasource.object.update");
-        route(routes, "POST", "/api/data-objects/*/preview", "datasource.object.preview");
+        route(routes, "GET", "/api/data-objects/*/preview", "datasource.object.preview");
         route(routes, "POST", "/api/data-objects/*/schema-preview", "datasource.object.publish_schema");
         route(routes, "GET", "/api/data-object-schema-operations", "datasource.object.publish_schema");
         route(routes, "GET", "/api/data-object-schema-operations/*/actual", "datasource.object.publish_schema");

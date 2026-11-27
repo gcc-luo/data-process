@@ -1,0 +1,210 @@
+{
+  "decision": "pending",
+  "reviewed": true,
+  "scope": "2026-11-27：对照新版模板和当前工作区继续补充详细设计、部分接口语义及测试案例；保留未验证和交付阻塞项",
+  "blockers": [
+    "177 条已识别接口均有详细章节，但动态映射、DTO 深层约束、权限及示例仍需逐项复核",
+    "详细设计尚未对每个模块及功能完整重复模板结构；前端及测试用例详细设计未全量覆盖",
+    "本地数据库 52 表和 371 字段已完成 SQL 迁移静态重放 51 表 360 列及 Java V3 一处差异溯源；仅 39 个字符字段长度、3 个历史索引和 5 项监控结构另行核对，其余长度、默认值、索引、约束和目标环境尚未完整核验",
+    "Mermaid 图表和跨文档编号尚未全量核验；目标环境及正式验收缺少证据",
+    "工作流补跑参数检查与当前 ORCH 业务日期变量结构存在静态兼容性风险；尚未隔离环境复现及确认修复"
+  ],
+  "unverified": [
+    "目标环境实际数据库及接口联调",
+    "MySQL 条件集成测试 10 项跳过",
+    "生产网络、TLS、备份恢复、性能和正式安全验收",
+    "Mermaid 全量渲染、所有敏感信息及交叉引用完整性"
+  ],
+  "counts": {
+    "migration_table_candidates": 51,
+    "permission_routes": 162,
+    "local_tables": 52,
+    "local_fields": 371,
+    "controller_route_candidates": 172,
+    "detailed_api_sections": 177,
+    "backend_tests": 343,
+    "backend_passed": 333,
+    "backend_skipped": 10,
+    "frontend_tests": 71,
+    "frontend_passed": 71,
+    "frontend_failed": 0,
+    "frontend_detailed_pages": 11,
+    "db_table_details": 52,
+    "identified_total_routes": 177,
+    "v40_v41_tables_column_type_nullability_compared": 7,
+    "v40_v41_columns_compared": 66,
+    "v39_tables_column_type_nullability_compared": 2,
+    "v39_columns_compared": 15,
+    "v39_v41_character_lengths_compared": 39,
+    "v41_history_indexes_compared": 3,
+    "single_create_tables_compared": 35,
+    "single_create_columns_compared": 223,
+    "mysql_sql_replay_tables": 51,
+    "mysql_sql_replay_columns": 360,
+    "mysql_sql_replay_difference_explained_by_java_migration": 1,
+    "detailed_test_cases": 93,
+    "source_claim_paths_checked": 76,
+    "detailed_feature_sections": 16,
+    "detailed_test_cases_run": 92,
+    "detailed_test_cases_proposed_unrun": 1
+  },
+  "table_name_comparison": {
+    "migration_create_candidates": 51,
+    "local_tables": 52,
+    "local_only": [
+      "flyway_schema_history"
+    ],
+    "migration_only": [],
+    "limitations": "只比较表名，不覆盖字段和约束变化"
+  },
+  "findings": [
+    {
+      "severity": "高",
+      "document": "05-接口设计说明书.md 第 2、9 章",
+      "finding": "运行详情、日志和节点预览只有权限路由模式，缺少具体契约。",
+      "evidence": "TaskController.runDetail/runLogs/nodePreview；TaskRunService.logs；PermissionCatalog.buildRoutes",
+      "recommendation": "补入三个 GET 的路径参数、响应字段及读权限。日志 afterId 默认 0，limit 默认 500，服务端将 limit 限制到 1–1000。",
+      "record_type": "历史审查发现；当前状态须结合 follow_up 和对应正文判断"
+    },
+    {
+      "severity": "高",
+      "document": "02-总体设计说明书.md 第 9 章；03-详细设计说明书.md 第 11 章",
+      "finding": "总体图把 Camel 路由与节点适配器合为一处，容易读成业务库访问全经 Camel。详细设计已有分工说明，但未提示试运行 HTTP 来源仍会发送实际请求。",
+      "evidence": "OrchTaskExecutor.executeNode；SqlTaskExecutor 构造函数",
+      "recommendation": "总体图分开画出 Camel SQL DML 与其他节点执行路径。详细设计补充试运行会读取配置的来源，HTTP 来源仍会真实请求。",
+      "record_type": "历史审查发现；当前状态须结合 follow_up 和对应正文判断"
+    },
+    {
+      "severity": "高",
+      "document": "03-详细设计说明书.md 第 11.4 节",
+      "finding": "尝试次数缺少解释。同一实例的运行尝试与单节点重试计数不同。",
+      "evidence": "TaskRunService.retry/nodeRuns；DbNodeRunSink.start/success/failure；V35__orchestration_rebuild.sql",
+      "recommendation": "分别定义运行尝试和节点执行尝试，注明节点详情按 node_key 取最大 attempt_no 行，避免把界面数字当作完整重试历史。",
+      "record_type": "历史审查发现；当前状态须结合 follow_up 和对应正文判断"
+    },
+    {
+      "severity": "交付阻塞",
+      "document": "04-数据库设计说明书.md 第 4 章",
+      "finding": "已有 52 张本地表、371 个字段的快照。此前一致性比对仅核对了表名。",
+      "evidence": "database-metadata.tsv；backend/src/main/resources/db/mysql",
+      "recommendation": "对照生效迁移核验字段类型、默认值、索引及约束，分别记录物理外键和逻辑关系。",
+      "record_type": "历史审查发现；当前状态须结合 follow_up 和对应正文判断"
+    },
+    {
+      "severity": "中",
+      "document": "06-前端界面设计说明书.md 第 2 章；09-测试与验收说明书.md",
+      "finding": "前端页面清单缺工作流、数据查询、轮询同步、数据服务和报表的入口与流程。验收文档缺可追踪的功能与用例映射。",
+      "evidence": "App.vue 的 section 分支；backend/src/test；frontend/tests",
+      "recommendation": "为主要页面补菜单、权限、主操作和 API，补验收矩阵并区分现有用例、执行记录与建议用例。",
+      "record_type": "历史审查发现；当前状态须结合 follow_up 和对应正文判断"
+    },
+    {
+      "severity": "中",
+      "document": "02、03、04 文档版本栏；05 修订记录",
+      "finding": "部分文档头仍为 0.1，而修订记录已经有 0.2 或 0.3。接口说明书的修订记录位于章节中间。",
+      "evidence": "02、03、04 的文档头与修订表；05 第 4、5 章之间",
+      "recommendation": "同步文档头与最新修订版本，并将修订表移到文末。",
+      "record_type": "历史审查发现；当前状态须结合 follow_up 和对应正文判断"
+    },
+    {
+      "severity": "高",
+      "document": "03-详细设计说明书.md 第 3.16 节；09-测试与验收说明书.md TEST-GAP-05",
+      "finding": "补跑对非 SQL 检查 sourceParameters 的 BUSINESS_DATE，而任务验证仅接受 ORCH；ORCH 执行器注入内置 business_date，常规缺失额外字段配置可能被拒绝。此为静态分析，尚未端到端复现。",
+      "evidence": "WorkflowRunService.backfill；TaskDefinitionValidator.validate；OrchDefinition.BUILTIN_BUSINESS_DATE；OrchTaskExecutor",
+      "recommendation": "在隔离环境按当前画布生成的 ORCH 定义复现，确认修复及回归。",
+      "record_type": "当前待核实问题"
+    }
+  ],
+  "follow_up": {
+    "status": "pending",
+    "updated_documents": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09"
+    ],
+    "database_scope": "本地表名对照、V22/V34—V36 五项监控结构及 V40—V41 七表 66 列名称/基础类型/可空性；V39 两表 15 列名称/基础类型/可空性；未发现 ALTER / DROP 的 35 张单次建表候选共 223 列名/基础类型/可空性（包含前述 V39—V41）；MySQL SQL 迁移静态重放 51 表 360 列，users.security_version 差异由 Java V3 源码解释",
+    "remaining": [
+      "177 条已识别接口均有详细章节，但动态映射、DTO 深层约束、权限及示例仍需逐项复核",
+      "详细设计尚未对每个模块及功能完整重复模板结构；前端及测试用例详细设计未全量覆盖",
+      "本地数据库 52 表和 371 字段已完成 SQL 迁移静态重放 51 表 360 列及 Java V3 一处差异溯源；仅 39 个字符字段长度、3 个历史索引和 5 项监控结构另行核对，其余长度、默认值、索引、约束和目标环境尚未完整核验",
+      "Mermaid 图表和跨文档编号尚未全量核验；目标环境及正式验收缺少证据",
+      "工作流补跑参数检查与当前 ORCH 业务日期变量结构存在静态兼容性风险；尚未隔离环境复现及确认修复"
+    ],
+    "recent_progress": [
+      "补充数据字典条目维护、Excel 导入及主数据记录删除的详细设计",
+      "复核字典条目查询、维护及导入接口",
+      "测试文档逐项展开 10 项代表性任务测试，校正原有数量不一致",
+      "基础格式及证据路径检查通过，不代表语义和交付审核通过",
+      "补充数据源登记设计，明确页面与 API 对连接测试的不同要求",
+      "补充数据集明细查询的数据范围、字段脱敏及跨库边界",
+      "复核数据集明细查询和数据源批量删除接口语义及事务边界",
+      "补充数据服务调用的令牌、授权、限流和状态设计，并修正接口示例格式",
+      "补充报表执行与运行时重新授权设计",
+      "补充查询及任务并发配置有效范围",
+      "补充工作流补跑流程并记录 ORCH 业务日期参数的静态兼容风险",
+      "为工作流补跑兼容性风险补充未执行的隔离环境验证用例",
+      "补充增量同步游标、跨库事务及故障恢复设计",
+      "补充登录防护、会话失效和权限刷新设计",
+      "按测试源码和 Surefire 结果补充 18 项编排定义校验用例",
+      "编排核心 35 项测试均已按模板逐项展开，另补充 1 项未执行的兼容性用例",
+      "字典模块 6 项测试按模板逐项展开并与 Surefire 核对",
+      "数据对象存储、建表与结构发布 10 项 H2 / 模拟测试逐项展开",
+      "数据对象方言和元数据另 5 项测试逐项展开",
+      "补全数据对象 15 项及字典 6 项测试详细设计，更新需求追溯矩阵",
+      "数据集明细权限及查询限制 7 项测试逐项展开",
+      "补充登录与会话安全 11 项本地自动测试详细设计",
+      "补充聚合、数据集策略与数据服务 9 项本地自动测试详细设计",
+      "补充增量同步 9 项本地自动测试，并区分实际 H2 写入与处理器替身"
+    ]
+  },
+  "test_results": {
+    "date": "2026-11-27",
+    "backend": {
+      "command": "mvn -f backend/pom.xml test",
+      "run": 343,
+      "passed": 333,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 10,
+      "scope": "默认集；主要为 H2 内存库",
+      "evidence": ".doc-sync/reports/backend-surefire-summary.tsv"
+    },
+    "frontend": {
+      "command": "node --test frontend/tests/*.test.js",
+      "run": 71,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "evidence": ".doc-sync/reports/frontend-tests.log"
+    },
+    "frontend_build": {
+      "command": "npm --prefix frontend run build",
+      "status": "成功",
+      "warnings": "大体积分块和 auth.js 同时被动态与静态导入"
+    }
+  },
+  "structural_check": {
+    "report": ".doc-sync/reports/repeated-section-check.json",
+    "recognized_api_sections": 177,
+    "recognized_page_sections": 11,
+    "recognized_feature_sections": 16,
+    "missing_required_subheadings": 0,
+    "limitations": "只校验已有编号章节的小节，不代表功能和页面覆盖完整，也不校验内容语义。"
+  },
+  "source_scan": {
+    "current_snapshot": ".doc-sync/facts/scan-current.json",
+    "prior_candidate": ".doc-sync/facts/scan.json",
+    "comparison_scope": "backend/src、frontend/src、README、后端 POM、前端 package.json",
+    "added": 0,
+    "removed": 0,
+    "changed": 0,
+    "limitations": "仅候选扫描快照对比，不是已审核接受基线；排除其他工作树、构建物、二进制及可能的敏感文件。"
+  }
+}

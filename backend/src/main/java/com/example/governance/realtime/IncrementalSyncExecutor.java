@@ -42,7 +42,7 @@ public final class IncrementalSyncExecutor implements AutoCloseable {
         String query = "SELECT " + String.join(",", c.sourceColumns()) + "," + c.watermarkColumn() + "," + c.tieColumn() + " FROM " + c.sourceTable() + where + " ORDER BY " + c.watermarkColumn() + "," + c.tieColumn();
         String insertSql = "INSERT INTO " + c.targetTable() + " (" + String.join(",", c.targetColumns()) + ") VALUES (" + String.join(",", java.util.Collections.nCopies(c.targetColumns().size(), "?")) + ")";
         List<String> values = c.targetColumns().stream().filter(column -> c.targetKeys().stream().noneMatch(key -> key.equalsIgnoreCase(column))).toList();
-        String assignments = values.isEmpty() ? c.targetKeys().getFirst() + "=" + c.targetKeys().getFirst() : values.stream().map(column -> column + "=?").collect(java.util.stream.Collectors.joining(","));
+        String assignments = values.isEmpty() ? c.targetKeys().get(0) + "=" + c.targetKeys().get(0) : values.stream().map(column -> column + "=?").collect(java.util.stream.Collectors.joining(","));
         String predicate = c.targetKeys().stream().map(key -> key + "=?").collect(java.util.stream.Collectors.joining(" AND "));
         try (var source = request.source().getConnection(); var target = request.target().getConnection()) {
             source.setReadOnly(true); target.setAutoCommit(false);

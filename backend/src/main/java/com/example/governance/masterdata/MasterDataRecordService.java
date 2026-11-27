@@ -137,8 +137,8 @@ public class MasterDataRecordService {
                         List<MasterDataService.FieldView> missingKeys = detail.fields().stream()
                                 .filter(field -> "YES".equals(field.primaryKey()) && !key.containsKey(field.name())).toList();
                         if (generated.next() && missingKeys.size() == 1
-                                && ("YES".equals(missingKeys.getFirst().autoIncrement()) || detail.fields().stream().filter(field -> "YES".equals(field.primaryKey())).count() == 1)) {
-                            var keyField = missingKeys.getFirst();
+                                && ("YES".equals(missingKeys.get(0).autoIncrement()) || detail.fields().stream().filter(field -> "YES".equals(field.primaryKey())).count() == 1)) {
+                            var keyField = missingKeys.get(0);
                             Object value = safe(generated.getObject(1));
                             if (value != null) {
                                 key.put(keyField.name(), value);

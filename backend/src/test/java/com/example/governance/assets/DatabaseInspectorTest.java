@@ -57,7 +57,7 @@ class DatabaseInspectorTest {
         assertNotNull(book.schema());
         assertEquals(book.catalog(), book.schema());
         var columns = inspector.columns(definition, "p", book.catalog(), book.schema(), "BOOK");
-        assertEquals("ID", columns.getFirst().name());
+        assertEquals("ID", columns.get(0).name());
     }
     /** Models MySQL drivers: database lives in TABLE_CAT, TABLE_SCHEM is null and schema patterns are ignored. */
     private static Connection mysqlLike(Connection real) {
@@ -88,6 +88,6 @@ class DatabaseInspectorTest {
         var definition = new DataSourceDefinition("test", "POSTGRESQL:general", "localhost", 5432, "test", "sa");
         assertTrue(inspector.columns(definition, "p", null, "APP_A", "ITEMS").isEmpty());
         assertTrue(inspector.tables(definition, "p", null, "APP_A").isEmpty());
-        assertEquals("SECRET", inspector.columns(definition, "p", null, "APPXA", "ITEMS").getFirst().name());
+        assertEquals("SECRET", inspector.columns(definition, "p", null, "APPXA", "ITEMS").get(0).name());
     }
 }

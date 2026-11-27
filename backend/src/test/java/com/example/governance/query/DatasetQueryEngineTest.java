@@ -19,7 +19,7 @@ class DatasetQueryEngineTest {
         var dataset = new DatasetQueryEngine.Dataset(null, "PUBLIC", "CLIENTS", "DEPARTMENT_ID", Set.of("ID", "DEPARTMENT_ID", "PHONE"));
         var policy = new DatasetQueryEngine.Policy(Set.of(10L), Map.of("ID", DatasetAccess.Field.FULL, "PHONE", DatasetAccess.Field.MASKED));
         var rows = new DatasetQueryEngine().query(db, dataset, policy, List.of("ID", "PHONE"), 100);
-        assertEquals(1, rows.size()); assertEquals(1, rows.getFirst().get("ID")); assertEquals("****", rows.getFirst().get("PHONE"));
+        assertEquals(1, rows.size()); assertEquals(1, rows.get(0).get("ID")); assertEquals("****", rows.get(0).get("PHONE"));
         assertThrows(SecurityException.class, () -> new DatasetQueryEngine().query(db, dataset, policy, List.of("DEPARTMENT_ID"), 10));
     }
     @Test void rejectsUntrustedIdentifiersAndEmptyScopes() {
@@ -41,7 +41,7 @@ class DatasetQueryEngineTest {
                             "PHONE", Map.of(10L, DatasetAccess.Field.FULL, 20L, DatasetAccess.Field.MASKED));
         var policy = new DatasetQueryEngine.Policy(Set.of(10L,20L), Map.of("ID", DatasetAccess.Field.FULL, "PHONE", DatasetAccess.Field.FULL), grants);
         var rows = new DatasetQueryEngine().query(db, dataset, policy, List.of("ID", "PHONE"), 100);
-        assertEquals("one", rows.getFirst().get("PHONE")); assertEquals("****", rows.get(1).get("PHONE"));
+        assertEquals("one", rows.get(0).get("PHONE")); assertEquals("****", rows.get(1).get("PHONE"));
     }
     @Test void previewDoesNotMaterializeLargeObjects() throws Exception {
         var db = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
@@ -51,6 +51,6 @@ class DatasetQueryEngineTest {
         }
         var dataset = new DatasetQueryEngine.Dataset(null, "PUBLIC", "DOCUMENTS", "DEPARTMENT_ID", Set.of("DEPARTMENT_ID", "CONTENT"));
         var policy = new DatasetQueryEngine.Policy(Set.of(1L), Map.of("CONTENT", DatasetAccess.Field.FULL));
-        assertEquals("[大文本]", new DatasetQueryEngine().query(db, dataset, policy, List.of("CONTENT"), 1).getFirst().get("CONTENT"));
+        assertEquals("[大文本]", new DatasetQueryEngine().query(db, dataset, policy, List.of("CONTENT"), 1).get(0).get("CONTENT"));
     }
 }

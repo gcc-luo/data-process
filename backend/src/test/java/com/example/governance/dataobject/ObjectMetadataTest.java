@@ -24,7 +24,7 @@ class ObjectMetadataTest {
         var metadata=new ObjectMetadata(sources,provider);var tables=metadata.tables(1,null,"ONE");
         var table=tables.stream().filter(t->t.name().equals("CUSTOMERS")).findFirst().orElseThrow();
         var fields=metadata.fields(new ObjectStore.Identity(1,table.catalog(),table.schema(),table.name(),table.type()));
-        assertEquals(2,fields.size());assertEquals("YES",fields.getFirst().primaryKey());assertEquals("NO",fields.getFirst().nullable());
+        assertEquals(2,fields.size());assertEquals("YES",fields.get(0).primaryKey());assertEquals("NO",fields.get(0).nullable());
         assertThrows(IllegalArgumentException.class,()->metadata.fields(new ObjectStore.Identity(1,table.catalog(),"TWO","MISSING","TABLE")));
     }
 }

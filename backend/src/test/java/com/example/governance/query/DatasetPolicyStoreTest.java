@@ -55,7 +55,7 @@ class DatasetPolicyStoreTest {
         assertEquals("DEPT", policies.departmentField()); assertEquals(2, policies.rules().size());
         assertThrows(IllegalStateException.class, () -> store.configure(1,"OTHER_DEPT",1,AccessPolicy.Scope.OWN,Map.of("ID",DatasetAccess.Field.FULL)));
         assertTrue(store.revoke(1,1)); assertFalse(store.revoke(1,1));
-        assertEquals(2, store.listPolicies(1).rules().getFirst().roleId());
+        assertEquals(2, store.listPolicies(1).rules().get(0).roleId());
         assertEquals("DEPT", store.listPolicies(1).departmentField());
         assertTrue(store.revoke(1,2));
         store.configure(1,"OTHER_DEPT",1,AccessPolicy.Scope.OWN,Map.of("ID",DatasetAccess.Field.FULL));

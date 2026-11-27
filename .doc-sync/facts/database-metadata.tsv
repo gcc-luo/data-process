@@ -1,0 +1,730 @@
+META	MySQL	8.4.11
+TABLE	audit_events	
+COLUMN	audit_events	id	BIGINT	19	0	NO			YES
+COLUMN	audit_events	actor_id	BIGINT	19	0	YES			NO
+COLUMN	audit_events	occurred_at	TIMESTAMP	19	0	NO			NO
+COLUMN	audit_events	action	VARCHAR	160	0	NO			NO
+COLUMN	audit_events	object_type	VARCHAR	160	0	NO			NO
+COLUMN	audit_events	object_id	VARCHAR	160	0	NO			NO
+COLUMN	audit_events	result	VARCHAR	32	0	NO			NO
+COLUMN	audit_events	ip	VARCHAR	45	0	NO			NO
+COLUMN	audit_events	user_agent	VARCHAR	255	0	NO			NO
+COLUMN	audit_events	message	VARCHAR	255	0	NO			NO
+PRIMARY	audit_events	id	PRIMARY	1
+FOREIGN	audit_events	actor_id	users	id	audit_events_ibfk_1
+INDEX	audit_events	PRIMARY	id	false	1
+INDEX	audit_events	actor_id	actor_id	true	1
+TABLE	dashboard_reports	
+COLUMN	dashboard_reports	dashboard_id	BIGINT	19	0	NO			NO
+COLUMN	dashboard_reports	report_id	BIGINT	19	0	NO			NO
+COLUMN	dashboard_reports	ordinal_no	INT	10	0	NO			NO
+PRIMARY	dashboard_reports	dashboard_id	PRIMARY	1
+PRIMARY	dashboard_reports	report_id	PRIMARY	2
+FOREIGN	dashboard_reports	dashboard_id	dashboards	id	dashboard_reports_ibfk_1
+FOREIGN	dashboard_reports	report_id	reports	id	dashboard_reports_ibfk_2
+INDEX	dashboard_reports	dashboard_id	dashboard_id	false	1
+INDEX	dashboard_reports	dashboard_id	ordinal_no	false	2
+INDEX	dashboard_reports	PRIMARY	dashboard_id	false	1
+INDEX	dashboard_reports	PRIMARY	report_id	false	2
+INDEX	dashboard_reports	report_id	report_id	true	1
+TABLE	dashboards	
+COLUMN	dashboards	id	BIGINT	19	0	NO			YES
+COLUMN	dashboards	owner_id	BIGINT	19	0	NO			NO
+COLUMN	dashboards	name	VARCHAR	160	0	NO			NO
+COLUMN	dashboards	created_at	TIMESTAMP	19	0	NO			NO
+PRIMARY	dashboards	id	PRIMARY	1
+FOREIGN	dashboards	owner_id	users	id	dashboards_ibfk_1
+INDEX	dashboards	PRIMARY	id	false	1
+INDEX	dashboards	owner_id	owner_id	true	1
+TABLE	data_object_drafts	
+COLUMN	data_object_drafts	object_id	BIGINT	19	0	NO			NO
+COLUMN	data_object_drafts	definition_json	TEXT	65535	0	NO			NO
+COLUMN	data_object_drafts	updated_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	data_object_drafts	object_id	PRIMARY	1
+FOREIGN	data_object_drafts	object_id	data_objects	id	data_object_drafts_ibfk_1
+INDEX	data_object_drafts	PRIMARY	object_id	false	1
+TABLE	data_object_fields	
+COLUMN	data_object_fields	id	BIGINT	19	0	NO			YES
+COLUMN	data_object_fields	object_id	BIGINT	19	0	NO			NO
+COLUMN	data_object_fields	ordinal_position	INT	10	0	NO			NO
+COLUMN	data_object_fields	field_name	VARCHAR	255	0	NO			NO
+COLUMN	data_object_fields	native_type	VARCHAR	255	0	NO			NO
+COLUMN	data_object_fields	field_length	INT	10	0	YES			NO
+COLUMN	data_object_fields	field_scale	INT	10	0	YES			NO
+COLUMN	data_object_fields	nullable_state	VARCHAR	10	0	NO			NO
+COLUMN	data_object_fields	primary_key_state	VARCHAR	10	0	NO			NO
+COLUMN	data_object_fields	remarks	VARCHAR	1000	0	YES			NO
+PRIMARY	data_object_fields	id	PRIMARY	1
+FOREIGN	data_object_fields	object_id	data_objects	id	data_object_fields_ibfk_1
+INDEX	data_object_fields	object_id	object_id	false	1
+INDEX	data_object_fields	object_id	ordinal_position	false	2
+INDEX	data_object_fields	PRIMARY	id	false	1
+TABLE	data_object_operation_steps	
+COLUMN	data_object_operation_steps	operation_id	VARCHAR	36	0	NO			NO
+COLUMN	data_object_operation_steps	step_number	INT	10	0	NO			NO
+COLUMN	data_object_operation_steps	statement_text	TEXT	65535	0	NO			NO
+COLUMN	data_object_operation_steps	risk_text	VARCHAR	1000	0	YES			NO
+COLUMN	data_object_operation_steps	status	VARCHAR	32	0	NO			NO
+COLUMN	data_object_operation_steps	error_message	VARCHAR	1000	0	YES			NO
+PRIMARY	data_object_operation_steps	operation_id	PRIMARY	1
+PRIMARY	data_object_operation_steps	step_number	PRIMARY	2
+FOREIGN	data_object_operation_steps	operation_id	data_object_operations	id	data_object_operation_steps_ibfk_1
+INDEX	data_object_operation_steps	PRIMARY	operation_id	false	1
+INDEX	data_object_operation_steps	PRIMARY	step_number	false	2
+TABLE	data_object_operations	
+COLUMN	data_object_operations	id	VARCHAR	36	0	NO			NO
+COLUMN	data_object_operations	object_id	BIGINT	19	0	YES			NO
+COLUMN	data_object_operations	source_id	BIGINT	19	0	NO			NO
+COLUMN	data_object_operations	identity_hash	CHAR	64	0	NO			NO
+COLUMN	data_object_operations	active_identity	CHAR	64	0	YES			NO
+COLUMN	data_object_operations	operation_type	VARCHAR	16	0	NO			NO
+COLUMN	data_object_operations	status	VARCHAR	32	0	NO			NO
+COLUMN	data_object_operations	target_json	TEXT	65535	0	NO			NO
+COLUMN	data_object_operations	original_fingerprint	CHAR	64	0	YES			NO
+COLUMN	data_object_operations	error_message	VARCHAR	1000	0	YES			NO
+COLUMN	data_object_operations	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+COLUMN	data_object_operations	updated_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	data_object_operations	id	PRIMARY	1
+FOREIGN	data_object_operations	object_id	data_objects	id	data_object_operations_ibfk_1
+FOREIGN	data_object_operations	source_id	data_sources	id	data_object_operations_ibfk_2
+INDEX	data_object_operations	active_identity	active_identity	false	1
+INDEX	data_object_operations	PRIMARY	id	false	1
+INDEX	data_object_operations	object_id	object_id	true	1
+INDEX	data_object_operations	source_id	source_id	true	1
+TABLE	data_objects	
+COLUMN	data_objects	id	BIGINT	19	0	NO			YES
+COLUMN	data_objects	directory_id	BIGINT	19	0	NO			NO
+COLUMN	data_objects	source_id	BIGINT	19	0	NO			NO
+COLUMN	data_objects	catalog_name	VARCHAR	255	0	NO			NO
+COLUMN	data_objects	schema_name	VARCHAR	255	0	NO			NO
+COLUMN	data_objects	table_name	VARCHAR	255	0	NO			NO
+COLUMN	data_objects	object_type	VARCHAR	16	0	NO			NO
+COLUMN	data_objects	identity_hash	CHAR	64	0	NO			NO
+COLUMN	data_objects	display_name	VARCHAR	200	0	NO			NO
+COLUMN	data_objects	description	VARCHAR	1000	0	NO			NO
+COLUMN	data_objects	dataset_id	BIGINT	19	0	YES			NO
+COLUMN	data_objects	version	BIGINT	19	0	NO	1		NO
+COLUMN	data_objects	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+COLUMN	data_objects	updated_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	data_objects	id	PRIMARY	1
+FOREIGN	data_objects	source_id	data_sources	id	data_objects_ibfk_2
+FOREIGN	data_objects	dataset_id	datasets	id	data_objects_ibfk_3
+FOREIGN	data_objects	directory_id	object_directories	id	data_objects_ibfk_1
+INDEX	data_objects	identity_hash	identity_hash	false	1
+INDEX	data_objects	PRIMARY	id	false	1
+INDEX	data_objects	dataset_id	dataset_id	true	1
+INDEX	data_objects	directory_id	directory_id	true	1
+INDEX	data_objects	source_id	source_id	true	1
+TABLE	data_services	
+COLUMN	data_services	id	BIGINT	19	0	NO			YES
+COLUMN	data_services	creator_id	BIGINT	19	0	NO			NO
+COLUMN	data_services	dataset_id	BIGINT	19	0	NO			NO
+COLUMN	data_services	name	VARCHAR	160	0	NO			NO
+COLUMN	data_services	fields_json	LONGTEXT	2147483647	0	NO			NO
+COLUMN	data_services	row_limit	INT	10	0	NO			NO
+COLUMN	data_services	state	VARCHAR	16	0	NO			NO
+COLUMN	data_services	created_at	TIMESTAMP	19	0	NO			NO
+PRIMARY	data_services	id	PRIMARY	1
+FOREIGN	data_services	dataset_id	datasets	id	data_services_ibfk_2
+FOREIGN	data_services	creator_id	users	id	data_services_ibfk_1
+INDEX	data_services	PRIMARY	id	false	1
+INDEX	data_services	creator_id	creator_id	true	1
+INDEX	data_services	dataset_id	dataset_id	true	1
+TABLE	data_sources	
+COLUMN	data_sources	id	BIGINT	19	0	NO			YES
+COLUMN	data_sources	name	VARCHAR	120	0	NO			NO
+COLUMN	data_sources	source_type	VARCHAR	20	0	NO			NO
+COLUMN	data_sources	host	VARCHAR	253	0	NO			NO
+COLUMN	data_sources	port	INT	10	0	NO			NO
+COLUMN	data_sources	database_name	VARCHAR	128	0	NO			NO
+COLUMN	data_sources	username	VARCHAR	128	0	NO			NO
+COLUMN	data_sources	password_cipher	VARCHAR	4096	0	NO			NO
+COLUMN	data_sources	version_profile	VARCHAR	80	0	NO			NO
+COLUMN	data_sources	driver_id	BIGINT	19	0	YES			NO
+COLUMN	data_sources	extra_options	TEXT	65535	0	YES			NO
+PRIMARY	data_sources	id	PRIMARY	1
+FOREIGN	data_sources	driver_id	jdbc_drivers	id	fk_data_sources_driver
+INDEX	data_sources	name	name	false	1
+INDEX	data_sources	PRIMARY	id	false	1
+INDEX	data_sources	fk_data_sources_driver	driver_id	true	1
+TABLE	dataset_fields	
+COLUMN	dataset_fields	dataset_id	BIGINT	19	0	NO			NO
+COLUMN	dataset_fields	ordinal_no	INT	10	0	NO			NO
+COLUMN	dataset_fields	field_name	VARCHAR	255	0	NO			NO
+COLUMN	dataset_fields	data_type	VARCHAR	128	0	NO			NO
+COLUMN	dataset_fields	nullable	BIT	1	0	NO			NO
+PRIMARY	dataset_fields	dataset_id	PRIMARY	1
+PRIMARY	dataset_fields	field_name	PRIMARY	2
+FOREIGN	dataset_fields	dataset_id	datasets	id	dataset_fields_ibfk_1
+INDEX	dataset_fields	dataset_id	dataset_id	false	1
+INDEX	dataset_fields	dataset_id	ordinal_no	false	2
+INDEX	dataset_fields	PRIMARY	dataset_id	false	1
+INDEX	dataset_fields	PRIMARY	field_name	false	2
+TABLE	dataset_role_fields	
+COLUMN	dataset_role_fields	dataset_id	BIGINT	19	0	NO			NO
+COLUMN	dataset_role_fields	role_id	BIGINT	19	0	NO			NO
+COLUMN	dataset_role_fields	field_name	VARCHAR	255	0	NO			NO
+COLUMN	dataset_role_fields	access_mode	VARCHAR	16	0	NO			NO
+PRIMARY	dataset_role_fields	dataset_id	PRIMARY	1
+PRIMARY	dataset_role_fields	field_name	PRIMARY	3
+PRIMARY	dataset_role_fields	role_id	PRIMARY	2
+FOREIGN	dataset_role_fields	dataset_id	dataset_fields	dataset_id	dataset_role_fields_ibfk_2
+FOREIGN	dataset_role_fields	field_name	dataset_fields	field_name	dataset_role_fields_ibfk_2
+FOREIGN	dataset_role_fields	dataset_id	dataset_role_rules	dataset_id	dataset_role_fields_ibfk_1
+FOREIGN	dataset_role_fields	role_id	dataset_role_rules	role_id	dataset_role_fields_ibfk_1
+INDEX	dataset_role_fields	PRIMARY	dataset_id	false	1
+INDEX	dataset_role_fields	PRIMARY	role_id	false	2
+INDEX	dataset_role_fields	PRIMARY	field_name	false	3
+INDEX	dataset_role_fields	dataset_id	dataset_id	true	1
+INDEX	dataset_role_fields	dataset_id	field_name	true	2
+TABLE	dataset_role_rules	
+COLUMN	dataset_role_rules	dataset_id	BIGINT	19	0	NO			NO
+COLUMN	dataset_role_rules	role_id	BIGINT	19	0	NO			NO
+COLUMN	dataset_role_rules	scope	VARCHAR	32	0	NO			NO
+PRIMARY	dataset_role_rules	dataset_id	PRIMARY	1
+PRIMARY	dataset_role_rules	role_id	PRIMARY	2
+FOREIGN	dataset_role_rules	dataset_id	datasets	id	dataset_role_rules_ibfk_1
+FOREIGN	dataset_role_rules	role_id	roles	id	dataset_role_rules_ibfk_2
+INDEX	dataset_role_rules	PRIMARY	dataset_id	false	1
+INDEX	dataset_role_rules	PRIMARY	role_id	false	2
+INDEX	dataset_role_rules	role_id	role_id	true	1
+TABLE	datasets	
+COLUMN	datasets	id	BIGINT	19	0	NO			YES
+COLUMN	datasets	source_id	BIGINT	19	0	NO			NO
+COLUMN	datasets	name	VARCHAR	160	0	NO			NO
+COLUMN	datasets	catalog_name	VARCHAR	255	0	YES			NO
+COLUMN	datasets	schema_name	VARCHAR	255	0	YES			NO
+COLUMN	datasets	table_name	VARCHAR	255	0	NO			NO
+COLUMN	datasets	department_field	VARCHAR	255	0	YES			NO
+PRIMARY	datasets	id	PRIMARY	1
+FOREIGN	datasets	source_id	data_sources	id	datasets_ibfk_1
+INDEX	datasets	name	name	false	1
+INDEX	datasets	PRIMARY	id	false	1
+INDEX	datasets	source_id	source_id	true	1
+TABLE	departments	
+COLUMN	departments	id	BIGINT	19	0	NO			NO
+COLUMN	departments	name	VARCHAR	160	0	NO			NO
+COLUMN	departments	parent_id	BIGINT	19	0	YES			NO
+COLUMN	departments	sort_order	INT	10	0	NO	0		NO
+COLUMN	departments	leader	VARCHAR	160	0	YES			NO
+COLUMN	departments	phone	VARCHAR	48	0	YES			NO
+COLUMN	departments	email	VARCHAR	160	0	YES			NO
+COLUMN	departments	enabled	BIT	1	0	NO	1		NO
+PRIMARY	departments	id	PRIMARY	1
+FOREIGN	departments	parent_id	departments	id	departments_ibfk_1
+INDEX	departments	PRIMARY	id	false	1
+INDEX	departments	parent_id	parent_id	true	1
+TABLE	dictionary_directories	
+COLUMN	dictionary_directories	id	BIGINT	19	0	NO			YES
+COLUMN	dictionary_directories	parent_id	BIGINT	19	0	YES			NO
+COLUMN	dictionary_directories	name	VARCHAR	120	0	NO			NO
+COLUMN	dictionary_directories	sort_order	INT	10	0	NO	0		NO
+PRIMARY	dictionary_directories	id	PRIMARY	1
+FOREIGN	dictionary_directories	parent_id	dictionary_directories	id	dictionary_directories_ibfk_1
+INDEX	dictionary_directories	PRIMARY	id	false	1
+INDEX	dictionary_directories	parent_id	parent_id	true	1
+TABLE	dictionary_entries	
+COLUMN	dictionary_entries	id	BIGINT	19	0	NO			YES
+COLUMN	dictionary_entries	directory_id	BIGINT	19	0	NO			NO
+COLUMN	dictionary_entries	code	VARCHAR	100	0	NO			NO
+COLUMN	dictionary_entries	name	VARCHAR	200	0	NO			NO
+COLUMN	dictionary_entries	meaning	VARCHAR	200	0	NO			NO
+COLUMN	dictionary_entries	data_type	VARCHAR	20	0	NO			NO
+COLUMN	dictionary_entries	field_length	INT	10	0	YES			NO
+COLUMN	dictionary_entries	field_precision	INT	10	0	YES			NO
+COLUMN	dictionary_entries	description	VARCHAR	1000	0	YES			NO
+COLUMN	dictionary_entries	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+COLUMN	dictionary_entries	updated_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	dictionary_entries	id	PRIMARY	1
+FOREIGN	dictionary_entries	directory_id	dictionary_directories	id	dictionary_entries_ibfk_1
+INDEX	dictionary_entries	code	code	false	1
+INDEX	dictionary_entries	PRIMARY	id	false	1
+INDEX	dictionary_entries	directory_id	directory_id	true	1
+TABLE	execution_logs	
+COLUMN	execution_logs	id	BIGINT	19	0	NO			YES
+COLUMN	execution_logs	owner_type	VARCHAR	20	0	NO			NO
+COLUMN	execution_logs	owner_id	BIGINT	19	0	NO			NO
+COLUMN	execution_logs	node_key	VARCHAR	128	0	YES			NO
+COLUMN	execution_logs	attempt_no	INT	10	0	NO			NO
+COLUMN	execution_logs	line_no	INT	10	0	NO			NO
+COLUMN	execution_logs	level	VARCHAR	10	0	NO			NO
+COLUMN	execution_logs	message	VARCHAR	2000	0	NO			NO
+COLUMN	execution_logs	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	execution_logs	id	PRIMARY	1
+INDEX	execution_logs	PRIMARY	id	false	1
+INDEX	execution_logs	idx_execution_logs_owner	owner_type	true	1
+INDEX	execution_logs	idx_execution_logs_owner	owner_id	true	2
+INDEX	execution_logs	idx_execution_logs_owner	node_key	true	3
+INDEX	execution_logs	idx_execution_logs_owner	attempt_no	true	4
+INDEX	execution_logs	idx_execution_logs_owner	line_no	true	5
+TABLE	flyway_schema_history	
+COLUMN	flyway_schema_history	installed_rank	INT	10	0	NO			NO
+COLUMN	flyway_schema_history	version	VARCHAR	50	0	YES			NO
+COLUMN	flyway_schema_history	description	VARCHAR	200	0	NO			NO
+COLUMN	flyway_schema_history	type	VARCHAR	20	0	NO			NO
+COLUMN	flyway_schema_history	script	VARCHAR	1000	0	NO			NO
+COLUMN	flyway_schema_history	checksum	INT	10	0	YES			NO
+COLUMN	flyway_schema_history	installed_by	VARCHAR	100	0	NO			NO
+COLUMN	flyway_schema_history	installed_on	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+COLUMN	flyway_schema_history	execution_time	INT	10	0	NO			NO
+COLUMN	flyway_schema_history	success	BIT	1	0	NO			NO
+PRIMARY	flyway_schema_history	installed_rank	PRIMARY	1
+INDEX	flyway_schema_history	PRIMARY	installed_rank	false	1
+INDEX	flyway_schema_history	flyway_schema_history_s_idx	success	true	1
+TABLE	jdbc_drivers	
+COLUMN	jdbc_drivers	id	BIGINT	19	0	NO			YES
+COLUMN	jdbc_drivers	driver_key	VARCHAR	80	0	NO			NO
+COLUMN	jdbc_drivers	name	VARCHAR	120	0	NO			NO
+COLUMN	jdbc_drivers	db_type	VARCHAR	40	0	NO			NO
+COLUMN	jdbc_drivers	driver_class	VARCHAR	200	0	NO			NO
+COLUMN	jdbc_drivers	version_label	VARCHAR	60	0	YES			NO
+COLUMN	jdbc_drivers	original_filename	VARCHAR	255	0	YES			NO
+COLUMN	jdbc_drivers	jar_path	VARCHAR	500	0	NO			NO
+COLUMN	jdbc_drivers	sha256	CHAR	64	0	NO			NO
+COLUMN	jdbc_drivers	builtin	BIT	1	0	NO	0		NO
+COLUMN	jdbc_drivers	uploaded_by	BIGINT	19	0	YES			NO
+COLUMN	jdbc_drivers	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	jdbc_drivers	id	PRIMARY	1
+INDEX	jdbc_drivers	driver_key	driver_key	false	1
+INDEX	jdbc_drivers	PRIMARY	id	false	1
+INDEX	jdbc_drivers	sha256	sha256	false	1
+TABLE	master_data_history	
+COLUMN	master_data_history	id	BIGINT	19	0	NO			YES
+COLUMN	master_data_history	object_id	BIGINT	19	0	NO			NO
+COLUMN	master_data_history	source_id	BIGINT	19	0	NO			NO
+COLUMN	master_data_history	identity_hash	CHAR	64	0	NO			NO
+COLUMN	master_data_history	catalog_name	VARCHAR	255	0	NO			NO
+COLUMN	master_data_history	schema_name	VARCHAR	255	0	NO			NO
+COLUMN	master_data_history	table_name	VARCHAR	255	0	NO			NO
+COLUMN	master_data_history	operation_type	VARCHAR	24	0	NO			NO
+COLUMN	master_data_history	operation_status	VARCHAR	16	0	NO	SUCCESS		NO
+COLUMN	master_data_history	record_key_json	LONGTEXT	2147483647	0	NO			NO
+COLUMN	master_data_history	record_key_hash	CHAR	64	0	NO			NO
+COLUMN	master_data_history	before_json	LONGTEXT	2147483647	0	YES			NO
+COLUMN	master_data_history	after_json	LONGTEXT	2147483647	0	YES			NO
+COLUMN	master_data_history	actor_id	BIGINT	19	0	YES			NO
+COLUMN	master_data_history	actor_name	VARCHAR	160	0	NO			NO
+COLUMN	master_data_history	error_message	VARCHAR	1000	0	YES			NO
+COLUMN	master_data_history	occurred_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	master_data_history	id	PRIMARY	1
+INDEX	master_data_history	PRIMARY	id	false	1
+INDEX	master_data_history	master_data_history_identity_idx	identity_hash	true	1
+INDEX	master_data_history	master_data_history_identity_idx	id	true	2
+INDEX	master_data_history	master_data_history_key_idx	object_id	true	1
+INDEX	master_data_history	master_data_history_key_idx	record_key_hash	true	2
+INDEX	master_data_history	master_data_history_key_idx	id	true	3
+INDEX	master_data_history	master_data_history_object_idx	object_id	true	1
+INDEX	master_data_history	master_data_history_object_idx	id	true	2
+TABLE	menus	
+COLUMN	menus	id	BIGINT	19	0	NO			NO
+COLUMN	menus	parent_id	BIGINT	19	0	YES			NO
+COLUMN	menus	name	VARCHAR	160	0	NO			NO
+COLUMN	menus	menu_type	VARCHAR	16	0	NO			NO
+COLUMN	menus	route_path	VARCHAR	255	0	NO			NO
+COLUMN	menus	component	VARCHAR	160	0	NO			NO
+COLUMN	menus	permission	VARCHAR	160	0	NO			NO
+COLUMN	menus	icon	VARCHAR	80	0	NO			NO
+COLUMN	menus	sort_order	INT	10	0	NO	0		NO
+COLUMN	menus	visible	BIT	1	0	NO	1		NO
+COLUMN	menus	enabled	BIT	1	0	NO	1		NO
+PRIMARY	menus	id	PRIMARY	1
+FOREIGN	menus	parent_id	menus	id	menus_ibfk_1
+INDEX	menus	PRIMARY	id	false	1
+INDEX	menus	parent_id	parent_id	true	1
+TABLE	object_directories	
+COLUMN	object_directories	id	BIGINT	19	0	NO			YES
+COLUMN	object_directories	parent_id	BIGINT	19	0	YES			NO
+COLUMN	object_directories	name	VARCHAR	120	0	NO			NO
+COLUMN	object_directories	sort_order	INT	10	0	NO	0		NO
+PRIMARY	object_directories	id	PRIMARY	1
+FOREIGN	object_directories	parent_id	object_directories	id	object_directories_ibfk_1
+INDEX	object_directories	PRIMARY	id	false	1
+INDEX	object_directories	parent_id	parent_id	true	1
+TABLE	permission_catalog	
+COLUMN	permission_catalog	permission_code	VARCHAR	160	0	NO			NO
+COLUMN	permission_catalog	module_code	VARCHAR	120	0	NO			NO
+COLUMN	permission_catalog	module_name	VARCHAR	120	0	NO			NO
+COLUMN	permission_catalog	action_code	VARCHAR	80	0	NO			NO
+COLUMN	permission_catalog	action_name	VARCHAR	120	0	NO			NO
+COLUMN	permission_catalog	description	VARCHAR	255	0	NO			NO
+COLUMN	permission_catalog	sort_order	INT	10	0	NO			NO
+PRIMARY	permission_catalog	permission_code	PRIMARY	1
+INDEX	permission_catalog	permission_catalog_module_action_unique	module_code	false	1
+INDEX	permission_catalog	permission_catalog_module_action_unique	action_code	false	2
+INDEX	permission_catalog	PRIMARY	permission_code	false	1
+TABLE	platform_settings	
+COLUMN	platform_settings	setting_key	VARCHAR	128	0	NO			NO
+COLUMN	platform_settings	setting_value	VARCHAR	2048	0	NO			NO
+PRIMARY	platform_settings	setting_key	PRIMARY	1
+INDEX	platform_settings	PRIMARY	setting_key	false	1
+TABLE	processing_task_versions	
+COLUMN	processing_task_versions	task_id	BIGINT	19	0	NO			NO
+COLUMN	processing_task_versions	version	INT	10	0	NO			NO
+COLUMN	processing_task_versions	configuration	LONGTEXT	2147483647	0	NO			NO
+COLUMN	processing_task_versions	comment	VARCHAR	500	0	YES			NO
+COLUMN	processing_task_versions	published_by	VARCHAR	160	0	YES			NO
+COLUMN	processing_task_versions	published_at	TIMESTAMP	19	0	YES			NO
+PRIMARY	processing_task_versions	task_id	PRIMARY	1
+PRIMARY	processing_task_versions	version	PRIMARY	2
+FOREIGN	processing_task_versions	task_id	processing_tasks	id	processing_task_versions_ibfk_1
+INDEX	processing_task_versions	PRIMARY	task_id	false	1
+INDEX	processing_task_versions	PRIMARY	version	false	2
+TABLE	processing_tasks	
+COLUMN	processing_tasks	id	BIGINT	19	0	NO			YES
+COLUMN	processing_tasks	name	VARCHAR	160	0	NO			NO
+COLUMN	processing_tasks	task_type	VARCHAR	32	0	NO			NO
+COLUMN	processing_tasks	current_version	INT	10	0	NO			NO
+COLUMN	processing_tasks	directory_id	BIGINT	19	0	YES			NO
+COLUMN	processing_tasks	description	VARCHAR	500	0	YES			NO
+PRIMARY	processing_tasks	id	PRIMARY	1
+FOREIGN	processing_tasks	directory_id	task_directories	id	fk_tasks_directory
+INDEX	processing_tasks	PRIMARY	id	false	1
+INDEX	processing_tasks	fk_tasks_directory	directory_id	true	1
+TABLE	realtime_jobs	
+COLUMN	realtime_jobs	id	BIGINT	19	0	NO			YES
+COLUMN	realtime_jobs	name	VARCHAR	160	0	NO			NO
+COLUMN	realtime_jobs	source_id	BIGINT	19	0	NO			NO
+COLUMN	realtime_jobs	target_id	BIGINT	19	0	NO			NO
+COLUMN	realtime_jobs	config	LONGTEXT	2147483647	0	NO			NO
+COLUMN	realtime_jobs	interval_seconds	INT	10	0	NO			NO
+COLUMN	realtime_jobs	state	VARCHAR	16	0	NO			NO
+COLUMN	realtime_jobs	next_poll_epoch	BIGINT	19	0	NO			NO
+COLUMN	realtime_jobs	cursor_watermark	VARCHAR	128	0	YES			NO
+COLUMN	realtime_jobs	cursor_tie	BIGINT	19	0	YES			NO
+COLUMN	realtime_jobs	processed	BIGINT	19	0	NO			NO
+COLUMN	realtime_jobs	last_success	TIMESTAMP	19	0	YES			NO
+COLUMN	realtime_jobs	last_error	VARCHAR	255	0	YES			NO
+PRIMARY	realtime_jobs	id	PRIMARY	1
+FOREIGN	realtime_jobs	source_id	data_sources	id	realtime_jobs_ibfk_1
+FOREIGN	realtime_jobs	target_id	data_sources	id	realtime_jobs_ibfk_2
+INDEX	realtime_jobs	PRIMARY	id	false	1
+INDEX	realtime_jobs	source_id	source_id	true	1
+INDEX	realtime_jobs	target_id	target_id	true	1
+TABLE	reports	
+COLUMN	reports	id	BIGINT	19	0	NO			YES
+COLUMN	reports	owner_id	BIGINT	19	0	NO			NO
+COLUMN	reports	dataset_id	BIGINT	19	0	NO			NO
+COLUMN	reports	name	VARCHAR	160	0	NO			NO
+COLUMN	reports	chart_type	VARCHAR	16	0	NO			NO
+COLUMN	reports	query_kind	VARCHAR	16	0	NO			NO
+COLUMN	reports	query_config	LONGTEXT	2147483647	0	NO			NO
+COLUMN	reports	created_at	TIMESTAMP	19	0	NO			NO
+PRIMARY	reports	id	PRIMARY	1
+FOREIGN	reports	dataset_id	datasets	id	reports_ibfk_2
+FOREIGN	reports	owner_id	users	id	reports_ibfk_1
+INDEX	reports	PRIMARY	id	false	1
+INDEX	reports	dataset_id	dataset_id	true	1
+INDEX	reports	owner_id	owner_id	true	1
+TABLE	role_menus	
+COLUMN	role_menus	role_id	BIGINT	19	0	NO			NO
+COLUMN	role_menus	menu_id	BIGINT	19	0	NO			NO
+PRIMARY	role_menus	menu_id	PRIMARY	2
+PRIMARY	role_menus	role_id	PRIMARY	1
+FOREIGN	role_menus	menu_id	menus	id	role_menus_ibfk_2
+FOREIGN	role_menus	role_id	roles	id	role_menus_ibfk_1
+INDEX	role_menus	PRIMARY	role_id	false	1
+INDEX	role_menus	PRIMARY	menu_id	false	2
+INDEX	role_menus	menu_id	menu_id	true	1
+TABLE	role_permissions	
+COLUMN	role_permissions	role_id	BIGINT	19	0	NO			NO
+COLUMN	role_permissions	permission	VARCHAR	160	0	NO			NO
+PRIMARY	role_permissions	permission	PRIMARY	2
+PRIMARY	role_permissions	role_id	PRIMARY	1
+FOREIGN	role_permissions	role_id	roles	id	role_permissions_ibfk_1
+INDEX	role_permissions	PRIMARY	role_id	false	1
+INDEX	role_permissions	PRIMARY	permission	false	2
+TABLE	roles	
+COLUMN	roles	id	BIGINT	19	0	NO			NO
+COLUMN	roles	name	VARCHAR	160	0	NO			NO
+COLUMN	roles	role_key	VARCHAR	160	0	YES			NO
+COLUMN	roles	description	VARCHAR	500	0	YES			NO
+COLUMN	roles	sort_order	INT	10	0	NO	0		NO
+COLUMN	roles	enabled	BIT	1	0	NO	1		NO
+PRIMARY	roles	id	PRIMARY	1
+INDEX	roles	name	name	false	1
+INDEX	roles	PRIMARY	id	false	1
+INDEX	roles	roles_role_key_unique	role_key	false	1
+TABLE	service_callers	
+COLUMN	service_callers	id	BIGINT	19	0	NO			YES
+COLUMN	service_callers	name	VARCHAR	160	0	NO			NO
+COLUMN	service_callers	user_id	BIGINT	19	0	NO			NO
+COLUMN	service_callers	token_hash	VARCHAR	64	0	NO			NO
+COLUMN	service_callers	enabled	BIT	1	0	NO			NO
+COLUMN	service_callers	limit_per_minute	INT	10	0	NO			NO
+COLUMN	service_callers	window_epoch	BIGINT	19	0	NO			NO
+COLUMN	service_callers	window_count	INT	10	0	NO			NO
+COLUMN	service_callers	user_security_version	VARCHAR	36	0	NO			NO
+PRIMARY	service_callers	id	PRIMARY	1
+FOREIGN	service_callers	user_id	users	id	service_callers_ibfk_1
+INDEX	service_callers	name	name	false	1
+INDEX	service_callers	PRIMARY	id	false	1
+INDEX	service_callers	token_hash	token_hash	false	1
+INDEX	service_callers	user_id	user_id	true	1
+TABLE	service_grants	
+COLUMN	service_grants	service_id	BIGINT	19	0	NO			NO
+COLUMN	service_grants	caller_id	BIGINT	19	0	NO			NO
+PRIMARY	service_grants	caller_id	PRIMARY	2
+PRIMARY	service_grants	service_id	PRIMARY	1
+FOREIGN	service_grants	service_id	data_services	id	service_grants_ibfk_1
+FOREIGN	service_grants	caller_id	service_callers	id	service_grants_ibfk_2
+INDEX	service_grants	PRIMARY	service_id	false	1
+INDEX	service_grants	PRIMARY	caller_id	false	2
+INDEX	service_grants	caller_id	caller_id	true	1
+TABLE	service_invocations	
+COLUMN	service_invocations	id	BIGINT	19	0	NO			YES
+COLUMN	service_invocations	service_id	BIGINT	19	0	NO			NO
+COLUMN	service_invocations	caller_id	BIGINT	19	0	NO			NO
+COLUMN	service_invocations	started_at	TIMESTAMP	19	0	NO			NO
+COLUMN	service_invocations	duration_ms	BIGINT	19	0	YES			NO
+COLUMN	service_invocations	outcome	VARCHAR	20	0	NO			NO
+PRIMARY	service_invocations	id	PRIMARY	1
+FOREIGN	service_invocations	service_id	data_services	id	service_invocations_ibfk_1
+FOREIGN	service_invocations	caller_id	service_callers	id	service_invocations_ibfk_2
+INDEX	service_invocations	PRIMARY	id	false	1
+INDEX	service_invocations	caller_id	caller_id	true	1
+INDEX	service_invocations	service_id	service_id	true	1
+TABLE	task_directories	
+COLUMN	task_directories	id	BIGINT	19	0	NO			YES
+COLUMN	task_directories	parent_id	BIGINT	19	0	YES			NO
+COLUMN	task_directories	name	VARCHAR	120	0	NO			NO
+COLUMN	task_directories	sort_order	INT	10	0	NO	0		NO
+COLUMN	task_directories	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	task_directories	id	PRIMARY	1
+FOREIGN	task_directories	parent_id	task_directories	id	task_directories_ibfk_1
+INDEX	task_directories	PRIMARY	id	false	1
+INDEX	task_directories	parent_id	parent_id	true	1
+TABLE	task_drafts	
+COLUMN	task_drafts	task_id	BIGINT	19	0	NO			NO
+COLUMN	task_drafts	revision	BIGINT	19	0	NO	1		NO
+COLUMN	task_drafts	definition	LONGTEXT	2147483647	0	NO			NO
+COLUMN	task_drafts	updated_by	VARCHAR	160	0	NO			NO
+COLUMN	task_drafts	updated_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	task_drafts	task_id	PRIMARY	1
+FOREIGN	task_drafts	task_id	processing_tasks	id	task_drafts_ibfk_1
+INDEX	task_drafts	PRIMARY	task_id	false	1
+TABLE	task_node_runs	
+COLUMN	task_node_runs	id	BIGINT	19	0	NO			YES
+COLUMN	task_node_runs	run_id	BIGINT	19	0	NO			NO
+COLUMN	task_node_runs	attempt_no	INT	10	0	NO			NO
+COLUMN	task_node_runs	node_key	VARCHAR	128	0	NO			NO
+COLUMN	task_node_runs	state	VARCHAR	20	0	NO			NO
+COLUMN	task_node_runs	rows_in	BIGINT	19	0	YES			NO
+COLUMN	task_node_runs	rows_out	BIGINT	19	0	YES			NO
+COLUMN	task_node_runs	duration_ms	BIGINT	19	0	YES			NO
+COLUMN	task_node_runs	error_message	VARCHAR	500	0	YES			NO
+COLUMN	task_node_runs	started_at	TIMESTAMP	19	0	YES			NO
+COLUMN	task_node_runs	finished_at	TIMESTAMP	19	0	YES			NO
+COLUMN	task_node_runs	sample_json	LONGTEXT	2147483647	0	YES			NO
+PRIMARY	task_node_runs	id	PRIMARY	1
+FOREIGN	task_node_runs	run_id	task_runs	id	task_node_runs_ibfk_1
+INDEX	task_node_runs	PRIMARY	id	false	1
+INDEX	task_node_runs	uq_task_node_runs	run_id	false	1
+INDEX	task_node_runs	uq_task_node_runs	attempt_no	false	2
+INDEX	task_node_runs	uq_task_node_runs	node_key	false	3
+TABLE	task_run_attempts	
+COLUMN	task_run_attempts	run_id	BIGINT	19	0	NO			NO
+COLUMN	task_run_attempts	attempt_no	INT	10	0	NO			NO
+COLUMN	task_run_attempts	state	VARCHAR	20	0	NO			NO
+COLUMN	task_run_attempts	started_at	TIMESTAMP	19	0	YES			NO
+COLUMN	task_run_attempts	finished_at	TIMESTAMP	19	0	YES			NO
+COLUMN	task_run_attempts	error_message	VARCHAR	255	0	YES			NO
+COLUMN	task_run_attempts	stats	TEXT	65535	0	YES			NO
+PRIMARY	task_run_attempts	attempt_no	PRIMARY	2
+PRIMARY	task_run_attempts	run_id	PRIMARY	1
+FOREIGN	task_run_attempts	run_id	task_runs	id	task_run_attempts_ibfk_1
+INDEX	task_run_attempts	PRIMARY	run_id	false	1
+INDEX	task_run_attempts	PRIMARY	attempt_no	false	2
+TABLE	task_runs	
+COLUMN	task_runs	id	BIGINT	19	0	NO			YES
+COLUMN	task_runs	task_id	BIGINT	19	0	NO			NO
+COLUMN	task_runs	task_version	INT	10	0	NO			NO
+COLUMN	task_runs	business_date	DATE	10	0	NO			NO
+COLUMN	task_runs	state	VARCHAR	20	0	NO			NO
+COLUMN	task_runs	created_at	TIMESTAMP	19	0	NO			NO
+COLUMN	task_runs	started_at	TIMESTAMP	19	0	YES			NO
+COLUMN	task_runs	finished_at	TIMESTAMP	19	0	YES			NO
+COLUMN	task_runs	error_message	VARCHAR	255	0	YES			NO
+COLUMN	task_runs	attempt_no	INT	10	0	NO	1		NO
+COLUMN	task_runs	parameters	LONGTEXT	2147483647	0	YES			NO
+PRIMARY	task_runs	id	PRIMARY	1
+FOREIGN	task_runs	task_id	processing_task_versions	task_id	task_runs_ibfk_1
+FOREIGN	task_runs	task_version	processing_task_versions	version	task_runs_ibfk_1
+INDEX	task_runs	PRIMARY	id	false	1
+INDEX	task_runs	task_id	task_id	true	1
+INDEX	task_runs	task_id	task_version	true	2
+TABLE	task_schedules	
+COLUMN	task_schedules	id	BIGINT	19	0	NO			YES
+COLUMN	task_schedules	task_id	BIGINT	19	0	NO			NO
+COLUMN	task_schedules	cron_expression	VARCHAR	120	0	NO			NO
+COLUMN	task_schedules	zone	VARCHAR	64	0	NO	Asia/Shanghai		NO
+COLUMN	task_schedules	enabled	BIT	1	0	NO	1		NO
+COLUMN	task_schedules	next_fire_epoch	BIGINT	19	0	YES			NO
+COLUMN	task_schedules	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	task_schedules	id	PRIMARY	1
+FOREIGN	task_schedules	task_id	processing_tasks	id	task_schedules_ibfk_1
+INDEX	task_schedules	PRIMARY	id	false	1
+INDEX	task_schedules	task_id	task_id	false	1
+TABLE	task_watermarks	
+COLUMN	task_watermarks	task_id	BIGINT	19	0	NO			NO
+COLUMN	task_watermarks	node_key	VARCHAR	128	0	NO			NO
+COLUMN	task_watermarks	watermark_value	VARCHAR	200	0	YES			NO
+COLUMN	task_watermarks	tie_breaker_value	VARCHAR	200	0	YES			NO
+COLUMN	task_watermarks	committed_run_id	BIGINT	19	0	YES			NO
+COLUMN	task_watermarks	updated_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+PRIMARY	task_watermarks	node_key	PRIMARY	2
+PRIMARY	task_watermarks	task_id	PRIMARY	1
+FOREIGN	task_watermarks	task_id	processing_tasks	id	task_watermarks_ibfk_1
+INDEX	task_watermarks	PRIMARY	task_id	false	1
+INDEX	task_watermarks	PRIMARY	node_key	false	2
+TABLE	user_roles	
+COLUMN	user_roles	user_id	BIGINT	19	0	NO			NO
+COLUMN	user_roles	role_id	BIGINT	19	0	NO			NO
+PRIMARY	user_roles	role_id	PRIMARY	2
+PRIMARY	user_roles	user_id	PRIMARY	1
+FOREIGN	user_roles	role_id	roles	id	user_roles_ibfk_2
+FOREIGN	user_roles	user_id	users	id	user_roles_ibfk_1
+INDEX	user_roles	PRIMARY	user_id	false	1
+INDEX	user_roles	PRIMARY	role_id	false	2
+INDEX	user_roles	role_id	role_id	true	1
+TABLE	users	
+COLUMN	users	id	BIGINT	19	0	NO			NO
+COLUMN	users	username	VARCHAR	160	0	NO			NO
+COLUMN	users	password_hash	VARCHAR	255	0	NO			NO
+COLUMN	users	department_id	BIGINT	19	0	NO			NO
+COLUMN	users	enabled	BIT	1	0	NO			NO
+COLUMN	users	security_version	VARCHAR	36	0	NO			NO
+COLUMN	users	nickname	VARCHAR	160	0	YES			NO
+COLUMN	users	phone	VARCHAR	48	0	YES			NO
+COLUMN	users	email	VARCHAR	160	0	YES			NO
+COLUMN	users	deleted	BIT	1	0	NO	0		NO
+COLUMN	users	failed_attempts	INT	10	0	NO	0		NO
+COLUMN	users	locked_until	TIMESTAMP	19	0	YES			NO
+COLUMN	users	must_change_password	BIT	1	0	NO	[已隐藏]		NO
+COLUMN	users	created_at	TIMESTAMP	19	0	NO	CURRENT_TIMESTAMP		NO
+COLUMN	users	last_login_at	TIMESTAMP	19	0	YES			NO
+COLUMN	users	prev_login_at	TIMESTAMP	19	0	YES			NO
+PRIMARY	users	id	PRIMARY	1
+FOREIGN	users	department_id	departments	id	users_ibfk_1
+INDEX	users	PRIMARY	id	false	1
+INDEX	users	username	username	false	1
+INDEX	users	department_id	department_id	true	1
+TABLE	workflow_definitions	
+COLUMN	workflow_definitions	id	BIGINT	19	0	NO			YES
+COLUMN	workflow_definitions	name	VARCHAR	160	0	NO			NO
+COLUMN	workflow_definitions	current_version	INT	10	0	NO			NO
+PRIMARY	workflow_definitions	id	PRIMARY	1
+INDEX	workflow_definitions	PRIMARY	id	false	1
+TABLE	workflow_edges	
+COLUMN	workflow_edges	workflow_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_edges	workflow_version	INT	10	0	NO			NO
+COLUMN	workflow_edges	ordinal_no	INT	10	0	NO			NO
+COLUMN	workflow_edges	from_key	VARCHAR	128	0	NO			NO
+COLUMN	workflow_edges	to_key	VARCHAR	128	0	NO			NO
+PRIMARY	workflow_edges	from_key	PRIMARY	3
+PRIMARY	workflow_edges	to_key	PRIMARY	4
+PRIMARY	workflow_edges	workflow_id	PRIMARY	1
+PRIMARY	workflow_edges	workflow_version	PRIMARY	2
+FOREIGN	workflow_edges	workflow_id	workflow_nodes	workflow_id	workflow_edges_ibfk_1
+FOREIGN	workflow_edges	workflow_id	workflow_nodes	workflow_id	workflow_edges_ibfk_2
+FOREIGN	workflow_edges	workflow_version	workflow_nodes	workflow_version	workflow_edges_ibfk_1
+FOREIGN	workflow_edges	workflow_version	workflow_nodes	workflow_version	workflow_edges_ibfk_2
+FOREIGN	workflow_edges	from_key	workflow_nodes	node_key	workflow_edges_ibfk_1
+FOREIGN	workflow_edges	to_key	workflow_nodes	node_key	workflow_edges_ibfk_2
+INDEX	workflow_edges	PRIMARY	workflow_id	false	1
+INDEX	workflow_edges	PRIMARY	workflow_version	false	2
+INDEX	workflow_edges	PRIMARY	from_key	false	3
+INDEX	workflow_edges	PRIMARY	to_key	false	4
+INDEX	workflow_edges	workflow_id	workflow_id	false	1
+INDEX	workflow_edges	workflow_id	workflow_version	false	2
+INDEX	workflow_edges	workflow_id	ordinal_no	false	3
+INDEX	workflow_edges	workflow_id_2	workflow_id	true	1
+INDEX	workflow_edges	workflow_id_2	workflow_version	true	2
+INDEX	workflow_edges	workflow_id_2	to_key	true	3
+TABLE	workflow_node_attempts	
+COLUMN	workflow_node_attempts	run_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_node_attempts	node_key	VARCHAR	128	0	NO			NO
+COLUMN	workflow_node_attempts	attempt_no	INT	10	0	NO			NO
+COLUMN	workflow_node_attempts	state	VARCHAR	20	0	NO			NO
+COLUMN	workflow_node_attempts	started_at	TIMESTAMP	19	0	NO			NO
+COLUMN	workflow_node_attempts	finished_at	TIMESTAMP	19	0	YES			NO
+COLUMN	workflow_node_attempts	error_message	VARCHAR	1000	0	YES			NO
+COLUMN	workflow_node_attempts	stats	TEXT	65535	0	YES			NO
+PRIMARY	workflow_node_attempts	attempt_no	PRIMARY	3
+PRIMARY	workflow_node_attempts	node_key	PRIMARY	2
+PRIMARY	workflow_node_attempts	run_id	PRIMARY	1
+FOREIGN	workflow_node_attempts	run_id	workflow_run_nodes	run_id	workflow_node_attempts_ibfk_1
+FOREIGN	workflow_node_attempts	node_key	workflow_run_nodes	node_key	workflow_node_attempts_ibfk_1
+INDEX	workflow_node_attempts	PRIMARY	run_id	false	1
+INDEX	workflow_node_attempts	PRIMARY	node_key	false	2
+INDEX	workflow_node_attempts	PRIMARY	attempt_no	false	3
+TABLE	workflow_nodes	
+COLUMN	workflow_nodes	workflow_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_nodes	workflow_version	INT	10	0	NO			NO
+COLUMN	workflow_nodes	node_key	VARCHAR	128	0	NO			NO
+COLUMN	workflow_nodes	ordinal_no	INT	10	0	NO			NO
+COLUMN	workflow_nodes	task_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_nodes	task_version	INT	10	0	NO			NO
+COLUMN	workflow_nodes	position_x	DOUBLE	22	0	YES			NO
+COLUMN	workflow_nodes	position_y	DOUBLE	22	0	YES			NO
+PRIMARY	workflow_nodes	node_key	PRIMARY	3
+PRIMARY	workflow_nodes	workflow_id	PRIMARY	1
+PRIMARY	workflow_nodes	workflow_version	PRIMARY	2
+FOREIGN	workflow_nodes	task_id	processing_task_versions	task_id	workflow_nodes_ibfk_2
+FOREIGN	workflow_nodes	task_version	processing_task_versions	version	workflow_nodes_ibfk_2
+FOREIGN	workflow_nodes	workflow_id	workflow_versions	workflow_id	workflow_nodes_ibfk_1
+FOREIGN	workflow_nodes	workflow_version	workflow_versions	version	workflow_nodes_ibfk_1
+INDEX	workflow_nodes	PRIMARY	workflow_id	false	1
+INDEX	workflow_nodes	PRIMARY	workflow_version	false	2
+INDEX	workflow_nodes	PRIMARY	node_key	false	3
+INDEX	workflow_nodes	workflow_id	workflow_id	false	1
+INDEX	workflow_nodes	workflow_id	workflow_version	false	2
+INDEX	workflow_nodes	workflow_id	ordinal_no	false	3
+INDEX	workflow_nodes	task_id	task_id	true	1
+INDEX	workflow_nodes	task_id	task_version	true	2
+TABLE	workflow_run_nodes	
+COLUMN	workflow_run_nodes	run_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_run_nodes	node_key	VARCHAR	128	0	NO			NO
+COLUMN	workflow_run_nodes	state	VARCHAR	20	0	NO			NO
+COLUMN	workflow_run_nodes	started_at	TIMESTAMP	19	0	YES			NO
+COLUMN	workflow_run_nodes	finished_at	TIMESTAMP	19	0	YES			NO
+COLUMN	workflow_run_nodes	next_retry_epoch	BIGINT	19	0	YES			NO
+PRIMARY	workflow_run_nodes	node_key	PRIMARY	2
+PRIMARY	workflow_run_nodes	run_id	PRIMARY	1
+FOREIGN	workflow_run_nodes	run_id	workflow_runs	id	workflow_run_nodes_ibfk_1
+INDEX	workflow_run_nodes	PRIMARY	run_id	false	1
+INDEX	workflow_run_nodes	PRIMARY	node_key	false	2
+TABLE	workflow_runs	
+COLUMN	workflow_runs	id	BIGINT	19	0	NO			YES
+COLUMN	workflow_runs	workflow_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_runs	workflow_version	INT	10	0	NO			NO
+COLUMN	workflow_runs	business_date	DATE	10	0	NO			NO
+COLUMN	workflow_runs	state	VARCHAR	20	0	NO			NO
+COLUMN	workflow_runs	created_at	TIMESTAMP	19	0	NO			NO
+PRIMARY	workflow_runs	id	PRIMARY	1
+FOREIGN	workflow_runs	workflow_id	workflow_versions	workflow_id	workflow_runs_ibfk_1
+FOREIGN	workflow_runs	workflow_version	workflow_versions	version	workflow_runs_ibfk_1
+INDEX	workflow_runs	PRIMARY	id	false	1
+INDEX	workflow_runs	workflow_id	workflow_id	true	1
+INDEX	workflow_runs	workflow_id	workflow_version	true	2
+TABLE	workflow_schedules	
+COLUMN	workflow_schedules	id	BIGINT	19	0	NO			YES
+COLUMN	workflow_schedules	workflow_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_schedules	workflow_version	INT	10	0	NO			NO
+COLUMN	workflow_schedules	cron_expression	VARCHAR	128	0	NO			NO
+COLUMN	workflow_schedules	zone_id	VARCHAR	128	0	NO			NO
+COLUMN	workflow_schedules	next_fire_epoch	BIGINT	19	0	NO			NO
+COLUMN	workflow_schedules	enabled	BIT	1	0	NO			NO
+PRIMARY	workflow_schedules	id	PRIMARY	1
+FOREIGN	workflow_schedules	workflow_id	workflow_versions	workflow_id	workflow_schedules_ibfk_1
+FOREIGN	workflow_schedules	workflow_version	workflow_versions	version	workflow_schedules_ibfk_1
+INDEX	workflow_schedules	PRIMARY	id	false	1
+INDEX	workflow_schedules	workflow_id	workflow_id	true	1
+INDEX	workflow_schedules	workflow_id	workflow_version	true	2
+TABLE	workflow_versions	
+COLUMN	workflow_versions	workflow_id	BIGINT	19	0	NO			NO
+COLUMN	workflow_versions	version	INT	10	0	NO			NO
+PRIMARY	workflow_versions	version	PRIMARY	2
+PRIMARY	workflow_versions	workflow_id	PRIMARY	1
+FOREIGN	workflow_versions	workflow_id	workflow_definitions	id	workflow_versions_ibfk_1
+INDEX	workflow_versions	PRIMARY	workflow_id	false	1
+INDEX	workflow_versions	PRIMARY	version	false	2

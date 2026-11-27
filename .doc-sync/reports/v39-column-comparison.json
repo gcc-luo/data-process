@@ -1,0 +1,15 @@
+{
+  "scope": "列名、基础类型、可空性；不包括长度、默认值、约束或其他环境",
+  "results": [
+    {
+      "table": "dictionary_directories",
+      "columns": 4,
+      "differences": []
+    },
+    {
+      "table": "dictionary_entries",
+      "columns": 11,
+      "differences": []
+    }
+  ]
+}

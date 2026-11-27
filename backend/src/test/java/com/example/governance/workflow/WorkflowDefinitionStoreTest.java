@@ -25,7 +25,7 @@ class WorkflowDefinitionStoreTest {
         var saved = store.get(workflow, 1).orElseThrow();
         assertEquals(nodes, saved.nodes());
         assertEquals(List.of(new WorkflowGraph.Edge("a", "b")), saved.edges());
-        assertEquals(1, saved.nodes().getFirst().taskVersion());
+        assertEquals(1, saved.nodes().get(0).taskVersion());
         var revised = List.of(new WorkflowDefinitionStore.Node("a", first, 2));
         assertEquals(2, store.addVersion(workflow, revised, List.of()));
         assertEquals(nodes, store.get(workflow, 1).orElseThrow().nodes());

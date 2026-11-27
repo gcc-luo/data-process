@@ -61,7 +61,7 @@ public final class TaskScheduleStore {
             var rows = jdbc.query("SELECT task_id,cron_expression,zone,next_fire_epoch,enabled FROM task_schedules WHERE id=? FOR UPDATE",
                     (rs, row) -> new Row(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getBoolean(5)), scheduleId);
             if (rows.isEmpty()) throw new IllegalArgumentException("Unknown schedule");
-            var schedule = rows.getFirst();
+            var schedule = rows.get(0);
             if (!schedule.enabled() || schedule.next() > now.toEpochMilli()) return Optional.empty();
             int version = tasks.publishedVersion(schedule.taskId());
             if (version < 1) return Optional.empty();

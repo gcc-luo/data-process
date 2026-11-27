@@ -31,10 +31,13 @@ class ObjectExecutionServiceTest {
         when(metadata.fields(identity)).thenReturn(List.of(new ObjectStore.Field(1,"code","VARCHAR",20,null,"NO","YES",null)));
         var request=new ObjectExecutionService.CreateRequest(directory,identity,"客户","",List.of(new ObjectDialect.Field("code","VARCHAR",20,null,false,true)));
         var preview=execution.previewCreate(request);assertEquals("PREPARED",preview.status());assertTrue(preview.sql().contains("CREATE TABLE"));
+        var pending=execution.pending().stream().filter(item->item.operationId().equals(preview.operationId())).findFirst().orElseThrow();
+        assertEquals(identity,pending.identity());assertEquals("客户",pending.name());assertEquals("PREPARED",pending.status());assertNotNull(pending.createdAt());
         assertThrows(IllegalStateException.class,()->execution.previewCreate(request));
         assertEquals("SUCCEEDED",execution.executeCreate(preview.operationId()).status());
         assertThrows(IllegalStateException.class,()->execution.executeCreate(preview.operationId()));
         assertEquals(1,store.page(directory,"customer_create_test","",1,10).total());
+        assertTrue(execution.pending().stream().noneMatch(item->item.operationId().equals(preview.operationId())));
     }
     @Test void executesCommentStepsAndVerifiesMetadata() throws Exception {
         jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (9893,'注释测试源','POSTGRESQL','POSTGRESQL:general','localhost',5432,'db','test','cipher')");

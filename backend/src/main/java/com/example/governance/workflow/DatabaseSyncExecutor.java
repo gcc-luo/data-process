@@ -71,7 +71,7 @@ public final class DatabaseSyncExecutor implements AutoCloseable {
     }
     private static int upsertRows(ResultSet rows, PreparedStatement insert, Connection target, Request request) throws Exception {
         List<String> nonKeys = request.columns().stream().filter(column -> request.keys().stream().noneMatch(key -> key.equalsIgnoreCase(column))).toList();
-        String assignments = nonKeys.isEmpty() ? request.keys().getFirst() + "=" + request.keys().getFirst() : nonKeys.stream().map(column -> column + "=?").collect(java.util.stream.Collectors.joining(","));
+        String assignments = nonKeys.isEmpty() ? request.keys().get(0) + "=" + request.keys().get(0) : nonKeys.stream().map(column -> column + "=?").collect(java.util.stream.Collectors.joining(","));
         String where = request.keys().stream().map(key -> key + "=?").collect(java.util.stream.Collectors.joining(" AND "));
         try (var update = target.prepareStatement("UPDATE " + request.table() + " SET " + assignments + " WHERE " + where)) {
             update.setQueryTimeout(30); int count = 0;

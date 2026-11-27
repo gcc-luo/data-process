@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-27",
+  "scope": "本次 Surefire XML 中的跳过项，不代表测试失败",
+  "tests": [
+    {
+      "class": "com.example.governance.assets.MySqlRefreshSnapshotTest",
+      "method": "readsCurrentSourceCredentialsEvenWhenOuterSnapshotIsOld",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.assets.MySqlRefreshSnapshotTest",
+      "method": "concurrentRefreshUsesCurrentFieldSnapshotAndIsIdempotent",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlMigrationTest",
+      "method": "migratesAndEnforcesReferentialIntegrity",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlPolicySnapshotTest",
+      "method": "resolvingPolicyUsesOneConsistentSnapshotDuringConcurrentChange",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlRealtimeSettingsTest",
+      "method": "updateSettingsPreservesExistingCursorAndRejectsRunning",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlSourceDeletionTest",
+      "method": "deletionChecksCurrentReferencesEvenWithAnOlderRepeatableReadSnapshot",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlSyncExecutorTest",
+      "method": "uniqueKeyReplayAndFailedAppendPreserveTargetData",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlTaskParametersTest",
+      "method": "bindsMultipleValuesAndBusinessDateInOrder",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlTaskRejectionTest",
+      "method": "rejectedDispatchPersistsRunAndAttemptInSameState",
+      "reason": "System property [governance.mysql.test] does not exist"
+    },
+    {
+      "class": "com.example.governance.mysql.MySqlTaskUpgradeTest",
+      "method": "upgradesExistingFailedTaskAndBackfillsItsAttempt",
+      "reason": "System property [governance.mysql.test] does not exist"
+    }
+  ]
+}

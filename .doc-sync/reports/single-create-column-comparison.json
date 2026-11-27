@@ -1,0 +1,250 @@
+{
+  "scope": "静态筛选仅单次 CREATE 且未发现 ALTER 或 DROP 的表；比较列名、基础类型及可空性，不检查默认值、长度、索引、其他类型结构变化或目标环境；差异须人工复核",
+  "results": [
+    {
+      "table": "dashboard_reports",
+      "migration": "V15__reports.sql",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "dashboards",
+      "migration": "V15__reports.sql",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "data_object_drafts",
+      "migration": "V40__data_objects.sql",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "data_object_fields",
+      "migration": "V40__data_objects.sql",
+      "expected_columns": 10,
+      "local_columns": 10,
+      "differences": []
+    },
+    {
+      "table": "data_object_operation_steps",
+      "migration": "V40__data_objects.sql",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "data_object_operations",
+      "migration": "V40__data_objects.sql",
+      "expected_columns": 12,
+      "local_columns": 12,
+      "differences": []
+    },
+    {
+      "table": "data_objects",
+      "migration": "V40__data_objects.sql",
+      "expected_columns": 14,
+      "local_columns": 14,
+      "differences": []
+    },
+    {
+      "table": "data_services",
+      "migration": "V16__data_services.sql",
+      "expected_columns": 8,
+      "local_columns": 8,
+      "differences": []
+    },
+    {
+      "table": "dataset_fields",
+      "migration": "V6__datasets.sql",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "dataset_role_fields",
+      "migration": "V13__dataset_policies.sql",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "dataset_role_rules",
+      "migration": "V13__dataset_policies.sql",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "dictionary_directories",
+      "migration": "V39__data_dictionary.sql",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "dictionary_entries",
+      "migration": "V39__data_dictionary.sql",
+      "expected_columns": 11,
+      "local_columns": 11,
+      "differences": []
+    },
+    {
+      "table": "execution_logs",
+      "migration": "V34__execution_logs_and_stats.sql",
+      "expected_columns": 9,
+      "local_columns": 9,
+      "differences": []
+    },
+    {
+      "table": "jdbc_drivers",
+      "migration": "V30__jdbc_driver_management.sql",
+      "expected_columns": 12,
+      "local_columns": 12,
+      "differences": []
+    },
+    {
+      "table": "master_data_history",
+      "migration": "V41__master_data.sql",
+      "expected_columns": 17,
+      "local_columns": 17,
+      "differences": []
+    },
+    {
+      "table": "menus",
+      "migration": "V23__organization_admin_console.sql",
+      "expected_columns": 11,
+      "local_columns": 11,
+      "differences": []
+    },
+    {
+      "table": "object_directories",
+      "migration": "V40__data_objects.sql",
+      "expected_columns": 4,
+      "local_columns": 4,
+      "differences": []
+    },
+    {
+      "table": "platform_settings",
+      "migration": "V1__platform_settings.sql",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "realtime_jobs",
+      "migration": "V19__realtime_jobs.sql",
+      "expected_columns": 13,
+      "local_columns": 13,
+      "differences": []
+    },
+    {
+      "table": "reports",
+      "migration": "V15__reports.sql",
+      "expected_columns": 8,
+      "local_columns": 8,
+      "differences": []
+    },
+    {
+      "table": "role_menus",
+      "migration": "V23__organization_admin_console.sql",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "role_permissions",
+      "migration": "V2__organization.sql",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "service_grants",
+      "migration": "V16__data_services.sql",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "service_invocations",
+      "migration": "V16__data_services.sql",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "task_directories",
+      "migration": "V32__processing_menu_and_directories.sql",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "task_drafts",
+      "migration": "V35__orchestration_rebuild.sql",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "task_schedules",
+      "migration": "V35__orchestration_rebuild.sql",
+      "expected_columns": 7,
+      "local_columns": 7,
+      "differences": []
+    },
+    {
+      "table": "task_watermarks",
+      "migration": "V35__orchestration_rebuild.sql",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "user_roles",
+      "migration": "V2__organization.sql",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    },
+    {
+      "table": "workflow_definitions",
+      "migration": "V8__workflow_definitions.sql",
+      "expected_columns": 3,
+      "local_columns": 3,
+      "differences": []
+    },
+    {
+      "table": "workflow_edges",
+      "migration": "V8__workflow_definitions.sql",
+      "expected_columns": 5,
+      "local_columns": 5,
+      "differences": []
+    },
+    {
+      "table": "workflow_runs",
+      "migration": "V9__workflow_runs.sql",
+      "expected_columns": 6,
+      "local_columns": 6,
+      "differences": []
+    },
+    {
+      "table": "workflow_schedules",
+      "migration": "V12__workflow_schedules.sql",
+      "expected_columns": 7,
+      "local_columns": 7,
+      "differences": []
+    },
+    {
+      "table": "workflow_versions",
+      "migration": "V8__workflow_definitions.sql",
+      "expected_columns": 2,
+      "local_columns": 2,
+      "differences": []
+    }
+  ]
+}

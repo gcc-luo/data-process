@@ -79,8 +79,8 @@ public final class ServiceCatalogStore {
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}") || now == null) throw new SecurityException("Access denied");
         return tx.execute(status -> {
             var callers = jdbc.query("SELECT c.id,c.user_id,c.enabled,u.enabled,c.limit_per_minute,c.window_epoch,c.window_count,c.user_security_version,u.security_version FROM service_callers c JOIN users u ON u.id=c.user_id WHERE c.token_hash=? FOR UPDATE", (rs, row) -> new Caller(rs.getLong(1), rs.getLong(2), rs.getBoolean(3), rs.getBoolean(4), rs.getInt(5), rs.getLong(6), rs.getInt(7), rs.getString(8), rs.getString(9)), hash(token));
-            if (callers.isEmpty() || !callers.getFirst().enabled() || !callers.getFirst().userEnabled() || !callers.getFirst().issuedVersion().equals(callers.getFirst().currentVersion())) throw new SecurityException("Access denied");
-            var caller = callers.getFirst();
+            if (callers.isEmpty() || !callers.get(0).enabled() || !callers.get(0).userEnabled() || !callers.get(0).issuedVersion().equals(callers.get(0).currentVersion())) throw new SecurityException("Access denied");
+            var caller = callers.get(0);
             var services = jdbc.query("SELECT s.id,s.dataset_id,s.name,s.fields_json,s.row_limit,s.state FROM data_services s JOIN service_grants g ON g.service_id=s.id WHERE s.id=? AND g.caller_id=? AND s.state='PUBLISHED'", (rs, row) -> new ServiceView(rs.getLong(1), rs.getLong(2), rs.getString(3), fields(rs.getString(4)), rs.getInt(5), rs.getString(6)), serviceId, caller.id());
             if (services.isEmpty()) throw new SecurityException("Access denied");
             long minute = Math.floorDiv(now.toEpochMilli(), 60000); int count = minute > caller.window() ? 0 : caller.count();
@@ -88,7 +88,7 @@ public final class ServiceCatalogStore {
             jdbc.update("UPDATE service_callers SET window_epoch=?,window_count=? WHERE id=?", Math.max(minute, caller.window()), count + 1, caller.id());
             var key = new GeneratedKeyHolder();
             jdbc.update(connection -> { var st = connection.prepareStatement("INSERT INTO service_invocations(service_id,caller_id,started_at,outcome) VALUES (?,?,CURRENT_TIMESTAMP,'PENDING')", new String[]{"id"}); st.setLong(1, serviceId); st.setLong(2, caller.id()); return st; }, key);
-            var service = services.getFirst();
+            var service = services.get(0);
             return new Call(id(key), caller.userId(), service.datasetId(), service.fields(), service.limit());
         });
     }

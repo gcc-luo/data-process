@@ -43,7 +43,7 @@ public final class TaskVersionStore {
         return transaction.execute(status -> {
             var versions = jdbc.query("SELECT current_version FROM processing_tasks WHERE id=? FOR UPDATE", (rs, row) -> rs.getInt(1), taskId);
             if (versions.isEmpty()) throw new IllegalArgumentException("Unknown task");
-            int next = Math.addExact(versions.getFirst(), 1);
+            int next = Math.addExact(versions.get(0), 1);
             jdbc.update("INSERT INTO processing_task_versions(task_id,version,configuration,comment,published_by,published_at) VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)", taskId, next, configuration, comment, publishedBy);
             jdbc.update("UPDATE processing_tasks SET current_version=? WHERE id=?", next, taskId);
             return next;
@@ -59,7 +59,7 @@ public final class TaskVersionStore {
             var rows = jdbc.query("SELECT name,directory_id,description FROM processing_tasks WHERE id=? FOR UPDATE",
                     (rs, row) -> new Object[]{rs.getString(1), rs.getObject(2, Long.class), rs.getString(3)}, id);
             if (rows.isEmpty()) throw new java.util.NoSuchElementException("Unknown task");
-            Object[] current = rows.getFirst();
+            Object[] current = rows.get(0);
             String name = (String) current[0];
             if (changes.has("name")) {
                 com.fasterxml.jackson.databind.JsonNode node = changes.get("name");
@@ -106,7 +106,7 @@ public final class TaskVersionStore {
     }
     public int publishedVersion(long taskId) {
         var rows = jdbc.query("SELECT current_version FROM processing_tasks WHERE id=?", (rs, row) -> rs.getInt(1), taskId);
-        return rows.isEmpty() ? 0 : rows.getFirst();
+        return rows.isEmpty() ? 0 : rows.get(0);
     }
     public Optional<Version> findVersion(long taskId, int version) {
         return jdbc.query("SELECT v.task_id,v.version,t.task_type,v.configuration FROM processing_task_versions v JOIN processing_tasks t ON t.id=v.task_id WHERE v.task_id=? AND v.version=?", (rs, row) -> new Version(rs.getLong(1), rs.getInt(2), rs.getString(3), rs.getString(4)), taskId, version).stream().findFirst();

@@ -65,15 +65,15 @@ public class ObjectStore {
     }
     @Transactional public void delete(long id){
         var rows=jdbc.queryForList("SELECT dataset_id FROM data_objects WHERE id=? FOR UPDATE",Long.class,id);if(rows.isEmpty())throw new IllegalArgumentException("数据对象不存在");
-        if(rows.getFirst()!=null)throw new IllegalStateException("对象已关联数据集，请先解除关联");
+        if(rows.get(0)!=null)throw new IllegalStateException("对象已关联数据集，请先解除关联");
         if(jdbc.queryForObject("SELECT COUNT(*) FROM data_object_operations WHERE object_id=? AND active_identity IS NOT NULL",Integer.class,id)>0)throw new IllegalStateException("对象存在待处理的结构操作，不能删除");
         jdbc.update("UPDATE data_object_operations SET object_id=NULL WHERE object_id=?",id);
         jdbc.update("DELETE FROM data_object_drafts WHERE object_id=?",id);jdbc.update("DELETE FROM data_object_fields WHERE object_id=?",id);jdbc.update("DELETE FROM data_objects WHERE id=?",id);
     }
-    private boolean sameSchema(Identity candidate,Identity actual){String a=normal(candidate.schema()),b=normal(actual.schema());if(Objects.equals(a,b))return true;var type=jdbc.queryForList("SELECT source_type FROM data_sources WHERE id=?",String.class,actual.sourceId());return !type.isEmpty()&&"MYSQL".equals(type.getFirst())&&(a.isEmpty()||a.equals(normal(actual.catalog())))&&(b.isEmpty()||b.equals(normal(actual.catalog())));}
+    private boolean sameSchema(Identity candidate,Identity actual){String a=normal(candidate.schema()),b=normal(actual.schema());if(Objects.equals(a,b))return true;var type=jdbc.queryForList("SELECT source_type FROM data_sources WHERE id=?",String.class,actual.sourceId());return !type.isEmpty()&&"MYSQL".equals(type.get(0))&&(a.isEmpty()||a.equals(normal(actual.catalog())))&&(b.isEmpty()||b.equals(normal(actual.catalog())));}
     @Transactional public void bindDataset(long id,Long datasetId){
         if(jdbc.queryForList("SELECT id FROM data_objects WHERE id=? FOR UPDATE",Long.class,id).isEmpty())throw new IllegalArgumentException("数据对象不存在");
-        Item object=find(id);if(datasetId!=null){var rows=jdbc.query("SELECT source_id,catalog_name,schema_name,table_name FROM datasets WHERE id=?",(r,n)->new Identity(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),object.identity().type()),datasetId);if(rows.isEmpty())throw new IllegalArgumentException("数据集不存在");var candidate=rows.getFirst();var actual=object.identity();if(candidate.sourceId()!=actual.sourceId()||!Objects.equals(candidate.table(),actual.table())||!Objects.equals(normal(candidate.catalog()),normal(actual.catalog()))||!sameSchema(candidate,actual))throw new IllegalArgumentException("数据集必须关联相同的物理对象");}
+        Item object=find(id);if(datasetId!=null){var rows=jdbc.query("SELECT source_id,catalog_name,schema_name,table_name FROM datasets WHERE id=?",(r,n)->new Identity(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),object.identity().type()),datasetId);if(rows.isEmpty())throw new IllegalArgumentException("数据集不存在");var candidate=rows.get(0);var actual=object.identity();if(candidate.sourceId()!=actual.sourceId()||!Objects.equals(candidate.table(),actual.table())||!Objects.equals(normal(candidate.catalog()),normal(actual.catalog()))||!sameSchema(candidate,actual))throw new IllegalArgumentException("数据集必须关联相同的物理对象");}
         jdbc.update("UPDATE data_objects SET dataset_id=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=?",datasetId,id);
     }
 }

@@ -1,0 +1,1037 @@
+{
+  "scope": "静态文本匹配；仅直接字符串映射，可能遗漏无参数注解、数组、继承及复杂映射，需人工复核",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "source": "backend/src/main/java/com/example/governance/HealthController.java",
+      "line": 16
+    },
+    {
+      "method": "GET",
+      "path": "/api/datasets",
+      "source": "backend/src/main/java/com/example/governance/assets/DatasetController.java",
+      "line": 29
+    },
+    {
+      "method": "POST",
+      "path": "/api/datasets",
+      "source": "backend/src/main/java/com/example/governance/assets/DatasetController.java",
+      "line": 31
+    },
+    {
+      "method": "POST",
+      "path": "/api/datasets/{id}/refresh",
+      "source": "backend/src/main/java/com/example/governance/assets/DatasetController.java",
+      "line": 45
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/datasets/{id}",
+      "source": "backend/src/main/java/com/example/governance/assets/DatasetController.java",
+      "line": 58
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-sources/profiles",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 31
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-sources",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 33
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-sources",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 42
+    },
+    {
+      "method": "PUT",
+      "path": "/api/data-sources/{id}",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 55
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/data-sources/{id}",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 65
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-sources/batch-delete",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 76
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-sources/{id}/test",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 94
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-sources/test-config",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 101
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-sources/{id}/tables",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 124
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-sources/{id}/columns",
+      "source": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+      "line": 130
+    },
+    {
+      "method": "GET",
+      "path": "/api/drivers",
+      "source": "backend/src/main/java/com/example/governance/assets/DriverController.java",
+      "line": 29
+    },
+    {
+      "method": "POST",
+      "path": "/api/drivers",
+      "source": "backend/src/main/java/com/example/governance/assets/DriverController.java",
+      "line": 33
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/drivers/{id}",
+      "source": "backend/src/main/java/com/example/governance/assets/DriverController.java",
+      "line": 46
+    },
+    {
+      "method": "GET",
+      "path": "/api/object-directories",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 24
+    },
+    {
+      "method": "POST",
+      "path": "/api/object-directories",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 25
+    },
+    {
+      "method": "POST",
+      "path": "/api/object-directories/sort",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 26
+    },
+    {
+      "method": "PUT",
+      "path": "/api/object-directories/{id}",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 27
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/object-directories/{id}",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 28
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-objects",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 29
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-objects/export",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 30
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-objects/{id}",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 34
+    },
+    {
+      "method": "PUT",
+      "path": "/api/data-objects/{id}",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 35
+    },
+    {
+      "method": "PUT",
+      "path": "/api/data-objects/{id}/dataset",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 36
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-objects/{id}/preview",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 37
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/data-objects/{id}",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 38
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-objects/discovery",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 39
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-objects/discovery-fields",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 40
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-objects/register",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 41
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-object-operations/create-preview",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 42
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-object-operations/{id}/execute",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 43
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/data-object-operations/{id}",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 44
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-object-operations",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 45
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-object-operations/{id}/resolve-absent",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 46
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-object-operations/{id}/recover",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 47
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-objects/{id}/schema-preview",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 48
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-object-schema-operations/{id}/execute",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 49
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-object-schema-operations",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 50
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-object-schema-operations/{id}/actual",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 51
+    },
+    {
+      "method": "POST",
+      "path": "/api/data-object-schema-operations/{id}/acknowledge",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 52
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/data-object-schema-operations/{id}",
+      "source": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+      "line": 53
+    },
+    {
+      "method": "GET",
+      "path": "/api/dictionary/directories",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 24
+    },
+    {
+      "method": "GET",
+      "path": "/api/dictionary/entries",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 25
+    },
+    {
+      "method": "POST",
+      "path": "/api/dictionary/directories",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 26
+    },
+    {
+      "method": "POST",
+      "path": "/api/dictionary/directories/sort",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 27
+    },
+    {
+      "method": "PUT",
+      "path": "/api/dictionary/directories/{id}",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 28
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/dictionary/directories/{id}",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 29
+    },
+    {
+      "method": "POST",
+      "path": "/api/dictionary/entries",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 30
+    },
+    {
+      "method": "PUT",
+      "path": "/api/dictionary/entries/{id}",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 31
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/dictionary/entries/{id}",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 32
+    },
+    {
+      "method": "GET",
+      "path": "/api/dictionary/template",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 33
+    },
+    {
+      "method": "POST",
+      "path": "/api/dictionary/import",
+      "source": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+      "line": 61
+    },
+    {
+      "method": "GET",
+      "path": "/api/master-data/tree",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 55
+    },
+    {
+      "method": "GET",
+      "path": "/api/master-data/objects/{id}",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 57
+    },
+    {
+      "method": "POST",
+      "path": "/api/master-data/objects/{id}/query",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 63
+    },
+    {
+      "method": "POST",
+      "path": "/api/master-data/objects/{id}/records",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 69
+    },
+    {
+      "method": "PUT",
+      "path": "/api/master-data/objects/{id}/records",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 79
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/master-data/objects/{id}/records",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 89
+    },
+    {
+      "method": "GET",
+      "path": "/api/master-data/objects/{id}/template",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 98
+    },
+    {
+      "method": "GET",
+      "path": "/api/master-data/objects/{id}/export",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 109
+    },
+    {
+      "method": "POST",
+      "path": "/api/master-data/objects/{id}/import",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 122
+    },
+    {
+      "method": "GET",
+      "path": "/api/master-data/objects/{id}/history",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 166
+    },
+    {
+      "method": "GET",
+      "path": "/api/master-data/history/{historyId}",
+      "source": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+      "line": 180
+    },
+    {
+      "method": "GET",
+      "path": "/api/navigation",
+      "source": "backend/src/main/java/com/example/governance/organization/NavigationController.java",
+      "line": 12
+    },
+    {
+      "method": "GET",
+      "path": "/api/organization/audit",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 42
+    },
+    {
+      "method": "GET",
+      "path": "/api/organization/audit/export",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 46
+    },
+    {
+      "method": "GET",
+      "path": "/api/organization/online",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 53
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/online/{sessionId}/kick",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 54
+    },
+    {
+      "method": "GET",
+      "path": "/api/organization/roles/{id}/users",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 63
+    },
+    {
+      "method": "GET",
+      "path": "/api/organization/users/export",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 64
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/users/import",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 73
+    },
+    {
+      "method": "GET",
+      "path": "/api/organization/audit/catalog",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 99
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/departments",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 107
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/departments/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 112
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/departments/{id}/parent",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 117
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/organization/departments/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 121
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/roles",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 126
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/roles/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 131
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/organization/roles/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 136
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/roles/{id}/permissions",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 140
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/users",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 144
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/users/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 151
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/users/{id}/roles",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 158
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/users/{id}/enabled",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 162
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/users/{id}/password",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 167
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/organization/users/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 171
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/menus",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 176
+    },
+    {
+      "method": "POST",
+      "path": "/api/organization/menus/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 181
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/organization/menus/{id}",
+      "source": "backend/src/main/java/com/example/governance/organization/OrganizationController.java",
+      "line": 186
+    },
+    {
+      "method": "GET",
+      "path": "/api/accessible-datasets",
+      "source": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+      "line": 34
+    },
+    {
+      "method": "POST",
+      "path": "/api/datasets/{id}/policies",
+      "source": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+      "line": 39
+    },
+    {
+      "method": "GET",
+      "path": "/api/datasets/{id}/policies",
+      "source": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+      "line": 49
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/datasets/{id}/policies/{roleId}",
+      "source": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+      "line": 53
+    },
+    {
+      "method": "POST",
+      "path": "/api/datasets/{id}/preview",
+      "source": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+      "line": 61
+    },
+    {
+      "method": "POST",
+      "path": "/api/datasets/{id}/analysis",
+      "source": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+      "line": 71
+    },
+    {
+      "method": "PUT",
+      "path": "/api/realtime-jobs/{id}/settings",
+      "source": "backend/src/main/java/com/example/governance/realtime/RealtimeController.java",
+      "line": 32
+    },
+    {
+      "method": "POST",
+      "path": "/api/realtime-jobs/{id}/start",
+      "source": "backend/src/main/java/com/example/governance/realtime/RealtimeController.java",
+      "line": 44
+    },
+    {
+      "method": "POST",
+      "path": "/api/realtime-jobs/{id}/stop",
+      "source": "backend/src/main/java/com/example/governance/realtime/RealtimeController.java",
+      "line": 50
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 39
+    },
+    {
+      "method": "POST",
+      "path": "/api/reports",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 40
+    },
+    {
+      "method": "PUT",
+      "path": "/api/reports/{id}",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 54
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reports/{id}",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 69
+    },
+    {
+      "method": "POST",
+      "path": "/api/reports/{id}/run",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 76
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboards",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 93
+    },
+    {
+      "method": "POST",
+      "path": "/api/dashboards",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 94
+    },
+    {
+      "method": "PUT",
+      "path": "/api/dashboards/{id}",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 103
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/dashboards/{id}",
+      "source": "backend/src/main/java/com/example/governance/report/ReportController.java",
+      "line": 111
+    },
+    {
+      "method": "GET",
+      "path": "/api/captcha",
+      "source": "backend/src/main/java/com/example/governance/security/CaptchaController.java",
+      "line": 18
+    },
+    {
+      "method": "GET",
+      "path": "/api/csrf",
+      "source": "backend/src/main/java/com/example/governance/security/SessionController.java",
+      "line": 30
+    },
+    {
+      "method": "GET",
+      "path": "/api/session",
+      "source": "backend/src/main/java/com/example/governance/security/SessionController.java",
+      "line": 34
+    },
+    {
+      "method": "POST",
+      "path": "/api/session/password",
+      "source": "backend/src/main/java/com/example/governance/security/SessionController.java",
+      "line": 50
+    },
+    {
+      "method": "GET",
+      "path": "/api/service-call/{id}",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ExternalServiceController.java",
+      "line": 20
+    },
+    {
+      "method": "GET",
+      "path": "/api/services",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 26
+    },
+    {
+      "method": "GET",
+      "path": "/api/service-callers",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 27
+    },
+    {
+      "method": "GET",
+      "path": "/api/service-grants",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 28
+    },
+    {
+      "method": "GET",
+      "path": "/api/service-usage",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 29
+    },
+    {
+      "method": "POST",
+      "path": "/api/services",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 30
+    },
+    {
+      "method": "POST",
+      "path": "/api/services/{id}/submit",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 41
+    },
+    {
+      "method": "POST",
+      "path": "/api/services/{id}/approve",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 43
+    },
+    {
+      "method": "POST",
+      "path": "/api/service-callers",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 45
+    },
+    {
+      "method": "POST",
+      "path": "/api/services/{service}/callers/{caller}",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 51
+    },
+    {
+      "method": "POST",
+      "path": "/api/services/{id}/withdraw",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 55
+    },
+    {
+      "method": "POST",
+      "path": "/api/services/{service}/callers/{caller}/revoke",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 57
+    },
+    {
+      "method": "POST",
+      "path": "/api/service-callers/{id}/disable",
+      "source": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+      "line": 59
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 43
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 58
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/{id}/draft",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 71
+    },
+    {
+      "method": "PUT",
+      "path": "/api/tasks/{id}/draft",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 94
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/{id}/validate",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 108
+    },
+    {
+      "method": "POST",
+      "path": "/api/orch/validate",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 120
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/{id}/publish",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 138
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/{id}/versions",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 163
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/{id}/versions/{version}",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 166
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/{id}/copy",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 181
+    },
+    {
+      "method": "PUT",
+      "path": "/api/tasks/{id}",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 195
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tasks/{id}",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 205
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/{id}/runs",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 216
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/{id}/stop",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 232
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/{id}/runs",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 238
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/{id}/runs/{runId}/retry",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 241
+    },
+    {
+      "method": "GET",
+      "path": "/api/orch/components",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 248
+    },
+    {
+      "method": "POST",
+      "path": "/api/orch/schema",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 252
+    },
+    {
+      "method": "POST",
+      "path": "/api/orch/query-preview",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 267
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/{id}/schedule",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 283
+    },
+    {
+      "method": "PUT",
+      "path": "/api/tasks/{id}/schedule",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 287
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tasks/{id}/schedule",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 295
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-runs/{runId}",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 302
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-runs/{runId}/logs",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 308
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-runs/{runId}/nodes/{nodeKey}/preview",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 317
+    },
+    {
+      "method": "POST",
+      "path": "/api/orch/test-run",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+      "line": 324
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-directories",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java",
+      "line": 21
+    },
+    {
+      "method": "POST",
+      "path": "/api/task-directories",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java",
+      "line": 24
+    },
+    {
+      "method": "PUT",
+      "path": "/api/task-directories/{id}",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java",
+      "line": 33
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/task-directories/{id}",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java",
+      "line": 42
+    },
+    {
+      "method": "POST",
+      "path": "/api/task-directories/sort",
+      "source": "backend/src/main/java/com/example/governance/workflow/TaskDirectoryController.java",
+      "line": 51
+    },
+    {
+      "method": "GET",
+      "path": "/api/workflows",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 29
+    },
+    {
+      "method": "POST",
+      "path": "/api/workflows",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 31
+    },
+    {
+      "method": "POST",
+      "path": "/api/workflows/{id}/runs",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 44
+    },
+    {
+      "method": "GET",
+      "path": "/api/workflows/{id}/runs",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 49
+    },
+    {
+      "method": "GET",
+      "path": "/api/runs/{id}",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 54
+    },
+    {
+      "method": "POST",
+      "path": "/api/runs/{id}/retry",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 56
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedules",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 64
+    },
+    {
+      "method": "POST",
+      "path": "/api/workflows/{id}/schedules",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 66
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedules/{id}/enabled",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 75
+    },
+    {
+      "method": "POST",
+      "path": "/api/workflows/{id}/backfill",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 86
+    },
+    {
+      "method": "GET",
+      "path": "/api/workflows/{id}/versions/{version}",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 92
+    },
+    {
+      "method": "POST",
+      "path": "/api/workflows/{id}/versions",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowController.java",
+      "line": 96
+    },
+    {
+      "method": "POST",
+      "path": "/api/workflows/validate",
+      "source": "backend/src/main/java/com/example/governance/workflow/WorkflowValidationController.java",
+      "line": 16
+    }
+  ]
+}

@@ -36,11 +36,11 @@ class OrchScheduleTest {
         var due = Instant.parse("2026-11-22T00:00:01Z");
         var dueIds = schedules.due(due, 10);
         assertEquals(1, dueIds.size());
-        var fired = schedules.fireDue(dueIds.getFirst(), due);
+        var fired = schedules.fireDue(dueIds.get(0), due);
         assertTrue(fired.isPresent());
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=?", Integer.class, task));
         // same instant no longer due (advanced)
-        assertTrue(schedules.fireDue(dueIds.getFirst(), due).isEmpty());
+        assertTrue(schedules.fireDue(dueIds.get(0), due).isEmpty());
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=?", Integer.class, task));
     }
 
@@ -54,7 +54,7 @@ class OrchScheduleTest {
         var due = Instant.parse("2026-11-22T00:00:01Z");
         var ids = schedules.due(due, 10);
         assertEquals(1, ids.size());
-        assertTrue(schedules.fireDue(ids.getFirst(), due).isEmpty());
+        assertTrue(schedules.fireDue(ids.get(0), due).isEmpty());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM task_runs WHERE task_id=?", Integer.class, task));
     }
 

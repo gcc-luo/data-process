@@ -1,0 +1,56 @@
+{
+  "scope": "V41 主数据历史三个命名非唯一索引及列顺序",
+  "results": [
+    {
+      "index": "master_data_history_identity_idx",
+      "expected_columns": [
+        "identity_hash",
+        "id"
+      ],
+      "actual_columns": [
+        "identity_hash",
+        "id"
+      ],
+      "non_unique": [
+        "true",
+        "true"
+      ],
+      "match": true
+    },
+    {
+      "index": "master_data_history_key_idx",
+      "expected_columns": [
+        "object_id",
+        "record_key_hash",
+        "id"
+      ],
+      "actual_columns": [
+        "object_id",
+        "record_key_hash",
+        "id"
+      ],
+      "non_unique": [
+        "true",
+        "true",
+        "true"
+      ],
+      "match": true
+    },
+    {
+      "index": "master_data_history_object_idx",
+      "expected_columns": [
+        "object_id",
+        "id"
+      ],
+      "actual_columns": [
+        "object_id",
+        "id"
+      ],
+      "non_unique": [
+        "true",
+        "true"
+      ],
+      "match": true
+    }
+  ]
+}

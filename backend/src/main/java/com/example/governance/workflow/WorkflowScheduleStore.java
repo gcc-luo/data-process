@@ -47,7 +47,7 @@ public final class WorkflowScheduleStore {
         tx.executeWithoutResult(status -> {
             var schedules = jdbc.query("SELECT workflow_id,workflow_version,cron_expression,zone_id,next_fire_epoch,enabled FROM workflow_schedules WHERE id=? FOR UPDATE", (rs, row) -> new Schedule(rs.getLong(1), rs.getInt(2), rs.getString(3), rs.getString(4), rs.getLong(5), rs.getBoolean(6)), id);
             if (schedules.isEmpty()) throw new IllegalArgumentException("Unknown schedule");
-            var schedule = schedules.getFirst();
+            var schedule = schedules.get(0);
             if (schedule.enabled() == enabled) return;
             long next = schedule.next();
             if (enabled) {
@@ -67,7 +67,7 @@ public final class WorkflowScheduleStore {
         return tx.execute(status -> {
             var schedules = jdbc.query("SELECT workflow_id,workflow_version,cron_expression,zone_id,next_fire_epoch,enabled FROM workflow_schedules WHERE id=? FOR UPDATE", (rs, row) -> new Schedule(rs.getLong(1), rs.getInt(2), rs.getString(3), rs.getString(4), rs.getLong(5), rs.getBoolean(6)), scheduleId);
             if (schedules.isEmpty()) throw new IllegalArgumentException("Unknown schedule");
-            var schedule = schedules.getFirst();
+            var schedule = schedules.get(0);
             if (!schedule.enabled() || schedule.next() > now.toEpochMilli()) return Optional.empty();
             ZoneId zone = ZoneId.of(schedule.zone());
             var fire = Instant.ofEpochMilli(schedule.next()).atZone(zone);

@@ -19,7 +19,7 @@ public final class TaskDefinitionValidator {
             var definition = OrchDefinition.parse(root);
             var issues = definition.validate(id -> sources.find(id).map(com.example.governance.assets.DataSourceDefinition::type));
             var errors = issues.stream().filter(i -> "ERROR".equals(i.severity())).toList();
-            if (!errors.isEmpty()) throw new IllegalArgumentException(errors.getFirst().message());
+            if (!errors.isEmpty()) throw new IllegalArgumentException(errors.get(0).message());
         } catch (java.io.IOException ex) { throw new IllegalArgumentException("Invalid task configuration"); }
     }
 }

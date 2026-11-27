@@ -20,8 +20,8 @@ class AnalysisQueryEngineTest {
         var policy = new DatasetQueryEngine.Policy(Set.of(10L), Map.of("CATEGORY", DatasetAccess.Field.FULL, "AMOUNT", DatasetAccess.Field.FULL));
         var query = new AnalysisQueryEngine.Query(List.of("CATEGORY"), List.of(new AnalysisQueryEngine.Metric("SUM", "AMOUNT")), List.of(new AnalysisQueryEngine.Filter("CATEGORY", "EQ", "A")), 100);
         var rows = new AnalysisQueryEngine().query(db, dataset, policy, query);
-        assertEquals(1, rows.size()); assertEquals("A", rows.getFirst().get("CATEGORY"));
-        assertEquals(0, new java.math.BigDecimal("12").compareTo((java.math.BigDecimal) rows.getFirst().get("metric_0")));
+        assertEquals(1, rows.size()); assertEquals("A", rows.get(0).get("CATEGORY"));
+        assertEquals(0, new java.math.BigDecimal("12").compareTo((java.math.BigDecimal) rows.get(0).get("metric_0")));
     }
     @Test void refusesMaskedFieldsAndUnregisteredNames() {
         var db = new DriverManagerDataSource("jdbc:h2:mem:x", "sa", "");
@@ -36,7 +36,7 @@ class AnalysisQueryEngineTest {
         var dataset = new DatasetQueryEngine.Dataset(null, "PUBLIC", "SALES", "DEPARTMENT_ID", Set.of("DEPARTMENT_ID", "AMOUNT"));
         var policy = new DatasetQueryEngine.Policy(Set.of(1L), Map.of("AMOUNT", DatasetAccess.Field.FULL));
         var result = new AnalysisQueryEngine().query(db, dataset, policy, new AnalysisQueryEngine.Query(List.of(), List.of(new AnalysisQueryEngine.Metric("SUM", "AMOUNT")), List.of(), 10));
-        assertNull(result.getFirst().get("metric_0"));
+        assertNull(result.get(0).get("metric_0"));
         assertThrows(IllegalArgumentException.class, () -> new AnalysisQueryEngine().query(db, dataset, policy, new AnalysisQueryEngine.Query(List.of(), List.of(new AnalysisQueryEngine.Metric(null, "AMOUNT")), List.of(), 10)));
     }
     @Test void sortsBySelectedAggregateAndRejectsOtherColumns() throws Exception {
@@ -45,7 +45,7 @@ class AnalysisQueryEngineTest {
         var dataset = new DatasetQueryEngine.Dataset(null, "PUBLIC", "SALES", "DEPARTMENT_ID", Set.of("DEPARTMENT_ID", "CATEGORY", "AMOUNT"));
         var policy = new DatasetQueryEngine.Policy(Set.of(1L), Map.of("CATEGORY", DatasetAccess.Field.FULL, "AMOUNT", DatasetAccess.Field.FULL));
         var query = new AnalysisQueryEngine.Query(List.of("CATEGORY"), List.of(new AnalysisQueryEngine.Metric("SUM", "AMOUNT")), List.of(), 10, List.of(new AnalysisQueryEngine.Sort("metric_0", "DESC")));
-        assertEquals("B", new AnalysisQueryEngine().query(db, dataset, policy, query).getFirst().get("CATEGORY"));
+        assertEquals("B", new AnalysisQueryEngine().query(db, dataset, policy, query).get(0).get("CATEGORY"));
         var invalid = new AnalysisQueryEngine.Query(List.of("CATEGORY"), query.metrics(), List.of(), 10, List.of(new AnalysisQueryEngine.Sort("AMOUNT", "DESC")));
         assertThrows(IllegalArgumentException.class, () -> new AnalysisQueryEngine().query(db, dataset, policy, invalid));
     }

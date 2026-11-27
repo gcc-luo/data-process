@@ -1,0 +1,317 @@
+{
+  "scope": "仅显式 CHAR/VARCHAR 长度；不覆盖其他类型、默认值或约束",
+  "results": [
+    {
+      "table": "dictionary_directories",
+      "column": "name",
+      "expected_length": 120,
+      "actual_type": "VARCHAR",
+      "actual_length": 120,
+      "match": true
+    },
+    {
+      "table": "dictionary_entries",
+      "column": "code",
+      "expected_length": 100,
+      "actual_type": "VARCHAR",
+      "actual_length": 100,
+      "match": true
+    },
+    {
+      "table": "dictionary_entries",
+      "column": "name",
+      "expected_length": 200,
+      "actual_type": "VARCHAR",
+      "actual_length": 200,
+      "match": true
+    },
+    {
+      "table": "dictionary_entries",
+      "column": "meaning",
+      "expected_length": 200,
+      "actual_type": "VARCHAR",
+      "actual_length": 200,
+      "match": true
+    },
+    {
+      "table": "dictionary_entries",
+      "column": "data_type",
+      "expected_length": 20,
+      "actual_type": "VARCHAR",
+      "actual_length": 20,
+      "match": true
+    },
+    {
+      "table": "dictionary_entries",
+      "column": "description",
+      "expected_length": 1000,
+      "actual_type": "VARCHAR",
+      "actual_length": 1000,
+      "match": true
+    },
+    {
+      "table": "object_directories",
+      "column": "name",
+      "expected_length": 120,
+      "actual_type": "VARCHAR",
+      "actual_length": 120,
+      "match": true
+    },
+    {
+      "table": "data_objects",
+      "column": "catalog_name",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "data_objects",
+      "column": "schema_name",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "data_objects",
+      "column": "table_name",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "data_objects",
+      "column": "object_type",
+      "expected_length": 16,
+      "actual_type": "VARCHAR",
+      "actual_length": 16,
+      "match": true
+    },
+    {
+      "table": "data_objects",
+      "column": "identity_hash",
+      "expected_length": 64,
+      "actual_type": "CHAR",
+      "actual_length": 64,
+      "match": true
+    },
+    {
+      "table": "data_objects",
+      "column": "display_name",
+      "expected_length": 200,
+      "actual_type": "VARCHAR",
+      "actual_length": 200,
+      "match": true
+    },
+    {
+      "table": "data_objects",
+      "column": "description",
+      "expected_length": 1000,
+      "actual_type": "VARCHAR",
+      "actual_length": 1000,
+      "match": true
+    },
+    {
+      "table": "data_object_fields",
+      "column": "field_name",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "data_object_fields",
+      "column": "native_type",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "data_object_fields",
+      "column": "nullable_state",
+      "expected_length": 10,
+      "actual_type": "VARCHAR",
+      "actual_length": 10,
+      "match": true
+    },
+    {
+      "table": "data_object_fields",
+      "column": "primary_key_state",
+      "expected_length": 10,
+      "actual_type": "VARCHAR",
+      "actual_length": 10,
+      "match": true
+    },
+    {
+      "table": "data_object_fields",
+      "column": "remarks",
+      "expected_length": 1000,
+      "actual_type": "VARCHAR",
+      "actual_length": 1000,
+      "match": true
+    },
+    {
+      "table": "data_object_operations",
+      "column": "id",
+      "expected_length": 36,
+      "actual_type": "VARCHAR",
+      "actual_length": 36,
+      "match": true
+    },
+    {
+      "table": "data_object_operations",
+      "column": "identity_hash",
+      "expected_length": 64,
+      "actual_type": "CHAR",
+      "actual_length": 64,
+      "match": true
+    },
+    {
+      "table": "data_object_operations",
+      "column": "active_identity",
+      "expected_length": 64,
+      "actual_type": "CHAR",
+      "actual_length": 64,
+      "match": true
+    },
+    {
+      "table": "data_object_operations",
+      "column": "operation_type",
+      "expected_length": 16,
+      "actual_type": "VARCHAR",
+      "actual_length": 16,
+      "match": true
+    },
+    {
+      "table": "data_object_operations",
+      "column": "status",
+      "expected_length": 32,
+      "actual_type": "VARCHAR",
+      "actual_length": 32,
+      "match": true
+    },
+    {
+      "table": "data_object_operations",
+      "column": "original_fingerprint",
+      "expected_length": 64,
+      "actual_type": "CHAR",
+      "actual_length": 64,
+      "match": true
+    },
+    {
+      "table": "data_object_operations",
+      "column": "error_message",
+      "expected_length": 1000,
+      "actual_type": "VARCHAR",
+      "actual_length": 1000,
+      "match": true
+    },
+    {
+      "table": "data_object_operation_steps",
+      "column": "operation_id",
+      "expected_length": 36,
+      "actual_type": "VARCHAR",
+      "actual_length": 36,
+      "match": true
+    },
+    {
+      "table": "data_object_operation_steps",
+      "column": "risk_text",
+      "expected_length": 1000,
+      "actual_type": "VARCHAR",
+      "actual_length": 1000,
+      "match": true
+    },
+    {
+      "table": "data_object_operation_steps",
+      "column": "status",
+      "expected_length": 32,
+      "actual_type": "VARCHAR",
+      "actual_length": 32,
+      "match": true
+    },
+    {
+      "table": "data_object_operation_steps",
+      "column": "error_message",
+      "expected_length": 1000,
+      "actual_type": "VARCHAR",
+      "actual_length": 1000,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "identity_hash",
+      "expected_length": 64,
+      "actual_type": "CHAR",
+      "actual_length": 64,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "catalog_name",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "schema_name",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "table_name",
+      "expected_length": 255,
+      "actual_type": "VARCHAR",
+      "actual_length": 255,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "operation_type",
+      "expected_length": 24,
+      "actual_type": "VARCHAR",
+      "actual_length": 24,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "operation_status",
+      "expected_length": 16,
+      "actual_type": "VARCHAR",
+      "actual_length": 16,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "record_key_hash",
+      "expected_length": 64,
+      "actual_type": "CHAR",
+      "actual_length": 64,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "actor_name",
+      "expected_length": 160,
+      "actual_type": "VARCHAR",
+      "actual_length": 160,
+      "match": true
+    },
+    {
+      "table": "master_data_history",
+      "column": "error_message",
+      "expected_length": 1000,
+      "actual_type": "VARCHAR",
+      "actual_length": 1000,
+      "match": true
+    }
+  ]
+}

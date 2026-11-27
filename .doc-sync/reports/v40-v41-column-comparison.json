@@ -1,0 +1,47 @@
+{
+  "scope": "仅列名、基础类型与可空性；不检查长度、默认值、索引、外键或其他环境。组合主键按 NOT NULL 处理。",
+  "results": [
+    {
+      "migration": "V40__data_objects.sql",
+      "table": "object_directories",
+      "columns": 4,
+      "mismatches": []
+    },
+    {
+      "migration": "V40__data_objects.sql",
+      "table": "data_objects",
+      "columns": 14,
+      "mismatches": []
+    },
+    {
+      "migration": "V40__data_objects.sql",
+      "table": "data_object_fields",
+      "columns": 10,
+      "mismatches": []
+    },
+    {
+      "migration": "V40__data_objects.sql",
+      "table": "data_object_drafts",
+      "columns": 3,
+      "mismatches": []
+    },
+    {
+      "migration": "V40__data_objects.sql",
+      "table": "data_object_operations",
+      "columns": 12,
+      "mismatches": []
+    },
+    {
+      "migration": "V40__data_objects.sql",
+      "table": "data_object_operation_steps",
+      "columns": 6,
+      "mismatches": []
+    },
+    {
+      "migration": "V41__master_data.sql",
+      "table": "master_data_history",
+      "columns": 17,
+      "mismatches": []
+    }
+  ]
+}

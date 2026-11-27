@@ -69,8 +69,8 @@ public class TaskRunService {
         jdbc.queryForList("SELECT id FROM processing_tasks WHERE id=? FOR UPDATE", Long.class, taskId);
         if (hasActiveRun(taskId)) throw new IllegalStateException("任务已在运行，不能重试");
         var rows = jdbc.query("SELECT task_id,task_version,business_date,state,attempt_no FROM task_runs WHERE id=? FOR UPDATE", (rs, row) -> new Run(rs.getLong(1),rs.getInt(2),rs.getDate(3).toLocalDate(),rs.getString(4),rs.getInt(5)),runId);
-        if (rows.isEmpty() || rows.getFirst().taskId() != taskId) throw new IllegalArgumentException("Unknown task run");
-        var run = rows.getFirst();
+        if (rows.isEmpty() || rows.get(0).taskId() != taskId) throw new IllegalArgumentException("Unknown task run");
+        var run = rows.get(0);
         if (!java.util.Set.of("FAILED", "INTERRUPTED").contains(run.state())) throw new IllegalStateException("Task run cannot be retried");
         int attempt = Math.addExact(run.attempt(), 1);
         jdbc.update("UPDATE task_runs SET state='PENDING',attempt_no=?,started_at=NULL,finished_at=NULL,error_message=NULL WHERE id=?",attempt,runId);
@@ -104,7 +104,7 @@ public class TaskRunService {
                     nodeKey -> new DbRunLogSink(jdbc, "TASK_RUN", id, nodeKey, attempt));
             var version = tasks.findVersion(taskId, versionNo).orElseThrow();
             var parameters = jdbc.query("SELECT parameters FROM task_runs WHERE id=?", (rs, row) -> rs.getString(1), id);
-            String params = parameters.isEmpty() ? null : parameters.getFirst();
+            String params = parameters.isEmpty() ? null : parameters.get(0);
             var ctx = new OrchTaskExecutor.Context(taskId, id, date, CamelTaskRunner.parseVariables(params), false);
             var outcome = runner.execute(version, ctx, cancel, sinks, new DbNodeRunSink(jdbc, id, attempt), 100, 0);
             persistSamples(id, outcome);
@@ -191,7 +191,7 @@ public class TaskRunService {
                         rs.getTimestamp(6).toLocalDateTime(), rs.getTimestamp(7) == null ? null : rs.getTimestamp(7).toLocalDateTime(),
                         rs.getTimestamp(8) == null ? null : rs.getTimestamp(8).toLocalDateTime(), rs.getString(9), rs.getString(10), List.of()), runId);
         if (rows.isEmpty()) throw new IllegalArgumentException("Unknown run");
-        var base = rows.getFirst();
+        var base = rows.get(0);
         return new RunDetail(base.id(), base.taskId(), base.taskVersion(), base.businessDate(), base.state(), base.createdAt(), base.startedAt(), base.finishedAt(), base.errorMessage(), base.parameters(), nodeRuns(runId, nodeNames(base.taskId(), base.taskVersion())));
     }
 
@@ -226,7 +226,7 @@ public class TaskRunService {
         var rows = jdbc.query("SELECT sample_json FROM task_node_runs WHERE run_id=? AND node_key=? AND sample_json IS NOT NULL ORDER BY attempt_no DESC LIMIT 1",
                 (rs, row) -> rs.getString(1), runId, nodeKey);
         if (rows.isEmpty()) return java.util.Map.of("columns", java.util.List.of(), "rows", java.util.List.of());
-        try { return new com.fasterxml.jackson.databind.ObjectMapper().readValue(rows.getFirst(), java.util.Map.class); }
+        try { return new com.fasterxml.jackson.databind.ObjectMapper().readValue(rows.get(0), java.util.Map.class); }
         catch (Exception ex) { return java.util.Map.of("columns", java.util.List.of(), "rows", java.util.List.of()); }
     }
 

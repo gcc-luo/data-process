@@ -202,7 +202,7 @@ public class OrganizationService {
             if (!exists("departments", department) || roles.stream().anyMatch(role -> !exists("roles", role))) throw new IllegalArgumentException("Unknown department or role");
             Set<Long> currentRoles = Set.copyOf(jdbc.queryForList("SELECT role_id FROM user_roles WHERE user_id=?", Long.class, id));
             validateRoleAssignments(roles, currentRoles, actor);
-            if (!currentDepartments.getFirst().equals(department) && count("SELECT COUNT(*) FROM departments WHERE id=? AND enabled=TRUE", department) == 0) throw new IllegalArgumentException("Cannot assign a user to a disabled department");
+            if (!currentDepartments.get(0).equals(department) && count("SELECT COUNT(*) FROM departments WHERE id=? AND enabled=TRUE", department) == 0) throw new IllegalArgumentException("Cannot assign a user to a disabled department");
             int changed = jdbc.update("UPDATE users SET username=?,nickname=?,email=?,phone=?,department_id=?,enabled=? WHERE id=? AND deleted=FALSE", username.trim(), defaultNickname(username, nickname), blankToNull(email), blankToNull(phone), department, enabled, id);
             if (changed != 1) throw new IllegalArgumentException("Unknown user");
             replaceUserRoles(id, roles);

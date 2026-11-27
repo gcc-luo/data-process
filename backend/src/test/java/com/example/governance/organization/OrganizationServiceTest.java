@@ -18,7 +18,7 @@ class OrganizationServiceTest {
         var jdbc = new JdbcTemplate(db);
         var org = new OrganizationService(jdbc, new DataSourceTransactionManager(db), new BCryptPasswordEncoder());
         long root = org.createDepartment("总部", null), child = org.createDepartment("销售部", root);
-        assertNull(org.snapshot(PermissionCatalog.codes()).departments().getFirst().parentId());
+        assertNull(org.snapshot(PermissionCatalog.codes()).departments().get(0).parentId());
         assertEquals(root, org.snapshot(PermissionCatalog.codes()).departments().get(1).parentId());
         assertThrows(IllegalArgumentException.class, () -> org.moveDepartment(root, child));
         jdbc.update("INSERT INTO roles(id,name,role_key) VALUES (1,'平台管理员','platform_admin')");

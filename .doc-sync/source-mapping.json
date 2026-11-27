@@ -1,0 +1,1563 @@
+{
+  "schema_version": 1,
+  "claims": [
+    {
+      "id": "DG-01-1",
+      "document": "docs/delivery/01-系统概述.md",
+      "section": "系统概述",
+      "sources": [
+        {
+          "path": "README.md",
+          "symbol": "内置功能",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-02-2",
+      "document": "docs/delivery/02-总体设计说明书.md",
+      "section": "总体设计说明书",
+      "sources": [
+        {
+          "path": "backend/pom.xml",
+          "symbol": "dependencies",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-03-3",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "详细设计说明书",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+          "symbol": "query/create/update/delete",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-03-4",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "详细设计说明书",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+          "symbol": "create/saveDraft",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-04-5",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "数据库设计说明书",
+      "sources": [
+        {
+          "path": "backend/src/main/resources/db/mysql/V41__master_data.sql",
+          "symbol": "master_data_history",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-05-6",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "接口设计说明书",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/security/PermissionCatalog.java",
+          "symbol": "buildRoutes",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-06-7",
+      "document": "docs/delivery/06-前端界面设计说明书.md",
+      "section": "前端界面设计说明书",
+      "sources": [
+        {
+          "path": "frontend/src/App.vue",
+          "symbol": "loadNavigation",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-07-8",
+      "document": "docs/delivery/07-安全设计说明书.md",
+      "section": "安全设计说明书",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/security/SecurityConfiguration.java",
+          "symbol": "securityFilterChain",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-08-9",
+      "document": "docs/delivery/08-部署运维说明书.md",
+      "section": "部署运维说明书",
+      "sources": [
+        {
+          "path": "backend/src/main/resources/application.properties",
+          "symbol": "spring.datasource",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-09-10",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "测试与验收说明书",
+      "sources": [
+        {
+          "path": "backend/pom.xml",
+          "symbol": "test dependencies",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-04-metadata",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "数据表结构",
+      "sources": [
+        {
+          "path": "backend/src/main/resources/db/mysql/V41__master_data.sql",
+          "symbol": "master_data_history",
+          "kind": "迁移及本地只读数据库元数据",
+          "method": "JDBC DatabaseMetaData 只读结构采集",
+          "status": "已从数据库结构确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "dictionary",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "数据字典",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+          "symbol": "importFile",
+          "kind": "源码",
+          "method": "静态控制器和调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "报表与数据服务",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/report/ReportController.java",
+          "symbol": "create/run",
+          "kind": "源码",
+          "method": "静态控制器和调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "realtime",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "数据轮询同步",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/realtime/RealtimeController.java",
+          "symbol": "settings/start/stop",
+          "kind": "源码",
+          "method": "静态控制器和调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "service",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "报表与数据服务",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/serviceapi/ServiceManagementController.java",
+          "symbol": "create/submit/approve",
+          "kind": "源码",
+          "method": "静态控制器和调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "task-api",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "任务发布及执行接口",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+          "symbol": "publish/run/retry",
+          "kind": "源码",
+          "method": "静态控制器和调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-api",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "数据字典接口",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+          "symbol": "directories/entries/importFile",
+          "kind": "源码",
+          "method": "静态控制器和调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "architecture-adr",
+      "document": "docs/delivery/02-总体设计说明书.md",
+      "section": "主要技术约束与已记录决策",
+      "sources": [
+        {
+          "path": "docs/workflow/ARCHITECTURE_DECISIONS.md",
+          "symbol": "ADR-1 至 ADR-12",
+          "kind": "源码或架构记录",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "query-policy",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "数据集策略与查询",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetPolicyStore.java",
+          "symbol": "configure/resolve",
+          "kind": "源码或架构记录",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "主数据写入与历史",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/masterdata/MasterDataHistoryStore.java",
+          "symbol": "prepare/succeed/fail",
+          "kind": "源码或架构记录",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "draft",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "任务编排生命周期",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/OrchDraftStore.java",
+          "symbol": "saveDraft/publish",
+          "kind": "源码或架构记录",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "task-lifecycle",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3. 业务模块详细设计 / 任务执行与监控设计",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/TaskRunService.java",
+          "symbol": "start/dispatchAfterCommit/execute/detail",
+          "kind": "源码",
+          "method": "静态调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "camel-route",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3. 业务模块详细设计 / 任务执行与监控设计",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/SqlTaskExecutor.java",
+          "symbol": "SqlTaskExecutor/execute",
+          "kind": "源码",
+          "method": "静态调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "orch-exec",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3. 业务模块详细设计 / 任务执行与监控设计",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/OrchTaskExecutor.java",
+          "symbol": "execute/executeNode",
+          "kind": "源码",
+          "method": "静态调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "run-api",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3. 业务模块详细设计 / 任务执行与监控设计",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+          "symbol": "run/runDetail/runLogs/nodePreview/testRun",
+          "kind": "源码",
+          "method": "静态调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "ui-monitor",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3. 业务模块详细设计 / 任务执行与监控设计",
+      "sources": [
+        {
+          "path": "frontend/src/OrchRunsDialog.vue",
+          "symbol": "refreshDetail/轮询",
+          "kind": "源码",
+          "method": "静态调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "node-monitor",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3. 业务模块详细设计 / 任务执行与监控设计",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/DbNodeRunSink.java",
+          "symbol": "start/success/failure/skipped",
+          "kind": "源码",
+          "method": "静态调用链分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "SEC-CHAINS",
+      "document": "docs/delivery/07-安全设计说明书.md",
+      "section": "2. 认证与会话管理",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/security/SecurityConfiguration.java",
+          "symbol": "externalServiceChain/securityFilterChain",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "SEC-LOCK",
+      "document": "docs/delivery/07-安全设计说明书.md",
+      "section": "2. 认证与会话管理",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/security/LoginGuardFilter.java",
+          "symbol": "CAPTCHA_AFTER/MAX_FAILURES/LOCK_MINUTES",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "SEC-KEY",
+      "document": "docs/delivery/07-安全设计说明书.md",
+      "section": "4. 敏感数据保护",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/assets/CredentialCipher.java",
+          "symbol": "CredentialCipher/encrypt/decrypt",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "SEC-RETAIN",
+      "document": "docs/delivery/07-安全设计说明书.md",
+      "section": "6. 审计日志与安全事件",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/security/AuditRetention.java",
+          "symbol": "purge",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "OPS-CONFIG",
+      "document": "docs/delivery/08-部署运维说明书.md",
+      "section": "5. 配置项及环境变量",
+      "sources": [
+        {
+          "path": "backend/src/main/resources/application.properties",
+          "symbol": "datasource/flyway/credential/session/multipart",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "OPS-HEALTH",
+      "document": "docs/delivery/08-部署运维说明书.md",
+      "section": "6.4 停止、重启与健康检查",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/HealthController.java",
+          "symbol": "health",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "UI-OBJECT",
+      "document": "docs/delivery/06-前端界面设计说明书.md",
+      "section": "3.4 数据对象",
+      "sources": [
+        {
+          "path": "frontend/src/DataObjects.vue",
+          "symbol": "DataObjects 页面与事件",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "API-TASK-CORE",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "4.29–4.34",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/TaskController.java",
+          "symbol": "validate/publish/stop/retry/validateDefinition/testRun",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "API-OBJECT-CORE",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "4.35–4.39",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+          "symbol": "directories/page/detail/update/delete",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DB-META",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "1、3—5 数据库只读结构",
+      "sources": [
+        {
+          "path": ".doc-sync/facts/database-metadata.tsv",
+          "symbol": "META/TABLE/COLUMN/FOREIGN/INDEX",
+          "kind": "只读元数据快照",
+          "method": "JDBC 只读采集",
+          "status": "已采集待复核",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "TEST-CORE",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.1—4.3 核心用例",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchDraftApiTest.java",
+          "symbol": "draftRevisionConflictPublishAndVersionImmutability",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-UI-SOURCE",
+      "document": "docs/delivery/06-前端界面设计说明书.md",
+      "section": "3.7 数据源、数据集与驱动",
+      "sources": [
+        {
+          "path": "frontend/src/DataSources.vue",
+          "symbol": "template、load、submitUpload、savePolicy",
+          "kind": "源码",
+          "method": "静态分析；测试结果以本轮执行报告为准",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-UI-SERVICE",
+      "document": "docs/delivery/06-前端界面设计说明书.md",
+      "section": "3.8 数据服务",
+      "sources": [
+        {
+          "path": "frontend/src/Services.vue",
+          "symbol": "template、load、createService、createCaller、createGrant",
+          "kind": "源码",
+          "method": "静态分析；测试结果以本轮执行报告为准",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-UI-REPORT",
+      "document": "docs/delivery/06-前端界面设计说明书.md",
+      "section": "3.9 报表与看板",
+      "sources": [
+        {
+          "path": "frontend/src/Reports.vue",
+          "symbol": "template、load、saveDashboard、editReport",
+          "kind": "源码",
+          "method": "静态分析；测试结果以本轮执行报告为准",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-MONITOR",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.4 运行版本与监控接口",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchDraftApiTest.java",
+          "symbol": "runPinsVersionAndExposesNodeStateAndLogs",
+          "kind": "源码",
+          "method": "静态分析；测试结果以本轮执行报告为准",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-RETRY",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.5 节点重试与 4.6 试运行",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchTaskExecutorTest.java",
+          "symbol": "nodeRetrySucceedsAfterTransientFailure、dryRunDoesNotWriteTarget",
+          "kind": "源码",
+          "method": "静态分析；测试结果以本轮执行报告为准",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-UI-ORG",
+      "document": "docs/delivery/06-前端界面设计说明书.md",
+      "section": "3.10 系统管理",
+      "sources": [
+        {
+          "path": "frontend/src/Organization.vue",
+          "symbol": "view、template、loadAudit、exportUsers",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-UI-WORKFLOW",
+      "document": "docs/delivery/06-前端界面设计说明书.md",
+      "section": "3.11 工作流与定时计划",
+      "sources": [
+        {
+          "path": "frontend/src/TaskStudio.vue",
+          "symbol": "reload、saveWorkflow、start、backfill、createSchedule、template",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-OBJECT-REGISTER",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.7 数据对象批量登记",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+          "symbol": "register",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/dataobject/ObjectStore.java",
+          "symbol": "register、identityHash",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DB-V40-V41-COLUMNS",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "9 Schema 差异记录 / 数据对象和主数据列级对照",
+      "sources": [
+        {
+          "path": ".doc-sync/reports/v40-v41-column-comparison.json",
+          "symbol": "7 表 66 列比较结果",
+          "kind": "比对报告",
+          "method": "对照本地只读元数据与迁移 SQL 的列名、基础类型及可空性",
+          "status": "局部已核对",
+          "baseline": "2026-11-26 本地数据库快照与当前工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DB-V39-COLUMNS",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "9 Schema 差异记录 / 数据字典列级对照",
+      "sources": [
+        {
+          "path": ".doc-sync/reports/v39-column-comparison.json",
+          "symbol": "2 表 15 列比较结果",
+          "kind": "比对报告",
+          "method": "对照本地只读元数据与迁移 SQL 的列名、基础类型及可空性",
+          "status": "局部已核对",
+          "baseline": "2026-11-26 本地数据库快照与当前工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-MD-CREATE",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.8 主数据记录新增",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+          "symbol": "create、prepare、complete、fail",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/masterdata/MasterDataRecordService.java",
+          "symbol": "create",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DB-CHAR-LENGTHS",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "9 Schema 差异记录 / 字符字段长度局部对照",
+      "sources": [
+        {
+          "path": ".doc-sync/reports/v39-v41-character-length-comparison.json",
+          "symbol": "39 个字符字段",
+          "kind": "比对报告",
+          "method": "对照迁移中显式 CHAR/VARCHAR 长度和本地只读元数据",
+          "status": "局部已核对",
+          "baseline": "2026-11-26 本地数据库快照与当前工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DB-V41-INDEX",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "9 Schema 差异记录 / 主数据历史索引局部对照",
+      "sources": [
+        {
+          "path": ".doc-sync/reports/v41-history-index-comparison.json",
+          "symbol": "V41 三个历史索引",
+          "kind": "比对报告",
+          "method": "比较本地只读元数据与 V41 的索引列顺序和唯一性",
+          "status": "局部已核对",
+          "baseline": "2026-11-26 本地数据库快照与当前工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DB-SINGLE-CREATE",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "9 Schema 差异记录 / 未发现后续 ALTER 的单次建表对照",
+      "sources": [
+        {
+          "path": ".doc-sync/reports/single-create-column-comparison.json",
+          "symbol": "35 表 223 列",
+          "kind": "比对报告",
+          "method": "静态筛选迁移建表并比较本地快照列名、基础类型和可空性",
+          "status": "局部已核对",
+          "baseline": "2026-11-26 本地数据库快照与当前工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DB-SQL-REPLAY",
+      "document": "docs/delivery/04-数据库设计说明书.md",
+      "section": "9 MySQL SQL 迁移列级静态重放",
+      "sources": [
+        {
+          "path": ".doc-sync/reports/mysql-migration-column-replay.json",
+          "symbol": "51 表 360 列及差异",
+          "kind": "比对报告",
+          "method": "SQL 迁移文本静态重放与本地只读快照比较",
+          "status": "局部已核对",
+          "baseline": "2026-11-26 本地数据库快照与当前工作区"
+        },
+        {
+          "path": "backend/src/main/java/db/mysql/V3__security_version.java",
+          "symbol": "migrate",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "已从源码确认",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DICT-ENTRY",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.9 数据字典条目维护",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dictionary/DictionaryStore.java",
+          "symbol": "page、validate、create、update、delete",
+          "kind": "源码",
+          "method": "静态分析；测试结果对照 Surefire XML",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-ORCH-ADDITIONAL",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.7—4.10 任务编排测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchDraftApiTest.java",
+          "symbol": "invalidDraftCannotPublish、publishRequiresPermission",
+          "kind": "源码",
+          "method": "静态分析；测试结果对照 Surefire XML",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-ORCH-EXECUTOR",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.9—4.10 执行器测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchTaskExecutorTest.java",
+          "symbol": "artifactCapFailsFastWithoutPartialWrite、realRunCapturesPreviewWhileWritingData",
+          "kind": "源码",
+          "method": "静态分析；测试结果对照 Surefire XML",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-API-DICT-ENTRY-REVIEW",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "4.20、4.24—4.26 字典条目接口",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+          "symbol": "entries、create、update、delete、invalid",
+          "kind": "源码",
+          "method": "对照控制器、异常处理和权限配置静态复核",
+          "status": "局部已核对；未执行目标环境联调",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/dictionary/DictionaryStore.java",
+          "symbol": "page、validate、create、update、delete",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部已核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-MD-DELETE",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.10 主数据记录删除",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/masterdata/MasterDataController.java",
+          "symbol": "delete、prepare、complete、fail",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/masterdata/MasterDataRecordService.java",
+          "symbol": "delete、writableDetail、validateKey",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DICT-IMPORT",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.11 数据字典批量导入",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dictionary/DictionaryController.java",
+          "symbol": "importFile、number",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/dictionary/DictionaryStore.java",
+          "symbol": "directoryByPath、create",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-DATASOURCE-CREATE",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.12 数据源连接登记",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+          "symbol": "create、testConfig",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/assets/DataSourceStore.java",
+          "symbol": "create",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "frontend/src/DataSources.vue",
+          "symbol": "testPassed、testForm",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-QUERY-PREVIEW",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.13 数据集明细查询",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+          "symbol": "preview",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetQueryEngine.java",
+          "symbol": "query、safeValue",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-API-QUERY-PREVIEW-REVIEW",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "4.150 数据集明细预览",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+          "symbol": "preview",
+          "kind": "源码",
+          "method": "静态核对请求、状态码与权限",
+          "status": "局部核对；目标环境未联调",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetQueryEngine.java",
+          "symbol": "query、safeValue",
+          "kind": "源码",
+          "method": "静态核对字段授权和脱敏",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-API-SOURCE-BATCH-DELETE",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "4.57 批量删除数据源",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/assets/DataSourceController.java",
+          "symbol": "batchDelete",
+          "kind": "源码",
+          "method": "静态核对事务、结果及权限",
+          "status": "局部核对；目标环境未联调",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/assets/DataSourceStore.java",
+          "symbol": "deleteUnused、lockSources",
+          "kind": "源码",
+          "method": "静态核对引用检查",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-OPS-QUERY-LIMITS",
+      "document": "docs/delivery/08-部署运维说明书.md",
+      "section": "5 配置项及环境变量",
+      "sources": [
+        {
+          "path": "README.md",
+          "symbol": "配置项及环境变量",
+          "kind": "项目文档",
+          "method": "对照默认配置项",
+          "status": "静态核对；目标环境覆盖未验证",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/query/QueryConfiguration.java",
+          "symbol": "queryLimits",
+          "kind": "源码",
+          "method": "静态检查配置名及默认值",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/WorkflowConfiguration.java",
+          "symbol": "taskExecutionLimiter",
+          "kind": "源码",
+          "method": "静态检查配置名及默认值",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/query/QueryLimits.java",
+          "symbol": "QueryLimits、acquire",
+          "kind": "源码",
+          "method": "检查有效范围及并发获取策略",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/TaskExecutionLimiter.java",
+          "symbol": "TaskExecutionLimiter、acquire",
+          "kind": "源码",
+          "method": "检查有效范围及并发获取策略",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-SERVICE-CALL",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.14 数据服务外部调用",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/serviceapi/ExternalServiceController.java",
+          "symbol": "call",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/serviceapi/ServiceCatalogStore.java",
+          "symbol": "begin、complete",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-REPORT-RUN",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.15 报表执行",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/report/ReportController.java",
+          "symbol": "run、create、updateReport",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/report/ReportStore.java",
+          "symbol": "report",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetPolicyStore.java",
+          "symbol": "resolve",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-WORKFLOW-BACKFILL",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.16 工作流按日期补跑",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/WorkflowRunService.java",
+          "symbol": "backfill",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "发现兼容性风险，尚未端到端复现",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/workflow/TaskDefinitionValidator.java",
+          "symbol": "validate",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "frontend/src/OrchestratorEditor.vue",
+          "symbol": "definition、load",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-REALTIME-POLL",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.17 增量同步轮询",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/realtime/RealtimePoller.java",
+          "symbol": "poll、ready",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/realtime/RealtimeJobStore.java",
+          "symbol": "create、poll、start、stop、updateSettings",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/realtime/IncrementalSyncExecutor.java",
+          "symbol": "poll、execute、validateConfig",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-SECURITY-SESSION",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.18 会话登录与权限刷新",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/security/SecurityConfiguration.java",
+          "symbol": "securityFilterChain、userDetailsService",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/security/LoginGuardFilter.java",
+          "symbol": "doFilterInternal",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/security/ActiveUserFilter.java",
+          "symbol": "doFilterInternal",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-ORCH-DEFINITION",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.12—4.29 编排定义校验测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchDefinitionTest.java",
+          "symbol": "18 个 @Test 方法",
+          "kind": "源码",
+          "method": "逐方法读取测试输入及断言；对照 Surefire XML 的执行结果",
+          "status": "本地测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": ".doc-sync/reports/backend-surefire-summary.tsv",
+          "symbol": "OrchDefinitionTest 测试类汇总",
+          "kind": "测试报告",
+          "method": "核对本地测试类执行统计",
+          "status": "本地执行记录",
+          "baseline": "2026-11-27 本地测试"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-ORCH-EXECUTION-COMPLETE",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.30—4.36 编排 API 和执行器测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchDraftApiTest.java",
+          "symbol": "componentsRegistryMarksUnsupportedDisabled",
+          "kind": "源码",
+          "method": "对照测试输入和断言及 Surefire 结果",
+          "status": "本地测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/workflow/OrchTaskExecutorTest.java",
+          "symbol": "mergeUnionCombinesBranches、branchRoutesRowsAndDefaultCatchesRest、watermarkAdvancesOnlyOnSuccessAndReadsIncrementally、sourceMapSinkUpsertIsIdempotentOnRerun、sqlInjectionViaNamedParameterCannotChangeStructure、cleanTrimsDedupsAndDropsNulls",
+          "kind": "源码",
+          "method": "对照测试输入和断言及 Surefire 结果",
+          "status": "本地测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-DICTIONARY",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.37—4.42 字典模块测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/dictionary/DictionaryStoreTest.java",
+          "symbol": "4 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入和断言及 Surefire 结果",
+          "status": "本地测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/dictionary/DictionaryApiTest.java",
+          "symbol": "2 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入和断言及 Surefire 结果",
+          "status": "本地测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-OBJECT-OPERATIONS",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.43—4.52 数据对象存储及操作测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/dataobject/ObjectStoreTest.java",
+          "symbol": "3 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/dataobject/ObjectExecutionServiceTest.java",
+          "symbol": "3 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / 模拟测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/dataobject/ObjectSchemaServiceTest.java",
+          "symbol": "4 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / 模拟测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-OBJECT-DIALECT",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.53—4.57 对象方言及元数据测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/dataobject/ObjectDialectTest.java",
+          "symbol": "4 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地方言单元测试通过；非真实目标库验证",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/dataobject/ObjectMetadataTest.java",
+          "symbol": "distinguishesSchemasAndReadsPrimaryKeys",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-QUERY-PREVIEW",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.58—4.64 数据集明细及查询限制测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/query/DatasetQueryEngineTest.java",
+          "symbol": "4 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/query/QueryLimitsTest.java",
+          "symbol": "3 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-SECURITY-SESSION",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.65—4.75 登录会话安全测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/security/LoginSecurityTest.java",
+          "symbol": "3 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / MockMvc 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/security/DatabaseLoginTest.java",
+          "symbol": "7 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / MockMvc 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/security/SelfPasswordTest.java",
+          "symbol": "forcedInitialChangeBlocksApisUntilPasswordRotated",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / MockMvc 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-ANALYSIS-POLICY-SERVICE",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.76—4.84 聚合、数据策略与服务测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/query/AnalysisQueryEngineTest.java",
+          "symbol": "4 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/query/DatasetPolicyStoreTest.java",
+          "symbol": "3 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/serviceapi/ServiceCatalogStoreTest.java",
+          "symbol": "2 个 @Test 方法",
+          "kind": "源码",
+          "method": "对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 测试通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-QUERY-ANALYSIS",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.19 数据集分组聚合查询",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/query/AnalysisQueryEngine.java",
+          "symbol": "query、Query、Metric、Filter、Sort",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+          "symbol": "analysis",
+          "kind": "源码",
+          "method": "静态分析",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-API-QUERY-ANALYSIS-REVIEW",
+      "document": "docs/delivery/05-接口设计说明书.md",
+      "section": "4.151 数据集分组聚合",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/query/AnalysisQueryEngine.java",
+          "symbol": "query、Metric、Filter、Sort",
+          "kind": "源码",
+          "method": "静态核对参数、字段权限与结果",
+          "status": "局部核对；目标环境未联调",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/query/DatasetQueryController.java",
+          "symbol": "analysis",
+          "kind": "源码",
+          "method": "静态核对状态码",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-REALTIME",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "4.85—4.93 增量同步测试",
+      "sources": [
+        {
+          "path": "backend/src/test/java/com/example/governance/realtime/IncrementalSyncExecutorTest.java",
+          "symbol": "3 个 @Test 方法",
+          "kind": "源码",
+          "method": "逐项对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / 测试替身通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/realtime/RealtimeJobStoreTest.java",
+          "symbol": "2 个 @Test 方法",
+          "kind": "源码",
+          "method": "逐项对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / 测试替身通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/realtime/RealtimeJobSettingsTest.java",
+          "symbol": "3 个 @Test 方法",
+          "kind": "源码",
+          "method": "逐项对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / 测试替身通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/test/java/com/example/governance/realtime/RealtimeSettingsApiTest.java",
+          "symbol": "1 个 @Test 方法",
+          "kind": "源码",
+          "method": "逐项对照测试输入、断言及 Surefire 结果",
+          "status": "本地 H2 / 测试替身通过；目标环境未验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    },
+    {
+      "id": "DG-TEST-MYSQL-SKIPPED",
+      "document": "docs/delivery/09-测试与验收说明书.md",
+      "section": "5 专项测试 / 本地测试集中跳过的 MySQL 条件用例",
+      "sources": [
+        {
+          "path": ".doc-sync/reports/mysql-skipped-tests.json",
+          "symbol": "10 个 Surefire 跳过项及原因",
+          "kind": "测试报告",
+          "method": "读取本次 Surefire XML 的 skipped 节点",
+          "status": "未执行",
+          "baseline": "2026-11-27 本地测试"
+        }
+      ]
+    },
+    {
+      "id": "DG-OBJECT-SCHEMA",
+      "document": "docs/delivery/03-详细设计说明书.md",
+      "section": "3.20 数据对象结构预览与发布",
+      "sources": [
+        {
+          "path": "backend/src/main/java/com/example/governance/dataobject/ObjectSchemaService.java",
+          "symbol": "preview、execute、inspect、acknowledge、cancel",
+          "kind": "源码",
+          "method": "静态分析状态及跨库事务",
+          "status": "局部核对；真实数据库 DDL 待验",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        },
+        {
+          "path": "backend/src/main/java/com/example/governance/dataobject/ObjectController.java",
+          "symbol": "schemaPreview、schemaExecute、schemaActual",
+          "kind": "源码",
+          "method": "静态分析权限和控制器调用",
+          "status": "局部核对",
+          "baseline": "fb41721778aa17cb7c9b949f9cb3787c9902312d + 工作区"
+        }
+      ]
+    }
+  ]
+}

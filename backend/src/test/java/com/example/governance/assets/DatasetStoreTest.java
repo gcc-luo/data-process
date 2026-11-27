@@ -19,7 +19,7 @@ class DatasetStoreTest {
         var fields = List.of(new DatasetStore.Field("id", "BIGINT", false), new DatasetStore.Field("name", "VARCHAR", true));
         long id = store.create(1, "customers", null, "sales", "customers", fields);
         assertEquals(fields, store.fields(id));
-        assertThrows(IllegalArgumentException.class, () -> store.create(1, "bad", null, "sales", "customers", List.of(fields.getFirst(), fields.getFirst())));
+        assertThrows(IllegalArgumentException.class, () -> store.create(1, "bad", null, "sales", "customers", List.of(fields.get(0), fields.get(0))));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM datasets", Integer.class));
     }
     @Test void listingDoesNotAcquireASecondConnectionWhileStreamingResults() {
@@ -33,7 +33,7 @@ class DatasetStoreTest {
             jdbc.update("INSERT INTO data_sources(id,name,source_type,version_profile,host,port,database_name,username,password_cipher) VALUES (1,'db','MYSQL','MYSQL:8.x','localhost',3306,'db','u','cipher')");
             var store = new DatasetStore(jdbc, new DataSourceTransactionManager(db));
             store.create(1, "orders", null, null, "orders", List.of(new DatasetStore.Field("id", "BIGINT", false)));
-            assertEquals("id", store.list().getFirst().fields().getFirst().name());
+            assertEquals("id", store.list().get(0).fields().get(0).name());
         }
     }
     @Test void refreshOnlyAddsNewFieldsAndRejectsBreakingChangesAtomically() {

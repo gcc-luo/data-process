@@ -37,7 +37,8 @@ public final class WorkflowWorker {
         while (true) {
             var ready = runs.claimReady(runId);
             if (ready.isEmpty()) return;
-            try (var branches = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var branches = java.util.concurrent.Executors.newFixedThreadPool(Math.max(1, ready.size()));
+            try {
                 var futures = ready.stream().map(key -> branches.submit(() -> {
                     try (var permit = limiter.acquire()) { executeNode(runId, snapshot.businessDate(), key, nodes.get(key)); }
                     return null;
@@ -48,6 +49,8 @@ public final class WorkflowWorker {
                 throw new IllegalStateException("Worker interrupted", ex);
             } catch (java.util.concurrent.ExecutionException ex) {
                 throw new IllegalStateException("Branch execution failed", ex.getCause());
+            } finally {
+                branches.shutdown();
             }
 
         }

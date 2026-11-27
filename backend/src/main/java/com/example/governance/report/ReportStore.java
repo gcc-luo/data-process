@@ -76,7 +76,7 @@ public final class ReportStore {
         var names = jdbc.queryForList("SELECT name FROM dashboards WHERE owner_id=? AND id=?", String.class, owner, id);
         if (names.isEmpty()) return Optional.empty();
         var reports = jdbc.queryForList("SELECT report_id FROM dashboard_reports WHERE dashboard_id=? ORDER BY ordinal_no", Long.class, id);
-        return Optional.of(new Dashboard(id, names.getFirst(), reports));
+        return Optional.of(new Dashboard(id, names.get(0), reports));
     }
     public List<Dashboard> dashboards(long owner) {
         var ids = jdbc.queryForList("SELECT id FROM dashboards WHERE owner_id=? ORDER BY id", Long.class, owner);

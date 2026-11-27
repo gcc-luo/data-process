@@ -58,7 +58,7 @@ public final class WorkflowRunStore {
     public java.util.Optional<RunView> view(long runId) {
         var rows = jdbc.query("SELECT workflow_id,workflow_version,business_date,state FROM workflow_runs WHERE id=?", (rs, row) -> new RunView(runId, rs.getLong(1), rs.getInt(2), rs.getDate(3).toLocalDate(), rs.getString(4), List.of()), runId);
         if (rows.isEmpty()) return java.util.Optional.empty();
-        var run = rows.getFirst();
+        var run = rows.get(0);
         var basic = jdbc.query("SELECT node_key,state FROM workflow_run_nodes WHERE run_id=? ORDER BY node_key", (rs, row) -> new NodeView(rs.getString(1), rs.getString(2), List.of()), runId);
         var attempts = jdbc.query("SELECT node_key,attempt_no,state,started_at,finished_at,error_message FROM workflow_node_attempts WHERE run_id=? ORDER BY node_key,attempt_no", (rs, row) -> new java.util.AbstractMap.SimpleImmutableEntry<>(rs.getString(1), new AttemptView(rs.getInt(2), rs.getString(3), rs.getTimestamp(4).toLocalDateTime(), rs.getTimestamp(5) == null ? null : rs.getTimestamp(5).toLocalDateTime(), rs.getString(6))), runId);
         var grouped = attempts.stream().collect(java.util.stream.Collectors.groupingBy(java.util.Map.Entry::getKey, java.util.stream.Collectors.mapping(java.util.Map.Entry::getValue, java.util.stream.Collectors.toList())));
@@ -98,7 +98,7 @@ public final class WorkflowRunStore {
             var run = lock(runId);
             if (!Set.of("RUNNING", "FAILED", "WAITING").contains(run.state())) return false;
             var states = jdbc.queryForList("SELECT state FROM workflow_run_nodes WHERE run_id=? AND node_key=?", String.class, runId, node);
-            if (states.isEmpty() || !states.getFirst().equals("FAILED")) return false;
+            if (states.isEmpty() || !states.get(0).equals("FAILED")) return false;
             Integer attempt = jdbc.queryForObject("SELECT COALESCE(MAX(attempt_no),0) FROM workflow_node_attempts WHERE run_id=? AND node_key=?", Integer.class, runId, node);
             if (attempt > maxRetries) return false;
             long retryAt = now.plusSeconds(delaySeconds).toEpochMilli();

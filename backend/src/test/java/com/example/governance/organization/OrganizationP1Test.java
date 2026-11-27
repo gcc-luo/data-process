@@ -68,7 +68,7 @@ class OrganizationP1Test {
         f.org.setRoles(user, java.util.Set.of(role));
         var listed = f.org.roleUsers(role);
         assertEquals(1, listed.size());
-        assertEquals("alice", listed.getFirst().username());
+        assertEquals("alice", listed.get(0).username());
         assertThrows(IllegalArgumentException.class, () -> f.org.roleUsers(999L));
     }
 

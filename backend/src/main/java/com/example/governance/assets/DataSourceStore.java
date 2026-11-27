@@ -100,7 +100,7 @@ public final class DataSourceStore {
         if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Source lock requires a transaction");
         var rows = jdbc.query("SELECT name,version_profile,host,port,database_name,username,driver_id,extra_options,password_cipher FROM data_sources WHERE id=? FOR UPDATE", (rs, row) -> new java.util.AbstractMap.SimpleImmutableEntry<>(definition(rs), rs.getString("password_cipher")), id);
         if (rows.isEmpty()) throw new IllegalArgumentException("Unknown data source");
-        return new LockedCredentials(rows.getFirst().getKey(), cipher.decrypt(rows.getFirst().getValue()));
+        return new LockedCredentials(rows.get(0).getKey(), cipher.decrypt(rows.get(0).getValue()));
     }
     String passwordForExecution(long id) throws GeneralSecurityException {
         String encrypted = jdbc.queryForObject("SELECT password_cipher FROM data_sources WHERE id=?", String.class, id);
