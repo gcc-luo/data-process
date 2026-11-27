@@ -35,11 +35,15 @@ export function startOrchGuide() {
       label.className = 'orch-guide-optout'
       const checkbox = document.createElement('input')
       checkbox.type = 'checkbox'
-      checkbox.checked = dontShow
+      checkbox.checked = false
       checkbox.addEventListener('change', () => { dontShow = checkbox.checked })
       label.appendChild(checkbox)
-      label.appendChild(document.createTextNode(' 不再提示'))
+      label.appendChild(document.createTextNode(' 我已熟悉，跳过引导'))
       popover.footer.insertBefore(label, popover.footer.firstChild)
+    },
+    onNextClick: () => {
+      if (dontShow) { instance.destroy(); return false }
+      return true
     },
     onDestroyed: () => { if (dontShow) dismissGuide() }
   })

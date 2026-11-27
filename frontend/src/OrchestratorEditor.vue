@@ -726,6 +726,6 @@ onBeforeUnmount(() => {
 .orch-guide-popover .driver-popover-prev-btn{background:#fff;border:1px solid #dce4ed;color:#5a6b82}
 .orch-guide-popover .driver-popover-next-btn{background:#2f7fd1;border:1px solid #2f7fd1;color:#fff}
 .orch-guide-popover .driver-popover-close-btn{color:#9aa4b2}
-.orch-guide-optout{display:flex;align-items:center;gap:5px;font-size:12px;color:#8a94a6;cursor:pointer;margin-right:auto;user-select:none}
+.orch-guide-optout{display:flex;align-items:center;gap:5px;font-size:12px;color:#8a94a6;cursor:pointer;margin-right:auto;user-select:none;white-space:nowrap}
 .orch-guide-optout input{accent-color:#2f7fd1;cursor:pointer;margin:0}
 </style>
