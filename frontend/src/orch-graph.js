@@ -248,7 +248,7 @@ export function isConfigured(component, config = {}) {
 }
 
 /** VueFlow 节点适配。nodeStates: Map nodeId→state；issues: Set nodeId 有校验错误。 */
-export function toVueNodes(definition, byType, { nodeStates = new Map(), selectedId = null, issueIds = new Set(), running = false } = {}) {
+export function toVueNodes(definition, byType, { nodeStates = new Map(), selectedId = null, issueIds = new Set(), running = false, canDelete = false, onDeleteNode = null } = {}) {
   return (definition.nodes || []).map(n => {
     const component = byType.get(n.component)
     return {
@@ -264,7 +264,9 @@ export function toVueNodes(definition, byType, { nodeStates = new Map(), selecte
         enabled: n.enabled !== false,
         state: nodeStates.get(n.id) || null,
         hasIssue: issueIds.has(n.id),
-        readonly: running
+        readonly: running,
+        canDelete: canDelete && !running,
+        onDelete: onDeleteNode ? () => onDeleteNode(n.id) : null
       }
     }
   })

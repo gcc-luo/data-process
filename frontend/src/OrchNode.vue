@@ -53,6 +53,11 @@ const status = computed(() => {
         <span v-else class="spinner"></span>
       </span>
     </div>
+    <button v-if="data.canDelete" type="button" class="node-delete nodrag nopan"
+            :aria-label="`删除节点 ${node.name}`" title="删除节点及相连连线（可撤销）"
+            @click.stop.prevent="data.onDelete?.()">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+    </button>
     <div class="node-summary" :title="data.summary">{{ data.summary || '未配置' }}</div>
     <div v-if="outPorts.length > 1" class="node-ports">
       <div v-for="p in outPorts" :key="p.id" class="port-row">
@@ -86,6 +91,13 @@ const status = computed(() => {
 .node-type{font-size:11px;color:#8a94a6}
 .node-status{flex:none;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .node-status svg{width:12px;height:12px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.node-delete{position:absolute;z-index:2;top:-9px;right:-9px;width:22px;height:22px;padding:0;display:flex;align-items:center;justify-content:center;border:2px solid #fff;border-radius:50%;background:#f04438;color:#fff;cursor:pointer;opacity:0;pointer-events:none;transform:scale(.86);box-shadow:0 1px 4px rgba(130,30,30,.28);transition:opacity .14s,transform .14s,background-color .14s}
+.node-delete svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
+.orch-node:hover .node-delete,.orch-node:focus-within .node-delete{opacity:1;pointer-events:auto;transform:scale(1);animation:node-delete-pulse 1.35s ease-in-out infinite}
+.node-delete:hover{background:#d9363e}
+.node-delete:focus-visible{outline:2px solid var(--el-color-primary);outline-offset:2px}
+@keyframes node-delete-pulse{0%,100%{box-shadow:0 1px 4px rgba(130,30,30,.28),0 0 0 0 rgba(240,68,56,.3)}50%{box-shadow:0 1px 4px rgba(130,30,30,.28),0 0 0 5px rgba(240,68,56,.12)}}
+@media (prefers-reduced-motion:reduce){.node-delete,.orch-node:hover .node-delete,.orch-node:focus-within .node-delete{animation:none;transition:none}}
 .st-ready,.st-success{background:#3aa76d}
 .st-warning,.st-empty{background:#e6a23c}
 .st-failed{background:#e05656}

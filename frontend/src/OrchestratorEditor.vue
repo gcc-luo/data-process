@@ -74,7 +74,7 @@ const selectedNodeLogs = computed(() => consoleLogs.value.filter(l => l.nodeKey 
 const selectedNodeState = computed(() => nodeStatesMap.value.get(selectedId.value) || null)
 const sourceFields = ref([]), targetFields = ref([]), tables = ref([]), tablesLoading = ref(false), tablesSourceId = ref(null)
 
-const vueNodes = computed(() => toVueNodes(definition, byType.value, { nodeStates: nodeStatesMap.value, selectedId: selectedId.value, issueIds: issueIds.value, running: readonly.value }))
+const vueNodes = computed(() => toVueNodes(definition, byType.value, { nodeStates: nodeStatesMap.value, selectedId: selectedId.value, issueIds: issueIds.value, running: readonly.value, canDelete: canEdit.value, onDeleteNode: removeNode }))
 const vueEdges = computed(() => toVueEdges(definition, { selectedEdgeId: selectedEdgeId.value }))
 const zoomPercent = ref(100)
 const metricState = computed(() => runDetail.value ? ({ SUCCEEDED: '成功', FAILED: '失败', RUNNING: '运行中', INTERRUPTED: '已中断', PENDING: '排队' }[runDetail.value.state] || runDetail.value.state) : (publishedVersion.value > 0 ? '已发布' : '草稿'))
